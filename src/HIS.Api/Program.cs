@@ -20,6 +20,9 @@ builder.Services.AddInfrastructure();     // Dapper repositories (config-driven 
 // Per-request branch/user context (SRS §3.21). Populated by BranchContextMiddleware.
 builder.Services.AddScoped<IBranchContext, BranchContext>();
 
+// L1.2 — ensure a platform superadmin exists on startup (config-driven bootstrap).
+builder.Services.AddHostedService<HIS.Api.Startup.SuperAdminSeeder>();
+
 // JWT auth — all parameters come from config (SRS §8.1, nothing hardcoded).
 var jwt = builder.Configuration.GetSection("Jwt");
 var signingKey = jwt["SigningKey"];

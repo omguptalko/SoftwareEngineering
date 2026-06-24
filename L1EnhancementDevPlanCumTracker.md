@@ -94,21 +94,36 @@ Plus the agreed item: **add a superadmin login with RBAC.**
 
 ---
 
+## 4a. L1 Build Status (live)
+
+**Control plane provisioned and the superadmin login works end-to-end.** Solution builds clean (`dotnet build HIS.sln` → 0 errors); `HIS_Platform` migrates idempotently on MS SQL LocalDB.
+
+Implemented & verified so far:
+- **L1.0 control plane** — `HIS_Platform` DB created with **proper schemas** `platform` / `security` / `audit` (`db/platform/P0001_platform_core.sql`). Tables: `platform.Tenant` (per-tenant fiscal-year start = D1), `FiscalYear`, `TenantDomain`, `DbCatalog` (D2/D5 routing), `Subscription`, `BillingLedger`, `TenantModule`; full **dynamic RBAC** set `security.AppUser/Role/Permission/RolePermission/UserRole/AppModule/AppPage/PageAction/RoleModule/RolePage/RolePageAction`; `audit.PlatformAudit`. Runner `db/platform/run-platform-migrations.ps1`.
+- **L1.1 schemas (control-plane)** — schema set defined & applied; **0 `dbo` objects** in `HIS_Platform`. (Tenant data-plane re-schema of the 90 `dbo` tables is deferred to the provisioning work, per D7 parallel-build.)
+- **L1.2 superadmin + login** — PBKDF2 `PasswordHasher` (config-driven iterations), `JwtTokenIssuer` (key/issuer/audience/expiry from `Jwt:*`), `PlatformConnectionFactory` + `PlatformUserRepository`, `LoginCommand`/`LoginHandler`, `POST /api/auth/login`, and a startup `SuperAdminSeeder` (creates the superadmin from `Platform:Bootstrap:*`, hashed — no SQL-embedded password). **Closes parent tracker 0.6 (token issuance).** Verified: login → JWT with `uid/name/role/superadmin` claims (200); wrong password & unknown user → 401; empty fields → 400; every attempt written to `audit.PlatformAudit` (seed + success + 2 failures observed).
+
+Pending in these phases: tenant-role permission grants (depends on L1.3 module/page model), MFA for privileged roles (L1.2.5), RBAC authorization pipeline behavior (L1.2.6), login UI wiring (L1.2.7), and the tenant-DB schema refactor (L1.1.2–4).
+
+> **Dev-only note:** `appsettings.Development.json` now carries a dev `Jwt:SigningKey` and a bootstrap superadmin password (`ChangeMe!2026`). Both are **dev placeholders** — prod must supply them via environment / Key Vault, and the superadmin must rotate the password on first login (future task).
+
+---
+
 ## 5. PHASED L1 PLAN & TRACKER
 
 ### Phase L1.0 — Control-plane foundation
 | # | Task | Maps to | Status | Notes |
 |---|------|---------|--------|-------|
-| L1.0.1 | Create `HIS_Platform` DB + `platform`/`security`/`audit` schemas | R3,R4,R5 | ⬜ | New migration set `db/platform/` |
-| L1.0.2 | `platform.Tenant` (hospital), `platform.Hospital` profile, `platform.DbCatalog` (tenant+FY→DB name/conn) | R4,R5 | ⬜ | DbCatalog is the routing source of truth |
-| L1.0.3 | `platform.FiscalYear` (Code, StartDate, EndDate — boundaries config-driven, NOT hardcoded) + `platform.TenantFiscalYear` | R3,R4 | ⬜ | India default Apr1–Mar31 via config; see D1 |
-| L1.0.4 | `platform.TenantDomain` (host, IsPrimary, IsCommon) + `platform.Subscription` + `platform.BillingLedger` | R3,R5 | ⬜ | per-FY billing rows |
-| L1.0.5 | `platform.TenantModule` entitlements (tenant × fiscalYear × module, enabled flag) | R3 | ⬜ | drives "modules vary by FY" |
+| L1.0.1 | Create `HIS_Platform` DB + `platform`/`security`/`audit` schemas | R3,R4,R5 | 🟩 | `db/platform/P0001`; idempotent, verified |
+| L1.0.2 | `platform.Tenant` + `platform.DbCatalog` (tenant+FY→DB name/conn) | R4,R5 | 🟩 | DbCatalog is the routing source of truth |
+| L1.0.3 | `platform.FiscalYear` (Code, StartDate, EndDate — config-driven) + per-tenant FY start on `Tenant` | R3,R4 | 🟩 | D1 baked in (FyStartMonth/Day, default Apr 1) |
+| L1.0.4 | `platform.TenantDomain` (host, IsPrimary, IsCommon) + `platform.Subscription` + `platform.BillingLedger` | R3,R5 | 🟩 | tables done; per-FY billing logic pending (L1.4.2) |
+| L1.0.5 | `platform.TenantModule` entitlements (tenant × fiscalYear × module, enabled flag) | R3 | 🟩 | table done; enforcement pending (L1.3.5) |
 
 ### Phase L1.1 — Schema reorganisation (R1, R2)
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| L1.1.1 | Define schema set: `master`, `patient`, `clinical`, `diagnostics`, `pharmacy`, `inventory`, `billing`, `insurance`, `scheme`, `hr`, `occhealth`, `telemedicine`, `support`, `abdm`, `ai`, `compliance`, `audit`, `seq`/`proc` | ⬜ | see §6 map |
+| L1.1.1 | Define schema set: `master`, `patient`, `clinical`, `diagnostics`, `pharmacy`, `inventory`, `billing`, `insurance`, `scheme`, `hr`, `occhealth`, `telemedicine`, `support`, `abdm`, `ai`, `compliance`, `audit`, `seq`/`proc` | 🟦 | control-plane schemas live (`platform`/`security`/`audit`); tenant schema set defined in §6, applied during provisioning |
 | L1.1.2 | Refactor `db/migrations/0001…0013` to schema-qualified `CREATE`s (split master-DB vs data-DB scripts) | ⬜ | keep idempotency |
 | L1.1.3 | Update **every** Dapper query in `src/HIS.Infrastructure/Persistence/*Repositories.cs` to schema-qualified names | ⬜ | grep `dbo.` → 0 hits when done |
 | L1.1.4 | Move `usp_NextUhid`/`usp_NextDocNo` to `proc`/`master`; fiscal-year-aware counters | ⬜ | ties to L1.4 |
@@ -116,10 +131,10 @@ Plus the agreed item: **add a superadmin login with RBAC.**
 ### Phase L1.2 — Superadmin + Authentication + RBAC login
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| L1.2.1 | Password hashing (PBKDF2/BCrypt) — fills existing `AppUser.PasswordHash/PasswordSalt` | ⬜ | columns already exist (`0001:76-77`) |
-| L1.2.2 | `POST /api/auth/login` → validate creds, mint JWT (closes parent tracker **0.6**) | ⬜ | issuer/audience/key from config |
-| L1.2.3 | Seed **superadmin** user + `superadmin` role + full permission grants | ⬜ | platform `security` schema |
-| L1.2.4 | Seed **Permission** rows + `RolePermission` for the 14 roles (currently empty — A4) | ⬜ | RBAC becomes enforceable |
+| L1.2.1 | Password hashing (PBKDF2) — `PasswordHasher`, config-driven iterations | 🟩 | `src/HIS.Infrastructure/Security/PasswordHasher.cs`; verified |
+| L1.2.2 | `POST /api/auth/login` → validate creds, mint JWT (closes parent tracker **0.6**) | 🟩 | `JwtTokenIssuer` + `AuthController`; verified 200/401/400 |
+| L1.2.3 | Seed **superadmin** user + `superadmin` role + full permission grants | 🟩 | startup `SuperAdminSeeder` (config bootstrap) + `P0100` grants all perms to superadmin |
+| L1.2.4 | Seed **Permission** rows + `RolePermission` | 🟦 | platform perms + superadmin grants done; **14 tenant-role** grants pending (need L1.3 page model) |
 | L1.2.5 | MFA for privileged roles (`IsPrivileged`) + AES/TLS posture (parent **0.7**) | ⬜ | |
 | L1.2.6 | RBAC **authorization pipeline behavior** (parent **0.2** authz pending) | ⬜ | enforce permission per command |
 | L1.2.7 | Login UI wired in wireframe (`app/login.html` exists, currently static) | ⬜ | |

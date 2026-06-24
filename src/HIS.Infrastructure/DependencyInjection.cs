@@ -1,5 +1,7 @@
 using HIS.Application.Abstractions;
 using HIS.Infrastructure.Persistence;
+using HIS.Infrastructure.Platform;
+using HIS.Infrastructure.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HIS.Infrastructure;
@@ -11,6 +13,12 @@ public static class DependencyInjection
     {
         services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
         services.AddScoped<IAuditWriter, AuditWriter>();
+
+        // L1 control plane (HIS_Platform): identity + auth.
+        services.AddSingleton<IPlatformConnectionFactory, PlatformConnectionFactory>();
+        services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        services.AddSingleton<IJwtTokenIssuer, JwtTokenIssuer>();
         services.AddScoped<IModuleRegistryRepository, ModuleRegistryRepository>();
         services.AddScoped<ILookupRepository, LookupRepository>();
         services.AddScoped<IPatientRepository, PatientRepository>();
