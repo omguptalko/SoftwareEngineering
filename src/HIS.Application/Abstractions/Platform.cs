@@ -37,4 +37,15 @@ public interface IPlatformUserRepository
     Task AssignRoleAsync(long userId, int roleId, CancellationToken ct = default);
     Task WritePlatformAuditAsync(long? actorUserId, string? actorUserName, int? tenantId,
         string action, string entity, string? entityId, bool succeeded, string? error, CancellationToken ct = default);
+    Task<IReadOnlyList<(DateTime OccurredUtc, string? Actor, string Action, string Entity, string? EntityId, bool Succeeded)>>
+        GetRecentAuditAsync(int take, CancellationToken ct = default);
+}
+
+/// <summary>
+/// Resolves the effective permission codes for a set of role codes, from the
+/// control-plane RolePermission grants (L1.2.6). Used by the AuthorizationBehavior.
+/// </summary>
+public interface IPermissionResolver
+{
+    Task<IReadOnlySet<string>> GetPermissionsAsync(IEnumerable<string> roleCodes, CancellationToken ct = default);
 }

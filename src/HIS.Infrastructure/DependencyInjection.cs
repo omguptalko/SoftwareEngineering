@@ -17,6 +17,7 @@ public static class DependencyInjection
         // L1 control plane (HIS_Platform): identity + auth.
         services.AddSingleton<IPlatformConnectionFactory, PlatformConnectionFactory>();
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
+        services.AddScoped<IPermissionResolver, PermissionResolver>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenIssuer, JwtTokenIssuer>();
         services.AddScoped<IModuleRegistryRepository, ModuleRegistryRepository>();

@@ -17,3 +17,13 @@ public interface IAuditable
     string AuditEntity { get; }
     string? AuditEntityId { get; }
 }
+
+/// <summary>
+/// Opt-in marker: requests implementing this are gated by the AuthorizationBehavior
+/// (L1.2.6 RBAC). The caller must be authenticated AND hold <see cref="RequiredPermission"/>
+/// (a platform/security permission code), unless they are the platform superadmin.
+/// </summary>
+public interface IAuthorizable
+{
+    string RequiredPermission { get; }
+}

@@ -68,6 +68,18 @@ app.Use(async (ctx, next) =>
             errors = vex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage })
         });
     }
+    catch (System.Security.Authentication.AuthenticationException aex)
+    {
+        // RBAC: caller not authenticated (L1.2.6).
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        await ctx.Response.WriteAsJsonAsync(new { title = aex.Message });
+    }
+    catch (UnauthorizedAccessException uex)
+    {
+        // RBAC: authenticated but lacks the required permission (L1.2.6).
+        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await ctx.Response.WriteAsJsonAsync(new { title = uex.Message });
+    }
     catch (InvalidOperationException iex)
     {
         ctx.Response.StatusCode = StatusCodes.Status409Conflict;

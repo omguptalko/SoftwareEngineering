@@ -38,39 +38,68 @@ public sealed class SuperAdminSeeder : IHostedService
 
         try
         {
-            if (await users.GetByUserNameAsync(userName, ct) is not null)
+            if (await users.GetByUserNameAsync(userName, ct) is null)
+            {
+                var (hash, salt) = hasher.Hash(password);
+                var userId = await users.InsertUserAsync(new PlatformUser
+                {
+                    TenantId = null,
+                    UserName = userName,
+                    DisplayName = display,
+                    Email = email,
+                    PasswordHash = hash,
+                    PasswordSalt = salt,
+                    IsSuperAdmin = true,
+                    IsActive = true
+                }, ct);
+
+                var roleId = await users.GetRoleIdByCodeAsync("superadmin", ct)
+                    ?? throw new InvalidOperationException("Role 'superadmin' is not seeded (run db/platform migrations).");
+                await users.AssignRoleAsync(userId, roleId, ct);
+
+                await users.WritePlatformAuditAsync(userId, userName, null, "SeedSuperAdmin", "AppUser",
+                    userId.ToString(), succeeded: true, error: null, ct);
+
+                _log.LogInformation("SuperAdmin '{User}' created (id {Id}).", userName, userId);
+            }
+            else
             {
                 _log.LogInformation("SuperAdmin '{User}' already present.", userName);
-                return;
             }
 
-            var (hash, salt) = hasher.Hash(password);
-            var userId = await users.InsertUserAsync(new PlatformUser
-            {
-                TenantId = null,
-                UserName = userName,
-                DisplayName = display,
-                Email = email,
-                PasswordHash = hash,
-                PasswordSalt = salt,
-                IsSuperAdmin = true,
-                IsActive = true
-            }, ct);
-
-            var roleId = await users.GetRoleIdByCodeAsync("superadmin", ct)
-                ?? throw new InvalidOperationException("Role 'superadmin' is not seeded (run db/platform migrations).");
-            await users.AssignRoleAsync(userId, roleId, ct);
-
-            await users.WritePlatformAuditAsync(userId, userName, null, "SeedSuperAdmin", "AppUser",
-                userId.ToString(), succeeded: true, error: null, ct);
-
-            _log.LogInformation("SuperAdmin '{User}' created (id {Id}).", userName, userId);
+            // Optional dev demo user (non-privileged) to exercise RBAC 403 paths.
+            await SeedDemoUserAsync(users, hasher, ct);
         }
         catch (Exception ex)
         {
             // Don't crash the app if the platform DB isn't migrated yet; log and continue.
-            _log.LogWarning(ex, "SuperAdmin bootstrap failed (is HIS_Platform migrated?).");
+            _log.LogWarning(ex, "Platform bootstrap failed (is HIS_Platform migrated?).");
         }
+    }
+
+    private async Task SeedDemoUserAsync(IPlatformUserRepository users, IPasswordHasher hasher, CancellationToken ct)
+    {
+        var demoUser = _config["Platform:Bootstrap:DemoUser:UserName"];
+        var demoPass = _config["Platform:Bootstrap:DemoUser:Password"];
+        var demoRole = _config["Platform:Bootstrap:DemoUser:Role"] ?? "billing";
+        if (string.IsNullOrWhiteSpace(demoUser) || string.IsNullOrWhiteSpace(demoPass)) return;
+        if (await users.GetByUserNameAsync(demoUser, ct) is not null) return;
+
+        var (hash, salt) = hasher.Hash(demoPass);
+        var userId = await users.InsertUserAsync(new PlatformUser
+        {
+            TenantId = null,
+            UserName = demoUser,
+            DisplayName = _config["Platform:Bootstrap:DemoUser:DisplayName"] ?? demoUser,
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            IsSuperAdmin = false,
+            IsActive = true
+        }, ct);
+
+        var roleId = await users.GetRoleIdByCodeAsync(demoRole, ct);
+        if (roleId is int rid) await users.AssignRoleAsync(userId, rid, ct);
+        _log.LogInformation("Demo user '{User}' (role {Role}) created (id {Id}).", demoUser, demoRole, userId);
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
