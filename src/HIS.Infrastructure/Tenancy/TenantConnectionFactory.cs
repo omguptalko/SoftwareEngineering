@@ -84,7 +84,7 @@ public sealed class TenantScopedRepository : ITenantScopedRepository
             "EXEC [proc].usp_NextDocNo @BranchId=1, @DocType='BILL', @Prefix='BILL', @FyCode=@fy",
             new { fy = _tenant.FiscalYearCode }, cancellationToken: ct));
         var id = await c.QuerySingleAsync<long>(new CommandDefinition(
-            @"INSERT INTO billing.Bill (BillNo, Gross, PatientPays, Status)
+            @"INSERT INTO billing.Bill (BillNo, GrossAmount, PatientPays, Status)
               VALUES (@billNo, @gross, @gross, 'Open');
               SELECT CAST(SCOPE_IDENTITY() AS BIGINT);",
             new { billNo, gross }, cancellationToken: ct));
@@ -95,7 +95,7 @@ public sealed class TenantScopedRepository : ITenantScopedRepository
     {
         using var c = await _f.OpenDataAsync(ct);
         var rows = await c.QueryAsync<(long, string, decimal, string)>(new CommandDefinition(
-            "SELECT BillId, BillNo, Gross, Status FROM billing.Bill ORDER BY BillId", cancellationToken: ct));
+            "SELECT BillId, BillNo, GrossAmount AS Gross, Status FROM billing.Bill ORDER BY BillId", cancellationToken: ct));
         return rows.ToList();
     }
 }
