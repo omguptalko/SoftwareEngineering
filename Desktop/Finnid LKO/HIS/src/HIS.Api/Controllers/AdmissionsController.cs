@@ -1,0 +1,26 @@
+using HIS.Application.Features.Ipd;
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
+
+namespace HIS.Api.Controllers;
+
+[ApiController]
+[Route("api/ipd")]
+public sealed class AdmissionsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    public AdmissionsController(IMediator mediator) => _mediator = mediator;
+
+    /// <summary>Live bed board with occupants (SRS §3.4).</summary>
+    [HttpGet("bedboard")]
+    public Task<IReadOnlyList<BedDto>> BedBoard(CancellationToken ct) => _mediator.Send(new GetBedBoardQuery(), ct);
+
+    [HttpPost("admit")]
+    public Task<AdmitPatientResult> Admit([FromBody] AdmitPatientCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    [HttpPost("transfer")]
+    public Task<bool> Transfer([FromBody] TransferBedCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    [HttpPost("discharge")]
+    public Task<bool> Discharge([FromBody] DischargePatientCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+}
