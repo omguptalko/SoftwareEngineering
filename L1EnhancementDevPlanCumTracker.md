@@ -202,7 +202,7 @@ Pending in these phases: tenant-role *permission* grants (platform permission se
 |---|------|--------|-------|
 | L1.8.1 | Schema-split tenant templates (master + per-FY) | 🟩 | **all ~90 tenant tables** split across master (35) + per-FY (45) planes; fresh provision verified (DEV_Master + DEV_FY) |
 | L1.8.2 | Seed real tenants through the provisioning path | 🟩 | DEV auto-provisioned at startup; ACME/FINN via API — verified |
-| L1.8.3 | Cut over repositories to `ITenantConnectionFactory` (schema-qualified) | 🟦 | **`LookupRepository` cut over** (7 master lookups → tenant master DB), verified via marker-row routing proof + no regression; remaining repos pending |
+| L1.8.3 | Cut over repositories to `ITenantConnectionFactory` (schema-qualified) | 🟦 | **read-only repos cut over & verified by marker-row routing proofs:** `LookupRepository` → tenant master (7 lookups), `DashboardRepository` → tenant current-FY `analytics`. Write-aggregate repos = L1.8.5 big-bang |
 | L1.8.4 | Data backfill `dbo` → tenant DBs (identity-preserving) | 🟩 | `migrate/Backfill_DEV_from_dbo.sql`; verified row-count parity (6 patients etc.) into DEV_Master/DEV_FY |
 | L1.8.5 | Write-aggregate repository cutover (big-bang) + retire single-DB factory + docs | ⬜ | ~25 repos must switch together (dbo FKs bind all to Patient/Branch); 1 design item: pharmacy dispense is cross-plane (Drug master + DrugBatch FY) |
 
