@@ -100,4 +100,13 @@ public interface ITenantAdminRepository
     Task CopyModuleEntitlementsAsync(int tenantId, int fromFiscalYearId, int toFiscalYearId, CancellationToken ct = default);
     Task<IReadOnlyList<(int TenantId, string Code, string Name, string? FyCode, string DbKind, string DbName)>> GetTenantsAsync(CancellationToken ct = default);
     Task<(int TenantId, string Code)?> ResolveTenantByHostAsync(string host, CancellationToken ct = default);
+    /// <summary>Full routing for a host (own domain or registered common-domain alias).</summary>
+    Task<TenantRouting?> GetRoutingByHostAsync(string host, CancellationToken ct = default);
+    /// <summary>Full routing for a tenant code (common-domain subdomain / explicit hint).</summary>
+    Task<TenantRouting?> GetRoutingByCodeAsync(string code, CancellationToken ct = default);
 }
+
+/// <summary>A tenant's resolved databases for the current fiscal year (L1.6).</summary>
+public sealed record TenantRouting(
+    int TenantId, string Code, string? MasterDb,
+    int? CurrentFiscalYearId, string? CurrentFiscalYearCode, string? DataDb);

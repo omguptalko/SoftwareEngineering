@@ -27,6 +27,9 @@ builder.Services.AddInfrastructure();     // Dapper repositories (config-driven 
 // Per-request branch/user context (SRS §3.21). Populated by BranchContextMiddleware.
 builder.Services.AddScoped<IBranchContext, BranchContext>();
 
+// Per-request tenant routing (L1.6). Populated by TenantResolutionMiddleware.
+builder.Services.AddScoped<ITenantContext, TenantContext>();
+
 // L1.2 — ensure a platform superadmin exists on startup (config-driven bootstrap).
 builder.Services.AddHostedService<HIS.Api.Startup.SuperAdminSeeder>();
 
@@ -113,6 +116,7 @@ if (!string.IsNullOrWhiteSpace(signingKey))
     app.UseAuthorization();
 }
 app.UseMiddleware<BranchContextMiddleware>();
+app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.MapControllers();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", utc = DateTime.UtcNow }));
