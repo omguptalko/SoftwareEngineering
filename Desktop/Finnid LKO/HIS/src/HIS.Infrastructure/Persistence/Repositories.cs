@@ -180,23 +180,25 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
 
 public sealed class DashboardRepository : IDashboardRepository
 {
-    private readonly IDbConnectionFactory _f;
-    public DashboardRepository(IDbConnectionFactory f) => _f = f;
+    // L1.8 step 3 (read-only cutover): dashboard snapshots are fiscal-scoped →
+    // served from the resolved tenant's current-FY DB (analytics.* schema).
+    private readonly ITenantConnectionFactory _f;
+    public DashboardRepository(ITenantConnectionFactory f) => _f = f;
 
     public async Task<IReadOnlyList<(string, string, string)>> GetKpisAsync(int branchId, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         var rows = await c.QueryAsync<(string, string, string)>(new CommandDefinition(
-            @"SELECT [Value], Label, Trend FROM dbo.DashboardKpi WHERE BranchId = @branchId ORDER BY SortOrder",
+            @"SELECT [Value], Label, Trend FROM analytics.DashboardKpi WHERE BranchId = @branchId ORDER BY SortOrder",
             new { branchId }, cancellationToken: ct));
         return rows.ToList();
     }
 
     public async Task<IReadOnlyList<(string, int, decimal)>> GetServiceActivityAsync(int branchId, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         var rows = await c.QueryAsync<(string, int, decimal)>(new CommandDefinition(
-            @"SELECT Service, [Count], Revenue FROM dbo.ServiceActivityDaily WHERE BranchId = @branchId ORDER BY SortOrder",
+            @"SELECT Service, [Count], Revenue FROM analytics.ServiceActivityDaily WHERE BranchId = @branchId ORDER BY SortOrder",
             new { branchId }, cancellationToken: ct));
         return rows.ToList();
     }
