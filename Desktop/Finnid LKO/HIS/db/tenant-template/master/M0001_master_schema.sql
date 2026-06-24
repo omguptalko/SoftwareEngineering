@@ -119,19 +119,37 @@ CREATE TABLE master.Bed (
 );
 GO
 
-/* ---- patient schema: longitudinal identity (D3) -------------------- */
+/* ---- patient schema: longitudinal identity (D3), full column set --- */
 IF OBJECT_ID('patient.Patient') IS NULL
 CREATE TABLE patient.Patient (
     PatientId   BIGINT IDENTITY(1,1) CONSTRAINT PK_p_Patient PRIMARY KEY,
     Uhid        NVARCHAR(30) NOT NULL CONSTRAINT UQ_p_Patient_Uhid UNIQUE,
     RegBranchId INT NULL CONSTRAINT FK_p_Patient_Branch REFERENCES master.Branch(BranchId),
     RegisteredAtUtc DATETIME2(3) NOT NULL CONSTRAINT DF_p_Patient_Reg DEFAULT(SYSUTCDATETIME()),
-    FullName    NVARCHAR(160) NOT NULL,
+    FullName    NVARCHAR(120) NOT NULL,
+    GuardianName NVARCHAR(120) NULL,
+    AgeYears    INT NULL,
+    DateOfBirth DATE NULL,
     Sex         NVARCHAR(10)  NULL,
-    Mobile      NVARCHAR(20)  NULL,
+    BloodGroup  NVARCHAR(5)   NULL,
+    Mobile      NVARCHAR(15)  NULL,
+    Email       NVARCHAR(120) NULL,
+    MaritalStatus NVARCHAR(20) NULL,
+    Category    NVARCHAR(40)  NULL,
+    Address     NVARCHAR(200) NULL,
+    City        NVARCHAR(80)  NULL,
+    State       NVARCHAR(80)  NULL,
+    Pincode     NVARCHAR(10)  NULL,
+    Occupation  NVARCHAR(80)  NULL,
+    EmployerPayerCode NVARCHAR(20) NULL,
     AadhaarMasked NVARCHAR(20) NULL,
+    AbhaNumber  NVARCHAR(20)  NULL,
+    AbhaAddress NVARCHAR(80)  NULL,
     IsActive    BIT NOT NULL CONSTRAINT DF_p_Patient_Active DEFAULT(1)
 );
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_p_Patient_Search')
+    CREATE INDEX IX_p_Patient_Search ON patient.Patient(FullName, Mobile);
 GO
 
 /* ---- audit schema -------------------------------------------------- */
