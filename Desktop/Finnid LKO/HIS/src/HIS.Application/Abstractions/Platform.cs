@@ -67,3 +67,37 @@ public interface IModuleAdminRepository
     Task<IReadOnlyList<(string ModuleCode, string ModuleLabel, string? Icon, int ModuleSort, string PageCode, string PageLabel, string? Route, int PageSort)>>
         GetMenuForRolesAsync(IEnumerable<string> roleCodes, CancellationToken ct = default);
 }
+
+/// <summary>Names of the databases created/ensured during provisioning.</summary>
+public sealed record ProvisionedDb(string DbKind, string DbName);
+
+/// <summary>
+/// Automated multi-DB provisioning engine (L1.5, R4). Creates the per-tenant master
+/// DB and per-fiscal-year data DBs and applies their schema templates — no human
+/// intervention. Server/connection/template settings come from "Provisioning:*" config
+/// (Decision D5). DB names are validated to a strict identifier pattern.
+/// </summary>
+public interface IProvisioningEngine
+{
+    /// <summary>Ensures {Tenant}_Master exists + schema applied. Returns its DB name.</summary>
+    Task<ProvisionedDb> ProvisionMasterAsync(string tenantCode, CancellationToken ct = default);
+    /// <summary>Ensures {Tenant}_FY{fyCode} exists + schema applied. Returns its DB name.</summary>
+    Task<ProvisionedDb> ProvisionFiscalYearAsync(string tenantCode, string fyCode, CancellationToken ct = default);
+}
+
+/// <summary>Control-plane tenant/fiscal-year/domain/db-catalog operations (L1.7).</summary>
+public interface ITenantAdminRepository
+{
+    Task<bool> TenantExistsAsync(string code, CancellationToken ct = default);
+    Task<int> CreateTenantAsync(string code, string name, byte fyStartMonth, byte fyStartDay, CancellationToken ct = default);
+    Task<int?> GetTenantIdByCodeAsync(string code, CancellationToken ct = default);
+    Task<bool> FiscalYearExistsAsync(int tenantId, string fyCode, CancellationToken ct = default);
+    Task<int> CreateFiscalYearAsync(int tenantId, string code, DateTime start, DateTime end, bool isCurrent, CancellationToken ct = default);
+    Task ClearCurrentFiscalYearAsync(int tenantId, CancellationToken ct = default);
+    Task AddDomainAsync(int tenantId, string host, bool isPrimary, bool isCommon, CancellationToken ct = default);
+    Task RegisterDbAsync(int tenantId, int? fiscalYearId, string dbKind, string dbName, string? connectionRef, CancellationToken ct = default);
+    Task EnableAllModulesAsync(int tenantId, int fiscalYearId, CancellationToken ct = default);
+    Task CopyModuleEntitlementsAsync(int tenantId, int fromFiscalYearId, int toFiscalYearId, CancellationToken ct = default);
+    Task<IReadOnlyList<(int TenantId, string Code, string Name, string? FyCode, string DbKind, string DbName)>> GetTenantsAsync(CancellationToken ct = default);
+    Task<(int TenantId, string Code)?> ResolveTenantByHostAsync(string host, CancellationToken ct = default);
+}

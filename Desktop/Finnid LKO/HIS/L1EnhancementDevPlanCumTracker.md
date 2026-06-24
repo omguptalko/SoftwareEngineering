@@ -106,7 +106,9 @@ Implemented & verified so far:
 - **L1.2.6 RBAC authorization behavior** — `IAuthorizable` marker + `AuthorizationBehavior` (pipeline order Validation → **Authorization** → Logging → Audit) + `IPermissionResolver` (resolves permission codes from `security.RolePermission`). `IBranchContext` extended with `IsSuperAdmin` (set from the `superadmin` JWT claim); superadmin bypasses checks (D6). Unauthenticated → 401 (`AuthenticationException`), authenticated-but-unpermitted → 403 (`UnauthorizedAccessException`). Demonstrated on `GET /api/platform/audit` (gated by `audit.read`): no token → 401, superadmin → 200 + data, `billing.demo` (role with no grants) → 403. A config-driven dev demo user (`billing.demo`) is seeded to exercise the deny path. **Closes parent tracker 0.2 authorization.**
 - **L1.3 dynamic module/page RBAC** — seeded registry `security.AppModule` (10) / `AppPage` (21) / `PageAction` (84) + role grants (`P0101`). `IRequireAuthentication` marker added. Commands: create module/page (`module.manage`), assign module/page to role (`rbac.manage`) — `PlatformController`. Effective menu `GET /api/menu` (`MenuController`, auth-only): superadmin → all modules; other roles → only granted modules/pages. **Verified end-to-end:** `billing.demo` saw only Billing; after superadmin created `telemed` module+page and assigned it to the `billing` role, `billing.demo`'s menu live-updated to Billing + Telemedicine — no deploy. **Fixed a real bug:** JwtBearer's default inbound-claim remapping renamed the `role` claim to a long URI, so role-based context/menus were empty for non-superadmins; set `MapInboundClaims=false` + explicit `RoleClaimType`/`NameClaimType`.
 
-Pending in these phases: tenant-role *permission* grants (platform permission set is admin-only today), per-page action assignment + tenant/FY entitlement filtering of the menu, MFA (L1.2.5), login + admin UI wiring (L1.2.7 / L1.3.4), and the tenant-DB schema refactor (L1.1.2–4).
+- **L1.5 + L1.7 automated provisioning & onboarding** — `SqlProvisioningEngine` creates per-tenant databases and applies schema templates (`db/tenant-template/master` + `…/fy`) with a `GO`-aware runner; validated DB names; `BaseConnection`/`TemplateRoot` from `Provisioning:*` config (D5). `OnboardTenantCommand` (gated `tenant.onboard`) registers tenant + fiscal year (Apr–Mar, D1) + primary/common domains, **provisions DBs before writing platform rows** (so a failure leaves no orphan tenant, L1.5.5), registers them in `platform.DbCatalog`, and enables all modules for the year. `OpenFiscalYearCommand` (gated `fiscalyear.manage`) is the year-shift: provisions the next FY's data DB. `GetTenantsQuery` lists tenants + DBs (gated `tenant.manage`). **Verified end-to-end:** onboarding `ACME` created `ACME_Master` (schemas `master`/`patient`/`proc`/`audit`; blood groups seeded; `proc.usp_NextUhid`) + `ACME_FY2026_27` (schemas `billing`/`insurance`/`hr`/`seq`/`proc`/`audit`) — the **D3 split made physical**; year-shift created `ACME_FY2027_28`; re-onboard → 409; non-privileged user → 403; both actions audited; 11 modules enabled per FY. **Bugs fixed in testing:** template path now resolved from ContentRootPath; `EXEC` needs a variable (not an inline `QUOTENAME` call); `proc` is a reserved keyword (bracket the schema); FY DB name no longer double-prefixes `FY`.
+
+Pending in these phases: **L1.6 tenant/domain request routing + per-tenant connection resolution** (the running app still uses the single-DB factory until L1.8 cutover); tenant-role *permission* grants (platform permission set is admin-only today); per-page action assignment + tenant/FY entitlement filtering of the menu; MFA (L1.2.5); login + admin UI wiring (L1.2.7 / L1.3.4 / L1.7.1); and the tenant-DB schema refactor (L1.1.2–4).
 
 > **Dev-only note:** `appsettings.Development.json` now carries a dev `Jwt:SigningKey` and a bootstrap superadmin password (`ChangeMe!2026`). Both are **dev placeholders** — prod must supply them via environment / Key Vault, and the superadmin must rotate the password on first login (future task).
 
@@ -162,11 +164,11 @@ Pending in these phases: tenant-role *permission* grants (platform permission se
 ### Phase L1.5 — Automated multi-DB provisioning engine (R4)
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| L1.5.1 | Provisioning service: on onboarding create `{Tenant}_Master` + `{Tenant}_FY{…}` DBs programmatically | ⬜ | **zero human intervention** |
-| L1.5.2 | Programmatic migration runner (apply schema-split scripts to each new DB; idempotent) | ⬜ | reuse logic from `db/run-migrations.ps1` in C# |
-| L1.5.3 | Auto-seed masters into `{Tenant}_Master`; register DBs in `platform.DbCatalog` | ⬜ | |
-| L1.5.4 | Next-FY DB auto-creation on year shift (L1.4.3); carry-forward masters | ⬜ | |
-| L1.5.5 | Idempotent/retry-safe + rollback on partial failure; provisioning audit | ⬜ | |
+| L1.5.1 | Provisioning service: on onboarding create `{Tenant}_Master` + `{Tenant}_FY{…}` DBs programmatically | 🟩 | `SqlProvisioningEngine`; **zero human intervention** — verified ACME_Master + ACME_FY2026_27 created |
+| L1.5.2 | Programmatic migration runner (apply schema-split scripts to each new DB; idempotent) | 🟩 | GO-split runner over `db/tenant-template/{master,fy}`; idempotent |
+| L1.5.3 | Auto-seed masters into `{Tenant}_Master`; register DBs in `platform.DbCatalog` | 🟩 | blood groups seeded; DbCatalog rows registered + verified |
+| L1.5.4 | Next-FY DB auto-creation on year shift (L1.4.3); carry-forward entitlements | 🟩 | `OpenFiscalYearCommand` → ACME_FY2027_28 created; modules enabled per FY |
+| L1.5.5 | Idempotent/retry-safe + rollback on partial failure; provisioning audit | 🟦 | provision-before-write ordering avoids orphan tenants; scripts idempotent; audited. Full compensating drop of created DBs on later failure pending |
 
 ### Phase L1.6 — Tenant/domain resolution & connection routing (R4, R5)
 | # | Task | Status | Notes |
@@ -179,10 +181,10 @@ Pending in these phases: tenant-role *permission* grants (platform permission se
 ### Phase L1.7 — Onboarding wizard + domain↔login mapping (R3, R5)
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| L1.7.1 | Superadmin onboarding wizard with **fiscal-year dropdown** (R3) | ⬜ | drives L1.5 provisioning |
-| L1.7.2 | Capture hospital profile, primary domain, common-domain alias, initial modules/roles | ⬜ | R5 |
-| L1.7.3 | Domain→tenant→login-realm mapping (which login page/branding per host) | ⬜ | R5 "domain & login mapping" |
-| L1.7.4 | Tenant-scoped login (user authenticates within resolved tenant) | ⬜ | |
+| L1.7.1 | Superadmin onboarding wizard with **fiscal-year dropdown** (R3) | 🟦 | `POST /api/platform/tenants/onboard` (fiscal-year selection drives provisioning) verified; wireframe wizard UI pending |
+| L1.7.2 | Capture hospital profile, primary domain, common-domain alias, initial modules/roles | 🟩 | code/name/primary+common domains captured; all modules enabled per FY; richer profile fields later |
+| L1.7.3 | Domain→tenant→login-realm mapping (which login page/branding per host) | 🟦 | `TenantDomain` stored + `ResolveTenantByHostAsync` repo; resolution middleware + login-realm wiring is L1.6 |
+| L1.7.4 | Tenant-scoped login (user authenticates within resolved tenant) | ⬜ | L1.6 |
 
 ### Phase L1.8 — Cutover from single `dbo` DB
 | # | Task | Status | Notes |
