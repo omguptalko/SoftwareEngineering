@@ -110,7 +110,11 @@ Implemented & verified so far:
 
 - **L1.6 tenant/domain routing + connection resolution** — `ITenantContext` + `TenantResolutionMiddleware` resolve the tenant per request from the host (own domain), a common-domain subdomain (`Tenancy:CommonDomain`), or an `X-Tenant` hint (D4), then load the tenant's master + current-FY data DB names from `platform.DbCatalog`. New `ITenantConnectionFactory` opens the correct DB (additive — the legacy `SqlConnectionFactory` is untouched until the L1.8 cutover, D7). Demonstrator `TenantController`: patients → tenant **master** DB, bills → tenant **current-FY** DB. **Verified end-to-end:** resolution via own domain / common-domain subdomain / header; onboarded a 2nd tenant (FINN); patients & bills written to and read from the correct per-tenant, per-FY databases; **tenant isolation confirmed at the DB level** (ACME_Master vs FINN_Master hold only their own rows); ACME bill numbered `BILL-FY2027-28-…` (its current FY after year-shift) vs FINN `BILL-FY2026-27-…` (per-FY billing); unresolved request → 409; legacy single-DB endpoints still 200 (no regression).
 
-Pending in these phases: tenant-role *permission* grants (platform permission set is admin-only today); per-page action assignment + tenant/FY entitlement filtering of the menu; MFA (L1.2.5); tenant-scoped login + login-realm branding (L1.7.4); login + admin UI wiring (L1.2.7 / L1.3.4 / L1.7.1); and the **tenant-DB schema refactor + repository cutover to `ITenantConnectionFactory` (L1.1.2–4 / L1.8)** — the legacy app still runs on the single `HIS` DB.
+- **L1.8 cutover (started — read-only masters slice)** — expanded the tenant **master** template to the full master set (Branch/Doctor/Drug/Icd10Code/Payer/HbpPackage/BloodGroup/Tariff/Ward/Bed + patient) with reference seeds, and **cut over `LookupRepository`** (the 7 F3 master lookups: doctor/drug/icd10/payer/package/ward/tariff) from the single `dbo` DB to the resolved tenant's `master.*` schema via `ITenantConnectionFactory`. Added a config-driven **dev default tenant** (`Tenancy:DevDefaultTenant=DEV`) auto-provisioned at startup so the localhost wireframe routes to a real per-tenant DB. **Verified:** localhost lookups serve from `DEV_Master` (proven by a marker row inserted only into `DEV_Master` appearing in `/api/lookups/doctor`); the `patient` lookup intentionally stays on legacy `dbo` (part of the later write-aggregate migration); legacy endpoints (`/api/dashboard`, `/api/meta`, `/api/patients`) still 200 — **no regression**.
+
+  This is the safe first slice. The remaining cutover is the larger coordinated migration: the **write-side aggregates** (patient → clinical → billing → insurance → …) must move together with a **data backfill** because they share `PatientId`/`BranchId` references that cross databases once split — a piecemeal move would break FK consistency. Sequence: (1) finish the schema-split templates for all ~90 tables [L1.1.2–4], (2) build a `dbo → {Tenant}_Master/{Tenant}_FY` data-migration step, (3) switch the interdependent repositories to `ITenantConnectionFactory` in one coordinated change, (4) retire the single-DB `SqlConnectionFactory` and update `README.dev.md`.
+
+Pending in these phases: tenant-role *permission* grants (platform permission set is admin-only today); per-page action assignment + tenant/FY entitlement filtering of the menu; MFA (L1.2.5); tenant-scoped login + login-realm branding (L1.7.4); login + admin UI wiring (L1.2.7 / L1.3.4 / L1.7.1); and the **write-aggregate cutover + data backfill (L1.8.3/4)** — the legacy app still runs on the single `HIS` DB except for master lookups.
 
 > **Dev-only note:** `appsettings.Development.json` now carries a dev `Jwt:SigningKey` and a bootstrap superadmin password (`ChangeMe!2026`). Both are **dev placeholders** — prod must supply them via environment / Key Vault, and the superadmin must rotate the password on first login (future task).
 
@@ -191,10 +195,10 @@ Pending in these phases: tenant-role *permission* grants (platform permission se
 ### Phase L1.8 — Cutover from single `dbo` DB
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| L1.8.1 | Treat current `HIS` (all-`dbo`) as the **reference template**; generate schema-split scripts from it | ⬜ | |
-| L1.8.2 | Seed one real tenant (e.g. BR1 hospital) through the new provisioning path to validate parity | ⬜ | |
-| L1.8.3 | Data backfill/migration of existing demo data into the new topology | ⬜ | |
-| L1.8.4 | Deprecate single-DB path; update `README.dev.md` + `developmentplancumtracker.md` §3a | ⬜ | |
+| L1.8.1 | Schema-split tenant templates (master + per-FY) | 🟦 | master masters+patient + per-FY billing/insurance/hr complete & seeded; remaining ~70 tables to migrate from `dbo` |
+| L1.8.2 | Seed real tenants through the provisioning path | 🟩 | DEV auto-provisioned at startup; ACME/FINN via API — verified |
+| L1.8.3 | Cut over repositories to `ITenantConnectionFactory` (schema-qualified) | 🟦 | **`LookupRepository` cut over** (7 master lookups → tenant master DB), verified via marker-row routing proof + no regression; remaining repos pending |
+| L1.8.4 | Data backfill of existing `dbo` data + deprecate single-DB path; update docs | ⬜ | reference data re-seeded per tenant; transactional backfill + write-aggregate cutover (patient/clinical/billing) pending |
 
 ### Phase L1.9 — Verification, NFR & security
 | # | Task | Status | Notes |
