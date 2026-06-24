@@ -1,0 +1,77 @@
+using HIS.Application.Abstractions;
+using HIS.Domain.Entities;
+
+namespace HIS.Api.Startup;
+
+/// <summary>
+/// Ensures a platform superadmin exists (L1.2). On startup, if no user with the
+/// configured bootstrap username exists in HIS_Platform.security.AppUser, it
+/// creates one (PBKDF2-hashed password) and assigns the 'superadmin' role.
+/// Credentials come from config ("Platform:Bootstrap:*") — never hardcoded.
+/// Idempotent: a no-op once the superadmin exists.
+/// </summary>
+public sealed class SuperAdminSeeder : IHostedService
+{
+    private readonly IServiceScopeFactory _scopes;
+    private readonly IConfiguration _config;
+    private readonly ILogger<SuperAdminSeeder> _log;
+
+    public SuperAdminSeeder(IServiceScopeFactory scopes, IConfiguration config, ILogger<SuperAdminSeeder> log)
+    { _scopes = scopes; _config = config; _log = log; }
+
+    public async Task StartAsync(CancellationToken ct)
+    {
+        var userName = _config["Platform:Bootstrap:UserName"];
+        var password = _config["Platform:Bootstrap:Password"];
+        var display  = _config["Platform:Bootstrap:DisplayName"] ?? "Super Admin";
+        var email    = _config["Platform:Bootstrap:Email"];
+
+        if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
+        {
+            _log.LogInformation("SuperAdmin bootstrap skipped: 'Platform:Bootstrap:UserName/Password' not configured.");
+            return;
+        }
+
+        using var scope = _scopes.CreateScope();
+        var users  = scope.ServiceProvider.GetRequiredService<IPlatformUserRepository>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+        try
+        {
+            if (await users.GetByUserNameAsync(userName, ct) is not null)
+            {
+                _log.LogInformation("SuperAdmin '{User}' already present.", userName);
+                return;
+            }
+
+            var (hash, salt) = hasher.Hash(password);
+            var userId = await users.InsertUserAsync(new PlatformUser
+            {
+                TenantId = null,
+                UserName = userName,
+                DisplayName = display,
+                Email = email,
+                PasswordHash = hash,
+                PasswordSalt = salt,
+                IsSuperAdmin = true,
+                IsActive = true
+            }, ct);
+
+            var roleId = await users.GetRoleIdByCodeAsync("superadmin", ct)
+                ?? throw new InvalidOperationException("Role 'superadmin' is not seeded (run db/platform migrations).");
+            await users.AssignRoleAsync(userId, roleId, ct);
+
+            await users.WritePlatformAuditAsync(userId, userName, null, "SeedSuperAdmin", "AppUser",
+                userId.ToString(), succeeded: true, error: null, ct);
+
+            _log.LogInformation("SuperAdmin '{User}' created (id {Id}).", userName, userId);
+        }
+        catch (Exception ex)
+        {
+            // Don't crash the app if the platform DB isn't migrated yet; log and continue.
+            _log.LogWarning(ex, "SuperAdmin bootstrap failed (is HIS_Platform migrated?).");
+        }
+    }
+
+    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+}

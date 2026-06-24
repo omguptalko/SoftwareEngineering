@@ -131,7 +131,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | 0.3 | Dapper data-access base (generic CRUD repo, parameterized queries, UnitOfWork) | §9 | 🟩 | | ConnectionFactory + repos; UnitOfWork pending |
 | 0.4 | MS SQL schema baseline + migrations + **all reference/master tables seeded from scripts** | §9 | 🟩 | | 0001–0011 + seed, idempotent, verified |
 | 0.5 | Config & secrets via appsettings + Azure App Config + **Key Vault** (no inline secrets) | §8.1/§8.2 | 🟦 | | Config-driven done; Key Vault wiring pending |
-| 0.6 | JWT auth + **RBAC** (14 roles, permission tables) | §2.2/§8.1 | 🟦 | | JWT + role/permission tables done; token issuance pending |
+| 0.6 | JWT auth + **RBAC** (14 roles, permission tables) | §2.2/§8.1 | 🟦 | | JWT + role/permission tables done; **token issuance done via `POST /api/auth/login`** (L1.2, control plane); per-command RBAC authz behavior pending |
 | 0.7 | AES-256 at rest, TLS in transit, MFA for privileged roles, Aadhaar/PII masking | §8.1/§8.2 | 🟦 | | Aadhaar stored masked; AES/MFA pending |
 | 0.8 | Immutable audit-trail behavior (all writes) | §8.1/§3.22 | 🟩 | | Verified writing rows |
 | 0.9 | SignalR infrastructure (hubs, groups per branch) | §9 | ⬜ | | |
