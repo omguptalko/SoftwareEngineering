@@ -1,13 +1,12 @@
 /* =====================================================================
-   Tenant MASTER DB template (L1.5, applied to {Tenant}_Master)
-   Per Decision D2 (one master DB per tenant) + D3 (longitudinal data lives
-   in master, not the per-fiscal-year DB). Proper schemas (R1/R2):
-     master  : reference/master data (admin-editable)
+   Tenant MASTER DB template (L1.5/L1.8, applied to {Tenant}_Master)
+   Per Decision D2 (one master DB per tenant) + D3 (longitudinal + master
+   data lives here, not the per-fiscal-year DB). Proper schemas (R1/R2):
+     master  : reference/master data (admin-editable) — drives F3 lookups
      patient : longitudinal patient/EMR identity
      proc    : stored procedures (numbering, etc.)
      audit   : per-tenant immutable audit
-   Representative table set — the full 90-table refactor is L1.1.2-4.
-   Idempotent: safe to re-run (the provisioning engine may re-apply).
+   Column contracts match the cut-over LookupRepository (L1.8). Idempotent.
    ===================================================================== */
 SET XACT_ABORT ON;
 GO
@@ -43,14 +42,43 @@ CREATE TABLE master.Doctor (
 );
 GO
 
-IF OBJECT_ID('master.Tariff') IS NULL
-CREATE TABLE master.Tariff (
-    TariffId INT IDENTITY(1,1) CONSTRAINT PK_m_Tariff PRIMARY KEY,
-    BranchId INT NULL CONSTRAINT FK_m_Tariff_Branch REFERENCES master.Branch(BranchId),
-    Code     NVARCHAR(30)  NOT NULL,
-    Name     NVARCHAR(160) NOT NULL,
-    Rate     DECIMAL(12,2) NOT NULL,
-    IsActive BIT NOT NULL CONSTRAINT DF_m_Tariff_Active DEFAULT(1)
+IF OBJECT_ID('master.Drug') IS NULL
+CREATE TABLE master.Drug (
+    DrugId       INT IDENTITY(1,1) CONSTRAINT PK_m_Drug PRIMARY KEY,
+    Code         NVARCHAR(20)  NOT NULL CONSTRAINT UQ_m_Drug_Code UNIQUE,
+    Name         NVARCHAR(160) NOT NULL,
+    Form         NVARCHAR(20)  NOT NULL,
+    StockQty     INT NOT NULL CONSTRAINT DF_m_Drug_Stock DEFAULT(0),
+    ReorderLevel INT NOT NULL CONSTRAINT DF_m_Drug_Reorder DEFAULT(0),
+    IsActive     BIT NOT NULL CONSTRAINT DF_m_Drug_Active DEFAULT(1)
+);
+GO
+
+IF OBJECT_ID('master.Icd10Code') IS NULL
+CREATE TABLE master.Icd10Code (
+    Code        NVARCHAR(10)  NOT NULL CONSTRAINT PK_m_Icd10 PRIMARY KEY,
+    Description NVARCHAR(200) NOT NULL
+);
+GO
+
+IF OBJECT_ID('master.Payer') IS NULL
+CREATE TABLE master.Payer (
+    PayerId   INT IDENTITY(1,1) CONSTRAINT PK_m_Payer PRIMARY KEY,
+    Code      NVARCHAR(20)  NOT NULL CONSTRAINT UQ_m_Payer_Code UNIQUE,
+    Name      NVARCHAR(160) NOT NULL,
+    PayerType NVARCHAR(40)  NOT NULL,
+    IsActive  BIT NOT NULL CONSTRAINT DF_m_Payer_Active DEFAULT(1)
+);
+GO
+
+IF OBJECT_ID('master.HbpPackage') IS NULL
+CREATE TABLE master.HbpPackage (
+    PackageId INT IDENTITY(1,1) CONSTRAINT PK_m_Hbp PRIMARY KEY,
+    Code      NVARCHAR(20)  NOT NULL CONSTRAINT UQ_m_Hbp_Code UNIQUE,
+    Name      NVARCHAR(200) NOT NULL,
+    Specialty NVARCHAR(80)  NULL,
+    Rate      DECIMAL(12,2) NOT NULL,
+    IsActive  BIT NOT NULL CONSTRAINT DF_m_Hbp_Active DEFAULT(1)
 );
 GO
 
@@ -58,6 +86,36 @@ IF OBJECT_ID('master.BloodGroup') IS NULL
 CREATE TABLE master.BloodGroup (
     Code      NVARCHAR(5) NOT NULL CONSTRAINT PK_m_BloodGroup PRIMARY KEY,
     SortOrder INT NOT NULL CONSTRAINT DF_m_BloodGroup_Sort DEFAULT(0)
+);
+GO
+
+IF OBJECT_ID('master.Tariff') IS NULL
+CREATE TABLE master.Tariff (
+    TariffId    INT IDENTITY(1,1) CONSTRAINT PK_m_Tariff PRIMARY KEY,
+    BranchId    INT NULL CONSTRAINT FK_m_Tariff_Branch REFERENCES master.Branch(BranchId),
+    ServiceCode NVARCHAR(30)  NOT NULL,
+    ServiceName NVARCHAR(160) NOT NULL,
+    Category    NVARCHAR(40)  NULL,
+    Rate        DECIMAL(12,2) NOT NULL,
+    GstRatePct  DECIMAL(5,2)  NULL,
+    IsActive    BIT NOT NULL CONSTRAINT DF_m_Tariff_Active DEFAULT(1)
+);
+GO
+
+IF OBJECT_ID('master.Ward') IS NULL
+CREATE TABLE master.Ward (
+    WardId   INT IDENTITY(1,1) CONSTRAINT PK_m_Ward PRIMARY KEY,
+    BranchId INT NOT NULL CONSTRAINT FK_m_Ward_Branch REFERENCES master.Branch(BranchId),
+    Name     NVARCHAR(80) NOT NULL
+);
+GO
+
+IF OBJECT_ID('master.Bed') IS NULL
+CREATE TABLE master.Bed (
+    BedId  INT IDENTITY(1,1) CONSTRAINT PK_m_Bed PRIMARY KEY,
+    WardId INT NOT NULL CONSTRAINT FK_m_Bed_Ward REFERENCES master.Ward(WardId),
+    BedNo  NVARCHAR(20) NOT NULL,
+    Status NVARCHAR(10) NOT NULL CONSTRAINT DF_m_Bed_Status DEFAULT('free')
 );
 GO
 

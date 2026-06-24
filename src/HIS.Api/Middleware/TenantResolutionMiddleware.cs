@@ -43,6 +43,15 @@ public sealed class TenantResolutionMiddleware
                         routing = await tenants.GetRoutingByCodeAsync(code, http.RequestAborted);
                 }
             }
+
+            // Dev fallback: resolve a configured default tenant (e.g. for the localhost
+            // wireframe) so cut-over endpoints work without a real domain. Config-driven.
+            if (routing is null)
+            {
+                var devTenant = config["Tenancy:DevDefaultTenant"];
+                if (!string.IsNullOrWhiteSpace(devTenant))
+                    routing = await tenants.GetRoutingByCodeAsync(devTenant, http.RequestAborted);
+            }
         }
 
         if (routing is not null)

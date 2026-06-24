@@ -69,6 +69,10 @@ public sealed class SuperAdminSeeder : IHostedService
 
             // Optional dev demo user (non-privileged) to exercise RBAC 403 paths.
             await SeedDemoUserAsync(users, hasher, ct);
+
+            // Optional dev tenant — auto-provisioned so localhost (the wireframe) routes
+            // to a real per-tenant DB for cut-over endpoints (L1.8).
+            await SeedDevTenantAsync(scope, ct);
         }
         catch (Exception ex)
         {
@@ -100,6 +104,41 @@ public sealed class SuperAdminSeeder : IHostedService
         var roleId = await users.GetRoleIdByCodeAsync(demoRole, ct);
         if (roleId is int rid) await users.AssignRoleAsync(userId, rid, ct);
         _log.LogInformation("Demo user '{User}' (role {Role}) created (id {Id}).", demoUser, demoRole, userId);
+    }
+
+    /// <summary>Provisions a dev tenant (mirrors OnboardTenantHandler) so localhost is tenant-routed.</summary>
+    private async Task SeedDevTenantAsync(IServiceScope scope, CancellationToken ct)
+    {
+        var code = _config["Tenancy:DevDefaultTenant"];
+        if (string.IsNullOrWhiteSpace(code)) return;
+
+        var tenants = scope.ServiceProvider.GetRequiredService<ITenantAdminRepository>();
+        if (await tenants.TenantExistsAsync(code, ct))
+        {
+            _log.LogInformation("Dev tenant '{Code}' already present.", code);
+            return;
+        }
+
+        var engine = scope.ServiceProvider.GetRequiredService<IProvisioningEngine>();
+
+        // Fiscal year (Apr-Mar, D1) for "now".
+        var now = DateTime.UtcNow;
+        var startYear = now.Month >= 4 ? now.Year : now.Year - 1;
+        var start = new DateTime(startYear, 4, 1);
+        var end = start.AddYears(1).AddDays(-1);
+        var fyCode = $"FY{startYear}-{((startYear + 1) % 100):D2}";
+
+        var master = await engine.ProvisionMasterAsync(code, ct);
+        var data = await engine.ProvisionFiscalYearAsync(code, fyCode, ct);
+
+        var tenantId = await tenants.CreateTenantAsync(code, $"{code} (dev tenant)", 4, 1, ct);
+        var fyId = await tenants.CreateFiscalYearAsync(tenantId, fyCode, start, end, isCurrent: true, ct);
+        await tenants.AddDomainAsync(tenantId, $"{code.ToLowerInvariant()}.localhost", isPrimary: true, isCommon: false, ct);
+        await tenants.RegisterDbAsync(tenantId, null, master.DbKind, master.DbName, $"Tenant:{code}:Master", ct);
+        await tenants.RegisterDbAsync(tenantId, fyId, data.DbKind, data.DbName, $"Tenant:{code}:{fyCode}", ct);
+        await tenants.EnableAllModulesAsync(tenantId, fyId, ct);
+
+        _log.LogInformation("Dev tenant '{Code}' provisioned ({Master} + {Data}).", code, master.DbName, data.DbName);
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
