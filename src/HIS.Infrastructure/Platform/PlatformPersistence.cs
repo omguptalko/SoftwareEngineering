@@ -103,6 +103,102 @@ VALUES (@actorUserId, @actorUserName, @tenantId, @action, @entity, @entityId, @s
     }
 }
 
+/// <summary>Dynamic module/page registry + assignments + menu over HIS_Platform.security.* (L1.3).</summary>
+public sealed class ModuleAdminRepository : IModuleAdminRepository
+{
+    private readonly IPlatformConnectionFactory _f;
+    public ModuleAdminRepository(IPlatformConnectionFactory f) => _f = f;
+
+    public async Task<int> CreateModuleAsync(string code, string label, string? icon, int sortOrder, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.QuerySingleAsync<int>(new CommandDefinition(
+            @"INSERT INTO security.AppModule (Code, Label, Icon, SortOrder)
+              VALUES (@code, @label, @icon, @sortOrder);
+              SELECT CAST(SCOPE_IDENTITY() AS INT);",
+            new { code, label, icon, sortOrder }, cancellationToken: ct));
+    }
+
+    public async Task<int> CreatePageAsync(string moduleCode, string code, string label, string? route, int sortOrder, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.QuerySingleAsync<int>(new CommandDefinition(
+            @"DECLARE @ModuleId INT = (SELECT ModuleId FROM security.AppModule WHERE Code = @moduleCode);
+              IF @ModuleId IS NULL THROW 50000, 'Unknown module code.', 1;
+              INSERT INTO security.AppPage (ModuleId, Code, Label, Route, SortOrder)
+              VALUES (@ModuleId, @code, @label, @route, @sortOrder);
+              SELECT CAST(SCOPE_IDENTITY() AS INT);",
+            new { moduleCode, code, label, route, sortOrder }, cancellationToken: ct));
+    }
+
+    public async Task<bool> AssignModuleToRoleAsync(string roleCode, string moduleCode, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        var n = await c.ExecuteAsync(new CommandDefinition(
+            @"DECLARE @RoleId INT = (SELECT RoleId FROM security.Role WHERE Code = @roleCode);
+              DECLARE @ModuleId INT = (SELECT ModuleId FROM security.AppModule WHERE Code = @moduleCode);
+              IF @RoleId IS NULL OR @ModuleId IS NULL THROW 50000, 'Unknown role or module code.', 1;
+              IF NOT EXISTS (SELECT 1 FROM security.RoleModule WHERE RoleId = @RoleId AND ModuleId = @ModuleId)
+                  INSERT security.RoleModule (RoleId, ModuleId) VALUES (@RoleId, @ModuleId);",
+            new { roleCode, moduleCode }, cancellationToken: ct));
+        return n > 0;
+    }
+
+    public async Task<bool> AssignPageToRoleAsync(string roleCode, string pageCode, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        var n = await c.ExecuteAsync(new CommandDefinition(
+            @"DECLARE @RoleId INT = (SELECT RoleId FROM security.Role WHERE Code = @roleCode);
+              DECLARE @PageId INT = (SELECT PageId FROM security.AppPage WHERE Code = @pageCode);
+              IF @RoleId IS NULL OR @PageId IS NULL THROW 50000, 'Unknown role or page code.', 1;
+              IF NOT EXISTS (SELECT 1 FROM security.RolePage WHERE RoleId = @RoleId AND PageId = @PageId)
+                  INSERT security.RolePage (RoleId, PageId) VALUES (@RoleId, @PageId);",
+            new { roleCode, pageCode }, cancellationToken: ct));
+        return n > 0;
+    }
+
+    private const string MenuProjection =
+        @"SELECT m.Code AS ModuleCode, m.Label AS ModuleLabel, m.Icon, m.SortOrder AS ModuleSort,
+                 p.Code AS PageCode, p.Label AS PageLabel, p.Route, p.SortOrder AS PageSort";
+
+    public async Task<IReadOnlyList<(string, string, string?, int, string, string, string?, int)>> GetFullMenuAsync(CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        var rows = await c.QueryAsync<(string, string, string?, int, string, string, string?, int)>(new CommandDefinition(
+            MenuProjection + @"
+              FROM security.AppModule m
+              INNER JOIN security.AppPage p ON p.ModuleId = m.ModuleId
+              WHERE m.IsActive = 1 AND p.IsActive = 1
+              ORDER BY m.SortOrder, p.SortOrder", cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<(string, string, string?, int, string, string, string?, int)>> GetMenuForRolesAsync(IEnumerable<string> roleCodes, CancellationToken ct = default)
+    {
+        var codes = roleCodes?.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct().ToArray() ?? Array.Empty<string>();
+        if (codes.Length == 0) return Array.Empty<(string, string, string?, int, string, string, string?, int)>();
+
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        // A page is visible if any of the user's roles grants its module (RoleModule)
+        // or the page itself (RolePage).
+        var rows = await c.QueryAsync<(string, string, string?, int, string, string, string?, int)>(new CommandDefinition(
+            MenuProjection + @"
+              FROM security.AppModule m
+              INNER JOIN security.AppPage p ON p.ModuleId = m.ModuleId
+              WHERE m.IsActive = 1 AND p.IsActive = 1
+                AND (
+                  EXISTS (SELECT 1 FROM security.RoleModule rm
+                          INNER JOIN security.Role r ON r.RoleId = rm.RoleId
+                          WHERE rm.ModuleId = m.ModuleId AND r.Code IN @codes)
+                  OR EXISTS (SELECT 1 FROM security.RolePage rp
+                          INNER JOIN security.Role r ON r.RoleId = rp.RoleId
+                          WHERE rp.PageId = p.PageId AND r.Code IN @codes)
+                )
+              ORDER BY m.SortOrder, p.SortOrder", new { codes }, cancellationToken: ct));
+        return rows.ToList();
+    }
+}
+
 /// <summary>Resolves permission codes for role codes from HIS_Platform.security.* (L1.2.6).</summary>
 public sealed class PermissionResolver : IPermissionResolver
 {
