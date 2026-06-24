@@ -35,7 +35,15 @@ DELETE FROM master.ConsentTemplate;     DELETE FROM master.WasteColourCode;
 DELETE FROM master.HbpPackage;          DELETE FROM master.Payer;
 DELETE FROM master.Drug;                DELETE FROM master.Doctor;
 DELETE FROM master.Icd10Code;           DELETE FROM master.BloodGroup;
+DELETE FROM master.Module;              DELETE FROM master.ModuleGroup;
 DELETE FROM master.Branch;
+GO
+
+/* navigation registry */
+INSERT master.ModuleGroup (GroupId, Label, Icon, SortOrder)
+SELECT GroupId, Label, Icon, SortOrder FROM HIS.dbo.ModuleGroup;
+INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef)
+SELECT ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef FROM HIS.dbo.Module;
 GO
 
 /* masters (parents first) */
