@@ -49,3 +49,21 @@ public interface IPermissionResolver
 {
     Task<IReadOnlySet<string>> GetPermissionsAsync(IEnumerable<string> roleCodes, CancellationToken ct = default);
 }
+
+/// <summary>
+/// Dynamic module/page registry + role assignments + effective menu (L1.3, R3).
+/// Backed by HIS_Platform.security.AppModule/AppPage/PageAction/RoleModule/RolePage.
+/// </summary>
+public interface IModuleAdminRepository
+{
+    Task<int> CreateModuleAsync(string code, string label, string? icon, int sortOrder, CancellationToken ct = default);
+    Task<int> CreatePageAsync(string moduleCode, string code, string label, string? route, int sortOrder, CancellationToken ct = default);
+    Task<bool> AssignModuleToRoleAsync(string roleCode, string moduleCode, CancellationToken ct = default);
+    Task<bool> AssignPageToRoleAsync(string roleCode, string pageCode, CancellationToken ct = default);
+    /// <summary>All active modules + pages (superadmin view).</summary>
+    Task<IReadOnlyList<(string ModuleCode, string ModuleLabel, string? Icon, int ModuleSort, string PageCode, string PageLabel, string? Route, int PageSort)>>
+        GetFullMenuAsync(CancellationToken ct = default);
+    /// <summary>Modules + pages a set of roles can access (via RoleModule or RolePage).</summary>
+    Task<IReadOnlyList<(string ModuleCode, string ModuleLabel, string? Icon, int ModuleSort, string PageCode, string PageLabel, string? Route, int PageSort)>>
+        GetMenuForRolesAsync(IEnumerable<string> roleCodes, CancellationToken ct = default);
+}

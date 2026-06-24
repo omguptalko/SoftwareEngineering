@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddSingleton<IPlatformConnectionFactory, PlatformConnectionFactory>();
         services.AddScoped<IPlatformUserRepository, PlatformUserRepository>();
         services.AddScoped<IPermissionResolver, PermissionResolver>();
+        services.AddScoped<IModuleAdminRepository, ModuleAdminRepository>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenIssuer, JwtTokenIssuer>();
         services.AddScoped<IModuleRegistryRepository, ModuleRegistryRepository>();

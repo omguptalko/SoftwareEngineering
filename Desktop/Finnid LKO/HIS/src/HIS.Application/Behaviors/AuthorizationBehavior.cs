@@ -23,6 +23,9 @@ public sealed class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavi
 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
     {
+        if (request is IRequireAuthentication && !_ctx.IsAuthenticated)
+            throw new AuthenticationException("Authentication required.");
+
         if (request is IAuthorizable auth)
         {
             if (!_ctx.IsAuthenticated)

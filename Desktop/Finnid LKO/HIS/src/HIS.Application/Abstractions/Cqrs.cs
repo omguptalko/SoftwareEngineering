@@ -27,3 +27,9 @@ public interface IAuthorizable
 {
     string RequiredPermission { get; }
 }
+
+/// <summary>
+/// Opt-in marker: the caller must be authenticated, but no specific permission is
+/// required (e.g. self-scoped reads like "my menu"). Enforced by AuthorizationBehavior.
+/// </summary>
+public interface IRequireAuthentication { }

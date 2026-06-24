@@ -31,6 +31,8 @@ if (!string.IsNullOrWhiteSpace(signingKey))
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(o =>
         {
+            // Keep our short claim names ("role", "name", …) intact — don't remap to long URIs.
+            o.MapInboundClaims = false;
             o.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
@@ -39,7 +41,9 @@ if (!string.IsNullOrWhiteSpace(signingKey))
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = jwt["Issuer"],
                 ValidAudience = jwt["Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey))
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+                NameClaimType = "name",
+                RoleClaimType = "role"
             };
         });
     builder.Services.AddAuthorization();

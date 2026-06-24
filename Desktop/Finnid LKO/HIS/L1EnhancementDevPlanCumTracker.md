@@ -104,8 +104,9 @@ Implemented & verified so far:
 - **L1.2 superadmin + login** — PBKDF2 `PasswordHasher` (config-driven iterations), `JwtTokenIssuer` (key/issuer/audience/expiry from `Jwt:*`), `PlatformConnectionFactory` + `PlatformUserRepository`, `LoginCommand`/`LoginHandler`, `POST /api/auth/login`, and a startup `SuperAdminSeeder` (creates the superadmin from `Platform:Bootstrap:*`, hashed — no SQL-embedded password). **Closes parent tracker 0.6 (token issuance).** Verified: login → JWT with `uid/name/role/superadmin` claims (200); wrong password & unknown user → 401; empty fields → 400; every attempt written to `audit.PlatformAudit` (seed + success + 2 failures observed).
 
 - **L1.2.6 RBAC authorization behavior** — `IAuthorizable` marker + `AuthorizationBehavior` (pipeline order Validation → **Authorization** → Logging → Audit) + `IPermissionResolver` (resolves permission codes from `security.RolePermission`). `IBranchContext` extended with `IsSuperAdmin` (set from the `superadmin` JWT claim); superadmin bypasses checks (D6). Unauthenticated → 401 (`AuthenticationException`), authenticated-but-unpermitted → 403 (`UnauthorizedAccessException`). Demonstrated on `GET /api/platform/audit` (gated by `audit.read`): no token → 401, superadmin → 200 + data, `billing.demo` (role with no grants) → 403. A config-driven dev demo user (`billing.demo`) is seeded to exercise the deny path. **Closes parent tracker 0.2 authorization.**
+- **L1.3 dynamic module/page RBAC** — seeded registry `security.AppModule` (10) / `AppPage` (21) / `PageAction` (84) + role grants (`P0101`). `IRequireAuthentication` marker added. Commands: create module/page (`module.manage`), assign module/page to role (`rbac.manage`) — `PlatformController`. Effective menu `GET /api/menu` (`MenuController`, auth-only): superadmin → all modules; other roles → only granted modules/pages. **Verified end-to-end:** `billing.demo` saw only Billing; after superadmin created `telemed` module+page and assigned it to the `billing` role, `billing.demo`'s menu live-updated to Billing + Telemedicine — no deploy. **Fixed a real bug:** JwtBearer's default inbound-claim remapping renamed the `role` claim to a long URI, so role-based context/menus were empty for non-superadmins; set `MapInboundClaims=false` + explicit `RoleClaimType`/`NameClaimType`.
 
-Pending in these phases: tenant-role permission grants (depends on L1.3 module/page model), MFA for privileged roles (L1.2.5), login UI wiring (L1.2.7), and the tenant-DB schema refactor (L1.1.2–4).
+Pending in these phases: tenant-role *permission* grants (platform permission set is admin-only today), per-page action assignment + tenant/FY entitlement filtering of the menu, MFA (L1.2.5), login + admin UI wiring (L1.2.7 / L1.3.4), and the tenant-DB schema refactor (L1.1.2–4).
 
 > **Dev-only note:** `appsettings.Development.json` now carries a dev `Jwt:SigningKey` and a bootstrap superadmin password (`ChangeMe!2026`). Both are **dev placeholders** — prod must supply them via environment / Key Vault, and the superadmin must rotate the password on first login (future task).
 
@@ -144,11 +145,11 @@ Pending in these phases: tenant-role permission grants (depends on L1.3 module/p
 ### Phase L1.3 — Dynamic Module / Page / Assignment architecture (R3)
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| L1.3.1 | `security.AppModule` (supersedes static `Module`) — superadmin CRUD | ⬜ | dynamic, not seed-only |
-| L1.3.2 | `security.AppPage` (pages within a module) + `security.PageAction` (view/create/edit/delete/print…) | ⬜ | the "page" dimension R3 asks for |
-| L1.3.3 | Assignment tables: `RoleModule`, `RolePage`, `RolePageAction` (+ `TenantModule` from L1.0.5) | ⬜ | "assign page-module" architecture |
-| L1.3.4 | Superadmin admin screens: manage modules/pages, assign to roles & tenants | ⬜ | |
-| L1.3.5 | Menu/registry API returns **effective** modules/pages for (user, tenant, fiscalYear) | ⬜ | replaces `/api/meta/registry` static feed |
+| L1.3.1 | `security.AppModule` (supersedes static `Module`) — superadmin CRUD | 🟩 | `POST /api/platform/modules` (gated `module.manage`); seeded 10 modules (P0101) |
+| L1.3.2 | `security.AppPage` (pages within a module) + `security.PageAction` (view/create/edit/delete/print…) | 🟩 | `POST /api/platform/pages`; seeded 21 pages + 84 actions |
+| L1.3.3 | Assignment tables: `RoleModule`, `RolePage`, `RolePageAction` (+ `TenantModule` from L1.0.5) | 🟩 | `POST /api/platform/assign/module|page` (gated `rbac.manage`); RolePageAction/TenantModule tables exist (action/tenant-FY assignment APIs pending) |
+| L1.3.4 | Superadmin admin screens: manage modules/pages, assign to roles & tenants | 🟦 | APIs done & verified; wireframe admin UI deferred |
+| L1.3.5 | Menu/registry API returns **effective** modules/pages for (user, tenant, fiscalYear) | 🟩 | `GET /api/menu` (auth-only): superadmin → all; role-scoped otherwise; tenant/FY entitlement filter pending |
 
 ### Phase L1.4 — Fiscal-year model & per-FY billing/variables (R3)
 | # | Task | Status | Notes |
