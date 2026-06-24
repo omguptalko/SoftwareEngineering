@@ -127,7 +127,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | # | Task | SRS Ref | Status | Owner | Notes |
 |---|------|---------|--------|-------|-------|
 | 0.1 | Solution scaffolding (Web/Api/Application/Domain/Infrastructure/Shared) | §9 | 🟩 | | 6 projects, builds clean |
-| 0.2 | MediatR + CQRS pipeline behaviors (validation, auth, audit, txn, logging) | §8.1 | 🟩 | | Validation+Logging+Audit done; authz/txn pending |
+| 0.2 | MediatR + CQRS pipeline behaviors (validation, auth, audit, txn, logging) | §8.1 | 🟩 | | Validation+**Authorization (RBAC, L1.2.6)**+Logging+Audit done; txn/UnitOfWork pending |
 | 0.3 | Dapper data-access base (generic CRUD repo, parameterized queries, UnitOfWork) | §9 | 🟩 | | ConnectionFactory + repos; UnitOfWork pending |
 | 0.4 | MS SQL schema baseline + migrations + **all reference/master tables seeded from scripts** | §9 | 🟩 | | 0001–0011 + seed, idempotent, verified |
 | 0.5 | Config & secrets via appsettings + Azure App Config + **Key Vault** (no inline secrets) | §8.1/§8.2 | 🟦 | | Config-driven done; Key Vault wiring pending |

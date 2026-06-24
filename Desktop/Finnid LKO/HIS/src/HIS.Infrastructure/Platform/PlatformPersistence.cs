@@ -92,4 +92,35 @@ VALUES (@actorUserId, @actorUserName, @tenantId, @action, @entity, @entityId, @s
             new { actorUserId, actorUserName, tenantId, action, entity, entityId, succeeded, error },
             cancellationToken: ct));
     }
+
+    public async Task<IReadOnlyList<(DateTime, string?, string, string, string?, bool)>> GetRecentAuditAsync(int take, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        var rows = await c.QueryAsync<(DateTime, string?, string, string, string?, bool)>(new CommandDefinition(
+            @"SELECT TOP (@take) OccurredUtc, ActorUserName, Action, Entity, EntityId, Succeeded
+              FROM audit.PlatformAudit ORDER BY AuditId DESC", new { take }, cancellationToken: ct));
+        return rows.ToList();
+    }
+}
+
+/// <summary>Resolves permission codes for role codes from HIS_Platform.security.* (L1.2.6).</summary>
+public sealed class PermissionResolver : IPermissionResolver
+{
+    private readonly IPlatformConnectionFactory _f;
+    public PermissionResolver(IPlatformConnectionFactory f) => _f = f;
+
+    public async Task<IReadOnlySet<string>> GetPermissionsAsync(IEnumerable<string> roleCodes, CancellationToken ct = default)
+    {
+        var codes = roleCodes?.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct().ToArray() ?? Array.Empty<string>();
+        if (codes.Length == 0) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        var perms = await c.QueryAsync<string>(new CommandDefinition(
+            @"SELECT DISTINCT p.Code
+              FROM security.Role r
+              INNER JOIN security.RolePermission rp ON rp.RoleId = r.RoleId
+              INNER JOIN security.Permission p ON p.PermissionId = rp.PermissionId
+              WHERE r.Code IN @codes", new { codes }, cancellationToken: ct));
+        return new HashSet<string>(perms, StringComparer.OrdinalIgnoreCase);
+    }
 }

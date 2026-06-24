@@ -103,7 +103,9 @@ Implemented & verified so far:
 - **L1.1 schemas (control-plane)** — schema set defined & applied; **0 `dbo` objects** in `HIS_Platform`. (Tenant data-plane re-schema of the 90 `dbo` tables is deferred to the provisioning work, per D7 parallel-build.)
 - **L1.2 superadmin + login** — PBKDF2 `PasswordHasher` (config-driven iterations), `JwtTokenIssuer` (key/issuer/audience/expiry from `Jwt:*`), `PlatformConnectionFactory` + `PlatformUserRepository`, `LoginCommand`/`LoginHandler`, `POST /api/auth/login`, and a startup `SuperAdminSeeder` (creates the superadmin from `Platform:Bootstrap:*`, hashed — no SQL-embedded password). **Closes parent tracker 0.6 (token issuance).** Verified: login → JWT with `uid/name/role/superadmin` claims (200); wrong password & unknown user → 401; empty fields → 400; every attempt written to `audit.PlatformAudit` (seed + success + 2 failures observed).
 
-Pending in these phases: tenant-role permission grants (depends on L1.3 module/page model), MFA for privileged roles (L1.2.5), RBAC authorization pipeline behavior (L1.2.6), login UI wiring (L1.2.7), and the tenant-DB schema refactor (L1.1.2–4).
+- **L1.2.6 RBAC authorization behavior** — `IAuthorizable` marker + `AuthorizationBehavior` (pipeline order Validation → **Authorization** → Logging → Audit) + `IPermissionResolver` (resolves permission codes from `security.RolePermission`). `IBranchContext` extended with `IsSuperAdmin` (set from the `superadmin` JWT claim); superadmin bypasses checks (D6). Unauthenticated → 401 (`AuthenticationException`), authenticated-but-unpermitted → 403 (`UnauthorizedAccessException`). Demonstrated on `GET /api/platform/audit` (gated by `audit.read`): no token → 401, superadmin → 200 + data, `billing.demo` (role with no grants) → 403. A config-driven dev demo user (`billing.demo`) is seeded to exercise the deny path. **Closes parent tracker 0.2 authorization.**
+
+Pending in these phases: tenant-role permission grants (depends on L1.3 module/page model), MFA for privileged roles (L1.2.5), login UI wiring (L1.2.7), and the tenant-DB schema refactor (L1.1.2–4).
 
 > **Dev-only note:** `appsettings.Development.json` now carries a dev `Jwt:SigningKey` and a bootstrap superadmin password (`ChangeMe!2026`). Both are **dev placeholders** — prod must supply them via environment / Key Vault, and the superadmin must rotate the password on first login (future task).
 
@@ -136,7 +138,7 @@ Pending in these phases: tenant-role permission grants (depends on L1.3 module/p
 | L1.2.3 | Seed **superadmin** user + `superadmin` role + full permission grants | 🟩 | startup `SuperAdminSeeder` (config bootstrap) + `P0100` grants all perms to superadmin |
 | L1.2.4 | Seed **Permission** rows + `RolePermission` | 🟦 | platform perms + superadmin grants done; **14 tenant-role** grants pending (need L1.3 page model) |
 | L1.2.5 | MFA for privileged roles (`IsPrivileged`) + AES/TLS posture (parent **0.7**) | ⬜ | |
-| L1.2.6 | RBAC **authorization pipeline behavior** (parent **0.2** authz pending) | ⬜ | enforce permission per command |
+| L1.2.6 | RBAC **authorization pipeline behavior** (parent **0.2** authz pending) | 🟩 | `IAuthorizable` + `AuthorizationBehavior` + `IPermissionResolver`; verified 401/403/200 on `GET /api/platform/audit` |
 | L1.2.7 | Login UI wired in wireframe (`app/login.html` exists, currently static) | ⬜ | |
 
 ### Phase L1.3 — Dynamic Module / Page / Assignment architecture (R3)

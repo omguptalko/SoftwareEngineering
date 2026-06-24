@@ -12,6 +12,8 @@ public interface IBranchContext
     string? UserName { get; }
     IReadOnlyCollection<string> Roles { get; }
     bool IsAuthenticated { get; }
+    /// <summary>Platform superadmin (Decision D6) — bypasses permission checks.</summary>
+    bool IsSuperAdmin { get; }
 }
 
 /// <summary>Mutable default implementation populated by the API/Web pipeline.</summary>
@@ -23,4 +25,5 @@ public sealed class BranchContext : IBranchContext
     public string? UserName { get; set; }
     public IReadOnlyCollection<string> Roles { get; set; } = Array.Empty<string>();
     public bool IsAuthenticated => UserId.HasValue;
+    public bool IsSuperAdmin { get; set; }
 }
