@@ -1,0 +1,51 @@
+using HIS.Application.Features.Inventory;
+using HIS.Application.Features.Pharmacy;
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
+
+namespace HIS.Api.Controllers;
+
+[ApiController]
+[Route("api/pharmacy")]
+public sealed class PharmacyController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    public PharmacyController(IMediator mediator) => _mediator = mediator;
+
+    [HttpGet("queue")]
+    public Task<IReadOnlyList<RxQueueItemDto>> Queue(CancellationToken ct) => _mediator.Send(new GetPrescriptionQueueQuery(), ct);
+
+    [HttpGet("batches")]
+    public Task<IReadOnlyList<DrugBatchDto>> Batches([FromQuery] string drugCode, CancellationToken ct) => _mediator.Send(new GetDrugBatchesQuery(drugCode), ct);
+
+    [HttpPost("dispense")]
+    public Task<DispenseResult> Dispense([FromBody] DispenseCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+}
+
+[ApiController]
+[Route("api/inventory")]
+public sealed class InventoryController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    public InventoryController(IMediator mediator) => _mediator = mediator;
+
+    [HttpGet("lowstock")]
+    public Task<IReadOnlyList<LowStockItemDto>> LowStock(CancellationToken ct) => _mediator.Send(new GetLowStockQuery(), ct);
+
+    [HttpPost("purchase-orders")]
+    public Task<CreatePurchaseOrderResult> CreatePo([FromBody] CreatePurchaseOrderCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+}
+
+[ApiController]
+[Route("api/assets")]
+public sealed class AssetsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    public AssetsController(IMediator mediator) => _mediator = mediator;
+
+    [HttpGet]
+    public Task<IReadOnlyList<AssetDto>> List(CancellationToken ct) => _mediator.Send(new GetAssetsQuery(), ct);
+
+    [HttpPost]
+    public Task<long> Register([FromBody] RegisterAssetCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+}

@@ -1,0 +1,119 @@
+using FluentValidation;
+using HIS.Application.Abstractions;
+using HIS.Application.Features.Appointments;   // LookupCode
+using HIS.Domain.Entities;
+using HIS.Shared.Context;
+
+namespace HIS.Application.Features.Diagnostics;
+
+// ============================ Radiology (SRS §3.9) ============================
+public sealed record CreateRadiologyOrderCommand(string PatientUhid, string Modality, string? StudyName, bool IsPcPndtRegulated)
+    : ICommand<long>, IAuditable
+{
+    public string AuditEntity => "RadiologyOrder";
+    public string? AuditEntityId => PatientUhid;
+}
+
+public sealed class CreateRadiologyOrderValidator : AbstractValidator<CreateRadiologyOrderCommand>
+{
+    public CreateRadiologyOrderValidator()
+    {
+        RuleFor(x => x.PatientUhid).NotEmpty();
+        RuleFor(x => x.Modality).NotEmpty();
+    }
+}
+
+public sealed class CreateRadiologyOrderHandler : MediatR.IRequestHandler<CreateRadiologyOrderCommand, long>
+{
+    private readonly IRadiologyRepository _rad;
+    private readonly IPatientRepository _patients;
+    public CreateRadiologyOrderHandler(IRadiologyRepository rad, IPatientRepository patients) { _rad = rad; _patients = patients; }
+
+    public async Task<long> Handle(CreateRadiologyOrderCommand c, CancellationToken ct)
+    {
+        var patient = await _patients.GetByUhidAsync(LookupCode.Parse(c.PatientUhid), ct)
+            ?? throw new InvalidOperationException($"Unknown patient '{c.PatientUhid}'.");
+        return await _rad.CreateOrderAsync(new RadiologyOrder
+        {
+            PatientId = patient.PatientId, Modality = c.Modality, StudyName = c.StudyName,
+            ScheduledUtc = DateTime.UtcNow, IsPcPndtRegulated = c.IsPcPndtRegulated, Status = "Scheduled"
+        }, ct);
+    }
+}
+
+public sealed record RadWorklistItemDto(string Modality, string? Study, string Patient, string Status);
+public sealed record GetRadiologyWorklistQuery : IQuery<IReadOnlyList<RadWorklistItemDto>>;
+
+public sealed class GetRadiologyWorklistHandler : MediatR.IRequestHandler<GetRadiologyWorklistQuery, IReadOnlyList<RadWorklistItemDto>>
+{
+    private readonly IRadiologyRepository _rad;
+    private readonly IBranchContext _ctx;
+    public GetRadiologyWorklistHandler(IRadiologyRepository rad, IBranchContext ctx) { _rad = rad; _ctx = ctx; }
+
+    public async Task<IReadOnlyList<RadWorklistItemDto>> Handle(GetRadiologyWorklistQuery q, CancellationToken ct)
+    {
+        var rows = await _rad.GetWorklistAsync(_ctx.BranchId ?? 0, ct);
+        return rows.Select(r => new RadWorklistItemDto(r.Modality, r.Study, r.Patient, r.Status)).ToList();
+    }
+}
+
+// ============================ Blood Bank (SRS §3.7) ============================
+public sealed record BloodStockDto(string BloodGroup, int Units, int SafetyThreshold, bool BelowThreshold);
+public sealed record GetBloodStockQuery : IQuery<IReadOnlyList<BloodStockDto>>;
+
+public sealed class GetBloodStockHandler : MediatR.IRequestHandler<GetBloodStockQuery, IReadOnlyList<BloodStockDto>>
+{
+    private readonly IBloodBankRepository _bb;
+    private readonly IBranchContext _ctx;
+    public GetBloodStockHandler(IBloodBankRepository bb, IBranchContext ctx) { _bb = bb; _ctx = ctx; }
+
+    public async Task<IReadOnlyList<BloodStockDto>> Handle(GetBloodStockQuery q, CancellationToken ct)
+    {
+        var rows = await _bb.GetStockAsync(_ctx.BranchId ?? 0, ct);
+        return rows.Select(s => new BloodStockDto(s.BloodGroup, s.Units, s.SafetyThreshold, s.Units <= s.SafetyThreshold)).ToList();
+    }
+}
+
+public sealed record RaiseBloodRequestCommand(string? PatientUhid, string BloodGroup, int Units, bool IsEmergency)
+    : ICommand<RaiseBloodRequestResult>, IAuditable
+{
+    public string AuditEntity => "BloodRequest";
+    public string? AuditEntityId => BloodGroup;
+}
+public sealed record RaiseBloodRequestResult(long RequestId, bool DonorAlert);
+
+public sealed class RaiseBloodRequestValidator : AbstractValidator<RaiseBloodRequestCommand>
+{
+    public RaiseBloodRequestValidator()
+    {
+        RuleFor(x => x.BloodGroup).NotEmpty();
+        RuleFor(x => x.Units).GreaterThan(0);
+    }
+}
+
+public sealed class RaiseBloodRequestHandler : MediatR.IRequestHandler<RaiseBloodRequestCommand, RaiseBloodRequestResult>
+{
+    private readonly IBloodBankRepository _bb;
+    private readonly IPatientRepository _patients;
+    private readonly IBranchContext _ctx;
+    public RaiseBloodRequestHandler(IBloodBankRepository bb, IPatientRepository patients, IBranchContext ctx)
+    { _bb = bb; _patients = patients; _ctx = ctx; }
+
+    public async Task<RaiseBloodRequestResult> Handle(RaiseBloodRequestCommand c, CancellationToken ct)
+    {
+        var branchId = _ctx.BranchId ?? throw new InvalidOperationException("Branch context required.");
+        long? patientId = null;
+        if (!string.IsNullOrWhiteSpace(c.PatientUhid))
+            patientId = (await _patients.GetByUhidAsync(LookupCode.Parse(c.PatientUhid!), ct))?.PatientId;
+
+        var available = await _bb.GetAvailableUnitsAsync(branchId, c.BloodGroup, ct);
+        var id = await _bb.CreateRequestAsync(new BloodRequest
+        {
+            BranchId = branchId, PatientId = patientId, BloodGroup = c.BloodGroup,
+            Units = c.Units, IsEmergency = c.IsEmergency, RequestedUtc = DateTime.UtcNow, Status = "Requested"
+        }, ct);
+
+        // Donor alert when the request cannot be met from current stock (SRS §3.7).
+        return new RaiseBloodRequestResult(id, available < c.Units);
+    }
+}

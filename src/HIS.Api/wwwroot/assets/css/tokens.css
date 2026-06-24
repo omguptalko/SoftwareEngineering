@@ -1,0 +1,90 @@
+/* ============================================================================
+   HIS ERP — Design Tokens (shared by landing + app)
+   Finnid Infotech — Multi-Branch Industrial Hospital ERP
+   ========================================================================== */
+
+:root {
+  /* ---- Brand / accent ---------------------------------------------------- */
+  --brand:        #0d7a74;   /* healthcare teal            */
+  --brand-600:    #0b6a65;
+  --brand-700:    #095853;
+  --brand-50:     #e7f3f2;
+  --brand-100:    #cfe7e5;
+  --accent:       #1f6feb;   /* action blue (links/primary) */
+  --accent-600:   #1a5fce;
+
+  /* ---- Neutral palette --------------------------------------------------- */
+  --ink:          #1b2330;   /* primary text  */
+  --ink-2:        #45506180; /* (unused alpha helper) */
+  --muted:        #5b6675;   /* secondary text */
+  --muted-2:      #8a93a1;
+  --line:         #d4d9e0;   /* borders */
+  --line-2:       #e6e9ee;
+  --bg:           #f4f6f9;   /* app canvas */
+  --bg-2:         #eceff3;
+  --surface:      #ffffff;
+  --surface-2:    #f8fafc;
+
+  /* ---- Status colors ----------------------------------------------------- */
+  --ok:           #1a7f43;
+  --ok-bg:        #e4f4ea;
+  --warn:         #b9770a;
+  --warn-bg:      #fbf0da;
+  --danger:       #c2331f;
+  --danger-bg:    #fce4e0;
+  --info:         #1f6feb;
+  --info-bg:      #e5effd;
+  --purple:       #6b3fa0;
+  --purple-bg:    #efe7f8;
+
+  /* ---- Typography -------------------------------------------------------- */
+  --font-ui: "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", "SF Mono", ui-monospace, monospace;
+
+  /* ---- Desktop density --------------------------------------------------- */
+  --row-h:        26px;      /* form control height */
+  --grid-row-h:   24px;      /* data grid row height */
+  --fs:           12.5px;    /* base app font */
+  --fs-sm:        11.5px;
+  --fs-xs:        10.5px;
+  --radius:       3px;       /* sharp, desktop-ish corners */
+  --radius-lg:    5px;
+
+  /* ---- Elevation --------------------------------------------------------- */
+  --shadow-1: 0 1px 2px rgba(20,30,45,.08);
+  --shadow-2: 0 4px 14px rgba(20,30,45,.14);
+  --shadow-3: 0 12px 40px rgba(20,30,45,.22);
+
+  /* ---- Chrome heights ---------------------------------------------------- */
+  --h-titlebar: 30px;
+  --h-menubar:  26px;
+  --h-toolbar:  38px;
+  --h-tabstrip: 30px;
+  --h-status:   24px;
+  --w-sidebar:  236px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+/* Shared focus ring — strong & visible for keyboard-first use */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+::selection { background: var(--brand-100); }
+
+/* Utility status pills reused across landing + app */
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-xs); font-weight: 600; line-height: 1;
+  padding: 3px 7px; border-radius: 10px; white-space: nowrap;
+}
+.pill--ok     { color: var(--ok);     background: var(--ok-bg); }
+.pill--warn   { color: var(--warn);   background: var(--warn-bg); }
+.pill--danger { color: var(--danger); background: var(--danger-bg); }
+.pill--info   { color: var(--info);   background: var(--info-bg); }
+.pill--purple { color: var(--purple); background: var(--purple-bg); }
+.pill--muted  { color: var(--muted);  background: var(--bg-2); }

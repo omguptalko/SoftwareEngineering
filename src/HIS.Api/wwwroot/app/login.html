@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — Finnid HIS ERP</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/tokens.css">
+<style>
+  body{font-family:var(--font-ui);margin:0;min-height:100vh;display:grid;grid-template-columns:1.1fr .9fr;color:var(--ink);background:var(--surface)}
+  /* Left brand panel */
+  .lp{position:relative;overflow:hidden;color:#dff1ef;padding:48px 56px;display:flex;flex-direction:column;
+      background:radial-gradient(900px 500px at 80% -10%,#14a89f55,transparent 60%),linear-gradient(160deg,#0b5854,#0d7a74)}
+  .lp .brand{color:#fff}
+  .lp__mid{margin-top:auto}
+  .lp h1{font-size:34px;line-height:1.12;letter-spacing:-.6px;margin:0 0 14px;color:#fff}
+  .lp p{font-size:15px;color:#cdeae7;max-width:42ch;margin:0 0 26px}
+  .lp__feat{display:grid;gap:12px;margin-bottom:8px}
+  .lp__feat div{display:flex;gap:11px;align-items:center;font-size:13.5px}
+  .lp__feat i{color:#7ff0e6}
+  .lp__foot{margin-top:28px;font-size:12px;color:#9fd4cf;border-top:1px solid #ffffff22;padding-top:16px}
+  .brand__mark{width:40px;height:40px;border-radius:9px;display:grid;place-items:center;background:#ffffff22;color:#fff;font-size:21px}
+  .brand{display:flex;gap:12px;align-items:center;font-weight:800;font-size:18px}
+  .brand small{display:block;font-size:11px;font-weight:600;color:#bfe6e2}
+
+  /* Right form panel */
+  .rp{display:grid;place-items:center;padding:32px}
+  .card-login{width:min(380px,90vw)}
+  .card-login h2{font-size:22px;margin:0 0 4px}
+  .card-login .sub{color:var(--muted);font-size:13.5px;margin:0 0 22px}
+  .fld{margin-bottom:14px}
+  .fld label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .fld label .req{color:var(--danger)}
+  .ctrl{position:relative}
+  .ctrl > i.lead{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:15px;pointer-events:none}
+  input.inp,select.inp{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;background:#fff;
+      padding:0 12px 0 36px;font-size:14px;font-family:var(--font-ui);color:var(--ink)}
+  select.inp{appearance:none}
+  input.inp:focus,select.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px #1f6feb22;outline:none}
+  .ctrl .toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:15px;padding:6px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .between{display:flex;justify-content:space-between;align-items:center;margin:4px 0 18px;font-size:12.5px}
+  .between a{color:var(--accent);font-weight:600;text-decoration:none}
+  .between label{display:flex;gap:7px;align-items:center;color:var(--muted);font-weight:600}
+  .btn-login{width:100%;height:44px;border:0;border-radius:8px;background:var(--brand);color:#fff;font-weight:700;font-size:15px;cursor:pointer;display:flex;gap:9px;align-items:center;justify-content:center}
+  .btn-login:hover{background:var(--brand-600)}
+  .btn-login:active{transform:translateY(1px)}
+  .or{display:flex;align-items:center;gap:12px;color:var(--muted-2);font-size:12px;margin:18px 0}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line-2)}
+  .btn-abha{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font-weight:700;font-size:13.5px;cursor:pointer;display:flex;gap:9px;align-items:center;justify-content:center}
+  .btn-abha:hover{border-color:var(--brand);color:var(--brand)}
+  .hint{margin-top:18px;font-size:11.5px;color:var(--muted-2);text-align:center}
+  .hint kbd{font-family:var(--font-mono);background:var(--bg-2);border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:10.5px;color:var(--ink)}
+  .topback{position:absolute;top:20px;right:24px}
+  .topback a{color:var(--muted);font-size:12.5px;font-weight:600;text-decoration:none}
+  .topback a:hover{color:var(--brand)}
+  @media(max-width:860px){body{grid-template-columns:1fr}.lp{display:none}}
+</style>
+</head>
+<body>
+
+  <!-- Left brand panel -->
+  <aside class="lp">
+    <div class="brand"><span class="brand__mark"><i class="bi bi-heart-pulse-fill"></i></span>
+      <span>Finnid HIS&nbsp;ERP<small>Healthcare Enterprise Solutions</small></span></div>
+    <div class="lp__mid">
+      <h1>Multi-Branch Industrial<br>Hospital ERP</h1>
+      <p>Sign in to your branch workspace. Clinical, cashless claims, government schemes and ABDM — all on one keyboard-fast desk.</p>
+      <div class="lp__feat">
+        <div><i class="bi bi-check-circle-fill"></i> Role-based access · JWT · MFA for privileged roles</div>
+        <div><i class="bi bi-check-circle-fill"></i> AES-256 at rest · TLS in transit · audit trail</div>
+        <div><i class="bi bi-check-circle-fill"></i> DPDP Act 2023 · ABDM · ISO 27001 aligned</div>
+      </div>
+      <div class="lp__foot">© 2026 Finnid Infotech Pvt. Ltd. · SRS v2.0 · This is an interactive wireframe demo.</div>
+    </div>
+  </aside>
+
+  <!-- Right form -->
+  <main class="rp">
+    <div class="topback"><a href="../landing/index.html"><i class="bi bi-arrow-left"></i> Back to site</a></div>
+    <form class="card-login" id="loginForm" autocomplete="off">
+      <h2>Sign in</h2>
+      <p class="sub">Enter your credentials to access the ERP.</p>
+
+      <div class="row2">
+        <div class="fld">
+          <label>Branch <span class="req">*</span></label>
+          <div class="ctrl"><i class="bi bi-diagram-3 lead"></i>
+            <select class="inp" id="branch" tabindex="1" autofocus>
+              <option>Indl-North (BR1)</option>
+              <option>Indl-South (BR2)</option>
+              <option>City Central (BR3)</option>
+              <option>Refinery Unit (BR4)</option>
+            </select>
+          </div>
+        </div>
+        <div class="fld">
+          <label>Role <span class="req">*</span></label>
+          <div class="ctrl"><i class="bi bi-person-badge lead"></i>
+            <select class="inp" id="role" tabindex="2">
+              <option>Admin</option><option>Doctor</option><option>Nurse</option>
+              <option selected>Receptionist</option><option>Billing Staff</option>
+              <option>TPA / Insurance Desk</option><option>Ayushman Mitra (PMAM)</option>
+              <option>Pharmacist</option><option>Lab Technician</option>
+              <option>Occupational Health Officer</option><option>HR Manager</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="fld">
+        <label>User ID <span class="req">*</span></label>
+        <div class="ctrl"><i class="bi bi-person lead"></i>
+          <input class="inp" id="user" type="text" value="rao.k" tabindex="3" placeholder="e.g. rao.k">
+        </div>
+      </div>
+
+      <div class="fld">
+        <label>Password <span class="req">*</span></label>
+        <div class="ctrl"><i class="bi bi-lock lead"></i>
+          <input class="inp" id="pass" type="password" value="demo1234" tabindex="4" placeholder="••••••••">
+          <button type="button" class="toggle" id="togglePass" tabindex="-1" aria-label="Show password"><i class="bi bi-eye"></i></button>
+        </div>
+      </div>
+
+      <div class="between">
+        <label><input type="checkbox" tabindex="5"> Remember this device</label>
+        <a href="#" tabindex="-1">Forgot password?</a>
+      </div>
+
+      <button class="btn-login" type="submit" tabindex="6"><i class="bi bi-box-arrow-in-right"></i> Sign in</button>
+
+      <div class="or">or</div>
+      <button class="btn-abha" type="button" id="abhaBtn" tabindex="7"><i class="bi bi-fingerprint"></i> Sign in with ABHA / Aadhaar OTP</button>
+
+      <p class="hint">Press <kbd>Enter</kbd> to sign in · <kbd>Tab</kbd> to move between fields</p>
+    </form>
+  </main>
+
+<script>
+  // Show/hide password
+  document.getElementById('togglePass').addEventListener('click',function(){
+    const p=document.getElementById('pass'); const on=p.type==='password';
+    p.type=on?'text':'password'; this.querySelector('i').className=on?'bi bi-eye-slash':'bi bi-eye';
+  });
+  // Submit -> enter app shell
+  document.getElementById('loginForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    const b=document.getElementById('branch').value, r=document.getElementById('role').value, u=document.getElementById('user').value;
+    try{ sessionStorage.setItem('his_session', JSON.stringify({branch:b,role:r,user:u})); }catch(_){}
+    window.location.href='index.html';
+  });
+  document.getElementById('abhaBtn').addEventListener('click',function(){
+    alert('ABHA / Aadhaar OTP login\n\n(Wireframe) In the live system this opens UIDAI/ABDM OTP verification.');
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finnid HIS ERP — Workspace</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/tokens.css">
+<link rel="stylesheet" href="../assets/css/app.css">
+</head>
+<body class="app">
+<div class="win">
+
+  <!-- ============ TITLE BAR ============ -->
+  <header class="titlebar">
+    <span class="tb-brand"><i class="bi bi-heart-pulse-fill"></i> Finnid HIS ERP</span>
+    <span class="tb-sep"></span>
+    <span class="tb-ctx">Branch: <b id="ctxBranch">—</b></span>
+    <span class="tb-sep"></span>
+    <span class="tb-ctx">User: <b id="ctxUser">—</b> · <span id="ctxRole">—</span></span>
+    <span class="tb-right">
+      <span class="tb-clock" id="clock">--:--:--</span>
+      <span class="tb-sep"></span>
+      <span class="tb-win"><span title="Minimize">&minus;</span><span title="Restore">▢</span><span title="Close" onclick="location.href='login.html'">✕</span></span>
+    </span>
+  </header>
+
+  <!-- ============ MENU BAR ============ -->
+  <nav class="menubar" id="menubar">
+    <div class="menu" data-menu>
+      <button><u>F</u>ile</button>
+      <div class="menu__pop">
+        <div class="menu__item" data-act="new"><i class="bi bi-file-earmark-plus"></i> New Record <span class="sh">F2</span></div>
+        <div class="menu__item" data-act="open" data-mod="registration"><i class="bi bi-folder2-open"></i> Open Patient… <span class="sh">Ctrl+O</span></div>
+        <div class="menu__item" data-act="save"><i class="bi bi-save"></i> Save <span class="sh">F9</span></div>
+        <div class="menu__item" data-act="savenew"><i class="bi bi-save2"></i> Save &amp; New <span class="sh">F6</span></div>
+        <div class="menu__sep"></div>
+        <div class="menu__item" data-act="print"><i class="bi bi-printer"></i> Print <span class="sh">F12</span></div>
+        <div class="menu__sep"></div>
+        <div class="menu__item" data-act="logout"><i class="bi bi-box-arrow-left"></i> Log out <span class="sh">Ctrl+Q</span></div>
+      </div>
+    </div>
+    <div class="menu" data-menu>
+      <button><u>E</u>dit</button>
+      <div class="menu__pop">
+        <div class="menu__item" data-act="edit"><i class="bi bi-pencil-square"></i> Edit Record <span class="sh">F4</span></div>
+        <div class="menu__item" data-act="delete"><i class="bi bi-trash3"></i> Delete <span class="sh">F8</span></div>
+        <div class="menu__sep"></div>
+        <div class="menu__item" data-act="find"><i class="bi bi-search"></i> Find / Lookup <span class="sh">F3</span></div>
+        <div class="menu__item" data-act="refresh"><i class="bi bi-arrow-clockwise"></i> Refresh <span class="sh">F5</span></div>
+      </div>
+    </div>
+    <div class="menu" data-menu>
+      <button><u>V</u>iew</button>
+      <div class="menu__pop">
+        <div class="menu__item" data-act="open" data-mod="dashboard"><i class="bi bi-speedometer2"></i> Dashboard</div>
+        <div class="menu__item" data-act="closetab"><i class="bi bi-x-square"></i> Close Tab <span class="sh">Ctrl+W</span></div>
+        <div class="menu__item" data-act="nexttab"><i class="bi bi-arrow-left-right"></i> Next Tab <span class="sh">Ctrl+Tab</span></div>
+        <div class="menu__sep"></div>
+        <div class="menu__item" data-act="cheat"><i class="bi bi-keyboard"></i> Keyboard Shortcuts <span class="sh">F1</span></div>
+      </div>
+    </div>
+    <div class="menu" data-menu>
+      <button><u>P</u>atient</button>
+      <div class="menu__pop">
+        <div class="menu__item" data-act="open" data-mod="registration"><i class="bi bi-person-vcard"></i> Registration &amp; UHID</div>
+        <div class="menu__item" data-act="open" data-mod="appointments"><i class="bi bi-calendar-check"></i> Appointments &amp; Token</div>
+        <div class="menu__item" data-act="open" data-mod="opd"><i class="bi bi-clipboard2-pulse"></i> OPD Consultation</div>
+        <div class="menu__item" data-act="open" data-mod="ipd"><i class="bi bi-hospital"></i> IPD / Bed Board</div>
+      </div>
+    </div>
+    <div class="menu" data-menu>
+      <button><u>C</u>linical</button>
+      <div class="menu__pop">
+        <div class="menu__item" data-act="open" data-mod="opd"><i class="bi bi-clipboard2-pulse"></i> OPD Consultation</div>
+        <div class="menu__item" data-act="open" data-mod="lab"><i class="bi bi-eyedropper"></i> Laboratory (LIS)</div>
+        <div class="menu__item" data-act="open" data-mod="pharmacy"><i class="bi bi-capsule"></i> Pharmacy</div>
+        <div class="menu__item" data-act="open" data-mod="radiology"><i class="bi bi-radioactive"></i> Radiology</div>
+        <div class="menu__item" data-act="open" data-mod="ot"><i class="bi bi-scissors"></i> Operation Theatre</div>
+      </div>
+    </div>
+    <div class="menu" data-menu>
+      <button><u>I</u>nsurance</button>
+      <div class="menu__pop">
+        <div class="menu__item" data-act="open" data-mod="cashless"><i class="bi bi-credit-card-2-front"></i> Cashless / TPA Claims</div>
+        <div class="menu__item" data-act="open" data-mod="pmjay"><i class="bi bi-bank2"></i> AB PM-JAY (BIS/TMS)</div>
+        <div class="menu__item" data-act="open" data-mod="esic"><i class="bi bi-building-check"></i> ESIC</div>
+        <div class="menu__item" data-act="open" data-mod="cghs"><i class="bi bi-shield-plus"></i> CGHS</div>
+        <div class="menu__item" data-act="open" data-mod="echs"><i class="bi bi-shield-shaded"></i> ECHS</div>
+        <div class="menu__item" data-act="open" data-mod="claimsmis"><i class="bi bi-graph-up"></i> Claims MIS &amp; Reconciliation</div>
+      </div>
+    </div>
+    <div class="menu" data-menu>
+      <button><u>R</u>eports</button>
+      <div class="menu__pop">
+        <div class="menu__item" data-act="open" data-mod="dashboard"><i class="bi bi-speedometer2"></i> Admin Dashboard</div>
+        <div class="menu__item" data-act="open" data-mod="claimsmis"><i class="bi bi-graph-up"></i> Claims MIS</div>
+        <div class="menu__item" data-act="open" data-mod="compliance"><i class="bi bi-shield-check"></i> Compliance &amp; Audit</div>
+      </div>
+    </div>
+    <div class="menu" data-menu>
+      <button><u>T</u>ools</button>
+      <div class="menu__pop">
+        <div class="menu__item" data-act="open" data-mod="abdm"><i class="bi bi-fingerprint"></i> ABDM / ABHA Console</div>
+        <div class="menu__item" data-act="open" data-mod="ai"><i class="bi bi-cpu"></i> AI Suite</div>
+        <div class="menu__item" data-act="open" data-mod="paymentgw"><i class="bi bi-wallet2"></i> Payment Gateway</div>
+        <div class="menu__sep"></div>
+        <div class="menu__item" data-act="cheat"><i class="bi bi-sliders"></i> Preferences</div>
+      </div>
+    </div>
+    <div class="menu" data-menu style="margin-left:auto">
+      <button><u>H</u>elp</button>
+      <div class="menu__pop" style="left:auto;right:0">
+        <div class="menu__item" data-act="cheat"><i class="bi bi-keyboard"></i> Keyboard Shortcuts <span class="sh">F1</span></div>
+        <div class="menu__item" data-act="about"><i class="bi bi-info-circle"></i> About this demo</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ============ TOOLBAR ============ -->
+  <div class="toolbar" id="toolbar">
+    <button class="tbtn" data-act="new"><i class="bi bi-file-earmark-plus"></i><small>New</small><span class="fk">F2</span></button>
+    <button class="tbtn" data-act="find"><i class="bi bi-search"></i><small>Find</small><span class="fk">F3</span></button>
+    <button class="tbtn" data-act="edit"><i class="bi bi-pencil-square"></i><small>Edit</small><span class="fk">F4</span></button>
+    <button class="tbtn" data-act="refresh"><i class="bi bi-arrow-clockwise"></i><small>Refresh</small><span class="fk">F5</span></button>
+    <span class="tbar-sep"></span>
+    <button class="tbtn" data-act="savenew"><i class="bi bi-save2"></i><small>Save+New</small><span class="fk">F6</span></button>
+    <button class="tbtn" data-act="delete"><i class="bi bi-trash3"></i><small>Delete</small><span class="fk">F8</span></button>
+    <button class="tbtn" data-act="save"><i class="bi bi-save"></i><small>Save</small><span class="fk">F9</span></button>
+    <span class="tbar-sep"></span>
+    <button class="tbtn" data-act="print"><i class="bi bi-printer"></i><small>Print</small><span class="fk">F12</span></button>
+    <button class="tbtn" data-act="cheat"><i class="bi bi-keyboard"></i><small>Keys</small><span class="fk">F1</span></button>
+    <span class="tb-spacer"></span>
+    <div class="tbar-search"><i class="bi bi-search"></i><input id="globalSearch" placeholder="Search patient / UHID / claim…" tabindex="-1"></div>
+  </div>
+
+  <!-- ============ BODY (sidebar + workspace) ============ -->
+  <div class="body">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar__head"><i class="bi bi-grid-3x3-gap-fill"></i> Modules <span class="count" id="modCount">31</span></div>
+      <div class="sidebar__filter"><input id="modFilter" placeholder="Filter modules…" tabindex="-1"></div>
+      <div class="tree" id="tree"><!-- rendered by shell.js --></div>
+    </aside>
+
+    <!-- Workspace -->
+    <section class="workspace">
+      <div class="tabstrip" id="tabstrip"></div>
+      <div class="docarea" id="docarea">
+        <div class="empty-ws" id="emptyWs">
+          <div>
+            <div class="e-ico"><i class="bi bi-window-stack"></i></div>
+            <h3>Welcome to your workspace</h3>
+            <p>Open a module from the left explorer, the menu bar, or press a function key.</p>
+            <div class="e-keys">
+              <span class="pill pill--muted">F1 Shortcuts</span>
+              <span class="pill pill--muted">F3 Find</span>
+              <span class="pill pill--info">Tip: try Patient → Registration</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ STATUS BAR ============ -->
+  <footer class="statusbar" id="statusbar">
+    <span class="si legend" id="fkeyLegend">
+      <span><kbd>F1</kbd> <b>Help</b></span>
+      <span><kbd>F2</kbd> New</span>
+      <span><kbd>F3</kbd> Find</span>
+      <span><kbd>F9</kbd> Save</span>
+      <span><kbd>Esc</kbd> Close</span>
+    </span>
+    <span class="si right"><span class="online">● Online</span></span>
+    <span class="si right" id="sbDate">19-Jun-2026</span>
+    <span class="si right" id="sbBranch">BR1 · Indl-North</span>
+    <span class="si right" id="sbRec">Ready</span>
+    <span class="si right"><span id="capsInd">CAPS</span> · <span id="insInd">INS</span></span>
+  </footer>
+</div>
+
+<!-- ============ LOOKUP MODAL (F3) ============ -->
+<div class="overlay" id="overlay"></div>
+<div class="lookup" id="lookup" role="dialog" aria-modal="true">
+  <div class="lookup__head"><i class="bi bi-search"></i> <span id="lkTitle">Lookup</span> <span class="x" data-lk-close>&times;</span></div>
+  <div class="lookup__search"><input id="lkSearch" placeholder="Type to filter… (↑ ↓ to move, Enter to pick)"></div>
+  <div class="lookup__list" id="lkList"></div>
+  <div class="lookup__foot">
+    <span><kbd>↑</kbd> <kbd>↓</kbd> Navigate</span>
+    <span><kbd>Enter</kbd> Select</span>
+    <span><kbd>Esc</kbd> Cancel</span>
+    <span style="margin-left:auto" id="lkCount"></span>
+  </div>
+</div>
+
+<!-- ============ CHEAT SHEET (F1) ============ -->
+<div class="cheat" id="cheat">
+  <div class="cheat__h"><i class="bi bi-keyboard"></i> Keyboard Shortcuts <span class="x" data-cheat-close>&times;</span></div>
+  <div class="cheat__b">
+    <div class="ck"><kbd>F1</kbd><span>This help</span></div>
+    <div class="ck"><kbd>F2</kbd><span>New record</span></div>
+    <div class="ck"><kbd>F3</kbd><span>Find / Lookup</span></div>
+    <div class="ck"><kbd>F4</kbd><span>Edit record</span></div>
+    <div class="ck"><kbd>F5</kbd><span>Refresh</span></div>
+    <div class="ck"><kbd>F6</kbd><span>Save &amp; New</span></div>
+    <div class="ck"><kbd>F8</kbd><span>Delete</span></div>
+    <div class="ck"><kbd>F9</kbd><span>Save / Post</span></div>
+    <div class="ck"><kbd>F12</kbd><span>Print</span></div>
+    <div class="ck"><kbd>Enter</kbd><span>Next field</span></div>
+    <div class="ck"><kbd>⇧Enter</kbd><span>Prev field</span></div>
+    <div class="ck"><kbd>Esc</kbd><span>Close / Cancel</span></div>
+    <div class="ck"><kbd>Alt+_</kbd><span>Menu accesskey</span></div>
+    <div class="ck"><kbd>^Tab</kbd><span>Next tab</span></div>
+    <div class="ck"><kbd>^W</kbd><span>Close tab</span></div>
+    <div class="ck"><kbd>^O</kbd><span>Open patient</span></div>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div class="toast" id="toast"><i class="bi bi-check-circle-fill"></i> <span id="toastMsg"></span></div>
+
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/modules.js"></script>
+<script src="../assets/js/keyboard.js"></script>
+<script src="../assets/js/shell.js"></script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+using FluentValidation;
+using HIS.Application.Abstractions;
+using HIS.Application.Features.Appointments;   // LookupCode
+using HIS.Domain.Entities;
+using HIS.Shared.Context;
+
+namespace HIS.Application.Features.Opd;
+
+public sealed record VitalsDto(
+    decimal? TempF, int? Pulse, int? BpSystolic, int? BpDiastolic,
+    int? Spo2, int? RespRate, decimal? WeightKg, decimal? HeightCm, int? Grbs);
+
+public sealed record RxLineDto(string DrugCode, string? Dose, string? Frequency, int? Days, string? Route, int? Qty);
+
+/// <summary>Persists an OPD consultation in one unit: encounter + vitals + diagnoses +
+/// prescription + follow-up/advice (SRS §3.3). Codes/UHID resolved server-side.</summary>
+public sealed record SaveConsultationCommand(
+    string PatientUhid, string DoctorCode,
+    VitalsDto? Vitals, string? Complaints, string? History, string? Advice, DateTime? FollowUpDate,
+    IReadOnlyList<string>? DiagnosisCodes, IReadOnlyList<RxLineDto>? Prescription)
+    : ICommand<SaveConsultationResult>, IAuditable
+{
+    public string AuditEntity => "Encounter";
+    public string? AuditEntityId => PatientUhid;
+}
+
+public sealed record SaveConsultationResult(long EncounterId, long? PrescriptionId);
+
+public sealed class SaveConsultationValidator : AbstractValidator<SaveConsultationCommand>
+{
+    public SaveConsultationValidator()
+    {
+        RuleFor(x => x.PatientUhid).NotEmpty();
+        RuleFor(x => x.DoctorCode).NotEmpty();
+    }
+}
+
+public sealed class SaveConsultationHandler : MediatR.IRequestHandler<SaveConsultationCommand, SaveConsultationResult>
+{
+    private readonly IEncounterRepository _enc;
+    private readonly IPatientRepository _patients;
+    private readonly IBranchContext _ctx;
+
+    public SaveConsultationHandler(IEncounterRepository enc, IPatientRepository patients, IBranchContext ctx)
+    {
+        _enc = enc; _patients = patients; _ctx = ctx;
+    }
+
+    public async Task<SaveConsultationResult> Handle(SaveConsultationCommand c, CancellationToken ct)
+    {
+        var branchId = _ctx.BranchId ?? throw new InvalidOperationException("Branch context required.");
+
+        var patient = await _patients.GetByUhidAsync(LookupCode.Parse(c.PatientUhid), ct)
+            ?? throw new InvalidOperationException($"Unknown patient '{c.PatientUhid}'.");
+        var doctorId = await _enc.GetDoctorIdByCodeAsync(LookupCode.Parse(c.DoctorCode), ct);
+
+        var encounterId = await _enc.CreateEncounterAsync(new Encounter
+        {
+            BranchId = branchId,
+            PatientId = patient.PatientId,
+            DoctorId = doctorId,
+            EncType = "OPD",
+            StartedUtc = DateTime.UtcNow,
+            Complaints = c.Complaints,
+            History = c.History,
+            Advice = c.Advice,
+            FollowUpDate = c.FollowUpDate,
+            Status = "Closed"
+        }, ct);
+
+        if (c.Vitals is { } v && HasAnyVital(v))
+        {
+            await _enc.SaveVitalsAsync(new Vitals
+            {
+                EncounterId = encounterId,
+                RecordedUtc = DateTime.UtcNow,
+                TempF = v.TempF, Pulse = v.Pulse, BpSystolic = v.BpSystolic, BpDiastolic = v.BpDiastolic,
+                Spo2 = v.Spo2, RespRate = v.RespRate, WeightKg = v.WeightKg, HeightCm = v.HeightCm, Grbs = v.Grbs
+            }, ct);
+        }
+
+        if (c.DiagnosisCodes is { Count: > 0 })
+            foreach (var dx in c.DiagnosisCodes.Where(d => !string.IsNullOrWhiteSpace(d)))
+                await _enc.AddDiagnosisAsync(encounterId, LookupCode.Parse(dx), true, ct);
+
+        long? prescriptionId = null;
+        var lines = (c.Prescription ?? Array.Empty<RxLineDto>()).Where(l => !string.IsNullOrWhiteSpace(l.DrugCode)).ToList();
+        if (lines.Count > 0)
+        {
+            prescriptionId = await _enc.CreatePrescriptionAsync(encounterId, ct);
+            foreach (var l in lines)
+            {
+                var drugId = await _enc.GetDrugIdByCodeAsync(LookupCode.Parse(l.DrugCode), ct);
+                await _enc.AddPrescriptionLineAsync(new PrescriptionLine
+                {
+                    PrescriptionId = prescriptionId.Value,
+                    DrugId = drugId,
+                    Dose = l.Dose, Frequency = l.Frequency, Days = l.Days, Route = l.Route, Qty = l.Qty
+                }, ct);
+            }
+        }
+
+        return new SaveConsultationResult(encounterId, prescriptionId);
+    }
+
+    private static bool HasAnyVital(VitalsDto v) =>
+        v.TempF.HasValue || v.Pulse.HasValue || v.BpSystolic.HasValue || v.BpDiastolic.HasValue ||
+        v.Spo2.HasValue || v.RespRate.HasValue || v.WeightKg.HasValue || v.HeightCm.HasValue || v.Grbs.HasValue;
+}
