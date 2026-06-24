@@ -199,6 +199,132 @@ public sealed class ModuleAdminRepository : IModuleAdminRepository
     }
 }
 
+/// <summary>Control-plane tenant/fiscal-year/domain/db-catalog store (L1.7) over HIS_Platform.platform.*.</summary>
+public sealed class TenantAdminRepository : ITenantAdminRepository
+{
+    private readonly IPlatformConnectionFactory _f;
+    public TenantAdminRepository(IPlatformConnectionFactory f) => _f = f;
+
+    public async Task<bool> TenantExistsAsync(string code, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(1) FROM platform.Tenant WHERE Code = @code", new { code }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task<int> CreateTenantAsync(string code, string name, byte fyStartMonth, byte fyStartDay, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.QuerySingleAsync<int>(new CommandDefinition(
+            @"INSERT INTO platform.Tenant (Code, Name, FyStartMonth, FyStartDay)
+              VALUES (@code, @name, @fyStartMonth, @fyStartDay);
+              SELECT CAST(SCOPE_IDENTITY() AS INT);",
+            new { code, name, fyStartMonth, fyStartDay }, cancellationToken: ct));
+    }
+
+    public async Task<int?> GetTenantIdByCodeAsync(string code, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
+            "SELECT TenantId FROM platform.Tenant WHERE Code = @code", new { code }, cancellationToken: ct));
+    }
+
+    public async Task<bool> FiscalYearExistsAsync(int tenantId, string fyCode, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(1) FROM platform.FiscalYear WHERE TenantId = @tenantId AND Code = @fyCode",
+            new { tenantId, fyCode }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task<int> CreateFiscalYearAsync(int tenantId, string code, DateTime start, DateTime end, bool isCurrent, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.QuerySingleAsync<int>(new CommandDefinition(
+            @"INSERT INTO platform.FiscalYear (TenantId, Code, StartDate, EndDate, IsCurrent)
+              VALUES (@tenantId, @code, @start, @end, @isCurrent);
+              SELECT CAST(SCOPE_IDENTITY() AS INT);",
+            new { tenantId, code, start, end, isCurrent }, cancellationToken: ct));
+    }
+
+    public async Task ClearCurrentFiscalYearAsync(int tenantId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE platform.FiscalYear SET IsCurrent = 0 WHERE TenantId = @tenantId", new { tenantId }, cancellationToken: ct));
+    }
+
+    public async Task AddDomainAsync(int tenantId, string host, bool isPrimary, bool isCommon, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"IF NOT EXISTS (SELECT 1 FROM platform.TenantDomain WHERE Host = @host)
+                  INSERT platform.TenantDomain (TenantId, Host, IsPrimary, IsCommon)
+                  VALUES (@tenantId, @host, @isPrimary, @isCommon);",
+            new { tenantId, host, isPrimary, isCommon }, cancellationToken: ct));
+    }
+
+    public async Task RegisterDbAsync(int tenantId, int? fiscalYearId, string dbKind, string dbName, string? connectionRef, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"IF NOT EXISTS (SELECT 1 FROM platform.DbCatalog
+                             WHERE TenantId = @tenantId AND DbKind = @dbKind
+                               AND ISNULL(FiscalYearId,-1) = ISNULL(@fiscalYearId,-1))
+                  INSERT platform.DbCatalog (TenantId, FiscalYearId, DbKind, DbName, ConnectionRef)
+                  VALUES (@tenantId, @fiscalYearId, @dbKind, @dbName, @connectionRef);",
+            new { tenantId, fiscalYearId, dbKind, dbName, connectionRef }, cancellationToken: ct));
+    }
+
+    public async Task EnableAllModulesAsync(int tenantId, int fiscalYearId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"INSERT platform.TenantModule (TenantId, FiscalYearId, ModuleId, Enabled)
+              SELECT @tenantId, @fiscalYearId, m.ModuleId, 1
+              FROM security.AppModule m
+              WHERE m.IsActive = 1
+                AND NOT EXISTS (SELECT 1 FROM platform.TenantModule tm
+                                WHERE tm.TenantId = @tenantId AND tm.FiscalYearId = @fiscalYearId AND tm.ModuleId = m.ModuleId);",
+            new { tenantId, fiscalYearId }, cancellationToken: ct));
+    }
+
+    public async Task CopyModuleEntitlementsAsync(int tenantId, int fromFiscalYearId, int toFiscalYearId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"INSERT platform.TenantModule (TenantId, FiscalYearId, ModuleId, Enabled)
+              SELECT @tenantId, @toFiscalYearId, tm.ModuleId, tm.Enabled
+              FROM platform.TenantModule tm
+              WHERE tm.TenantId = @tenantId AND tm.FiscalYearId = @fromFiscalYearId
+                AND NOT EXISTS (SELECT 1 FROM platform.TenantModule x
+                                WHERE x.TenantId = @tenantId AND x.FiscalYearId = @toFiscalYearId AND x.ModuleId = tm.ModuleId);",
+            new { tenantId, fromFiscalYearId, toFiscalYearId }, cancellationToken: ct));
+    }
+
+    public async Task<IReadOnlyList<(int, string, string, string?, string, string)>> GetTenantsAsync(CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        var rows = await c.QueryAsync<(int, string, string, string?, string, string)>(new CommandDefinition(
+            @"SELECT t.TenantId, t.Code, t.Name, fy.Code AS FyCode, d.DbKind, d.DbName
+              FROM platform.Tenant t
+              LEFT JOIN platform.DbCatalog d ON d.TenantId = t.TenantId
+              LEFT JOIN platform.FiscalYear fy ON fy.FiscalYearId = d.FiscalYearId
+              ORDER BY t.TenantId, d.DbKind", cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<(int, string)?> ResolveTenantByHostAsync(string host, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        var row = await c.QuerySingleOrDefaultAsync<(int, string)?>(new CommandDefinition(
+            @"SELECT TOP 1 t.TenantId, t.Code
+              FROM platform.TenantDomain d INNER JOIN platform.Tenant t ON t.TenantId = d.TenantId
+              WHERE d.Host = @host", new { host }, cancellationToken: ct));
+        return row;
+    }
+}
+
 /// <summary>Resolves permission codes for role codes from HIS_Platform.security.* (L1.2.6).</summary>
 public sealed class PermissionResolver : IPermissionResolver
 {

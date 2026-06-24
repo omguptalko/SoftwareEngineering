@@ -33,4 +33,20 @@ public sealed class PlatformController : ControllerBase
     /// <summary>Assign a page to a role (gated by 'rbac.manage').</summary>
     [HttpPost("assign/page")]
     public Task<bool> AssignPage([FromBody] AssignPageToRoleCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    // ---- Onboarding + provisioning (L1.5/L1.7) ----
+
+    /// <summary>List onboarded tenants and their databases (gated by 'tenant.manage').</summary>
+    [HttpGet("tenants")]
+    public Task<IReadOnlyList<TenantRow>> Tenants(CancellationToken ct) => _mediator.Send(new GetTenantsQuery(), ct);
+
+    /// <summary>Onboard a hospital: registers tenant/fiscal-year/domains and auto-provisions
+    /// its master + fiscal-year databases (gated by 'tenant.onboard').</summary>
+    [HttpPost("tenants/onboard")]
+    public Task<OnboardTenantResult> Onboard([FromBody] OnboardTenantCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Open a new fiscal year for a tenant (year shift) — provisions its data DB
+    /// (gated by 'fiscalyear.manage').</summary>
+    [HttpPost("fiscal-years/open")]
+    public Task<OpenFiscalYearResult> OpenFiscalYear([FromBody] OpenFiscalYearCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }

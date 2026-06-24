@@ -14,6 +14,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
+// Resolve the provisioning template root to an absolute path. Configured value may be
+// relative to the repo root (src/HIS.Api → ../../). Absolute values are kept as-is.
+var templateRoot = builder.Configuration["Provisioning:TemplateRoot"];
+if (!string.IsNullOrWhiteSpace(templateRoot) && !Path.IsPathRooted(templateRoot))
+    builder.Configuration["Provisioning:TemplateRoot"] =
+        Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", templateRoot));
+
 builder.Services.AddApplication();        // MediatR + CQRS behaviors + validators
 builder.Services.AddInfrastructure();     // Dapper repositories (config-driven connection string)
 
