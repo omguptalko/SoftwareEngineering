@@ -2,6 +2,7 @@ using HIS.Application.Abstractions;
 using HIS.Infrastructure.Persistence;
 using HIS.Infrastructure.Platform;
 using HIS.Infrastructure.Security;
+using HIS.Infrastructure.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HIS.Infrastructure;
@@ -21,6 +22,8 @@ public static class DependencyInjection
         services.AddScoped<IModuleAdminRepository, ModuleAdminRepository>();
         services.AddScoped<ITenantAdminRepository, TenantAdminRepository>();
         services.AddSingleton<IProvisioningEngine, SqlProvisioningEngine>();
+        services.AddScoped<ITenantConnectionFactory, TenantConnectionFactory>();
+        services.AddScoped<ITenantScopedRepository, TenantScopedRepository>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenIssuer, JwtTokenIssuer>();
         services.AddScoped<IModuleRegistryRepository, ModuleRegistryRepository>();

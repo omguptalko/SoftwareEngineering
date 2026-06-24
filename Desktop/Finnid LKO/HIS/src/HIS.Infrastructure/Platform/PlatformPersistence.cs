@@ -323,6 +323,33 @@ public sealed class TenantAdminRepository : ITenantAdminRepository
               WHERE d.Host = @host", new { host }, cancellationToken: ct));
         return row;
     }
+
+    // Routing projection: tenant + master DB + current-FY data DB (current fiscal year).
+    private const string RoutingSql = @"
+        SELECT t.TenantId, t.Code,
+               dm.DbName AS MasterDb,
+               fy.FiscalYearId AS CurrentFiscalYearId, fy.Code AS CurrentFiscalYearCode,
+               dd.DbName AS DataDb
+        FROM platform.Tenant t
+        LEFT JOIN platform.DbCatalog dm ON dm.TenantId = t.TenantId AND dm.DbKind = 'master'
+        LEFT JOIN platform.FiscalYear fy ON fy.TenantId = t.TenantId AND fy.IsCurrent = 1
+        LEFT JOIN platform.DbCatalog dd ON dd.TenantId = t.TenantId AND dd.DbKind = 'data' AND dd.FiscalYearId = fy.FiscalYearId";
+
+    public async Task<TenantRouting?> GetRoutingByHostAsync(string host, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.QuerySingleOrDefaultAsync<TenantRouting>(new CommandDefinition(
+            RoutingSql + @"
+              WHERE t.TenantId = (SELECT TOP 1 TenantId FROM platform.TenantDomain WHERE Host = @host)",
+            new { host }, cancellationToken: ct));
+    }
+
+    public async Task<TenantRouting?> GetRoutingByCodeAsync(string code, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.QuerySingleOrDefaultAsync<TenantRouting>(new CommandDefinition(
+            RoutingSql + " WHERE t.Code = @code", new { code }, cancellationToken: ct));
+    }
 }
 
 /// <summary>Resolves permission codes for role codes from HIS_Platform.security.* (L1.2.6).</summary>

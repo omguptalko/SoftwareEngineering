@@ -108,7 +108,9 @@ Implemented & verified so far:
 
 - **L1.5 + L1.7 automated provisioning & onboarding** — `SqlProvisioningEngine` creates per-tenant databases and applies schema templates (`db/tenant-template/master` + `…/fy`) with a `GO`-aware runner; validated DB names; `BaseConnection`/`TemplateRoot` from `Provisioning:*` config (D5). `OnboardTenantCommand` (gated `tenant.onboard`) registers tenant + fiscal year (Apr–Mar, D1) + primary/common domains, **provisions DBs before writing platform rows** (so a failure leaves no orphan tenant, L1.5.5), registers them in `platform.DbCatalog`, and enables all modules for the year. `OpenFiscalYearCommand` (gated `fiscalyear.manage`) is the year-shift: provisions the next FY's data DB. `GetTenantsQuery` lists tenants + DBs (gated `tenant.manage`). **Verified end-to-end:** onboarding `ACME` created `ACME_Master` (schemas `master`/`patient`/`proc`/`audit`; blood groups seeded; `proc.usp_NextUhid`) + `ACME_FY2026_27` (schemas `billing`/`insurance`/`hr`/`seq`/`proc`/`audit`) — the **D3 split made physical**; year-shift created `ACME_FY2027_28`; re-onboard → 409; non-privileged user → 403; both actions audited; 11 modules enabled per FY. **Bugs fixed in testing:** template path now resolved from ContentRootPath; `EXEC` needs a variable (not an inline `QUOTENAME` call); `proc` is a reserved keyword (bracket the schema); FY DB name no longer double-prefixes `FY`.
 
-Pending in these phases: **L1.6 tenant/domain request routing + per-tenant connection resolution** (the running app still uses the single-DB factory until L1.8 cutover); tenant-role *permission* grants (platform permission set is admin-only today); per-page action assignment + tenant/FY entitlement filtering of the menu; MFA (L1.2.5); login + admin UI wiring (L1.2.7 / L1.3.4 / L1.7.1); and the tenant-DB schema refactor (L1.1.2–4).
+- **L1.6 tenant/domain routing + connection resolution** — `ITenantContext` + `TenantResolutionMiddleware` resolve the tenant per request from the host (own domain), a common-domain subdomain (`Tenancy:CommonDomain`), or an `X-Tenant` hint (D4), then load the tenant's master + current-FY data DB names from `platform.DbCatalog`. New `ITenantConnectionFactory` opens the correct DB (additive — the legacy `SqlConnectionFactory` is untouched until the L1.8 cutover, D7). Demonstrator `TenantController`: patients → tenant **master** DB, bills → tenant **current-FY** DB. **Verified end-to-end:** resolution via own domain / common-domain subdomain / header; onboarded a 2nd tenant (FINN); patients & bills written to and read from the correct per-tenant, per-FY databases; **tenant isolation confirmed at the DB level** (ACME_Master vs FINN_Master hold only their own rows); ACME bill numbered `BILL-FY2027-28-…` (its current FY after year-shift) vs FINN `BILL-FY2026-27-…` (per-FY billing); unresolved request → 409; legacy single-DB endpoints still 200 (no regression).
+
+Pending in these phases: tenant-role *permission* grants (platform permission set is admin-only today); per-page action assignment + tenant/FY entitlement filtering of the menu; MFA (L1.2.5); tenant-scoped login + login-realm branding (L1.7.4); login + admin UI wiring (L1.2.7 / L1.3.4 / L1.7.1); and the **tenant-DB schema refactor + repository cutover to `ITenantConnectionFactory` (L1.1.2–4 / L1.8)** — the legacy app still runs on the single `HIS` DB.
 
 > **Dev-only note:** `appsettings.Development.json` now carries a dev `Jwt:SigningKey` and a bootstrap superadmin password (`ChangeMe!2026`). Both are **dev placeholders** — prod must supply them via environment / Key Vault, and the superadmin must rotate the password on first login (future task).
 
@@ -173,18 +175,18 @@ Pending in these phases: **L1.6 tenant/domain request routing + per-tenant conne
 ### Phase L1.6 — Tenant/domain resolution & connection routing (R4, R5)
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| L1.6.1 | `ITenantContext` (TenantId, FiscalYearId, MasterDb, DataDb) — extends `IBranchContext` (A6) | ⬜ | |
-| L1.6.2 | `TenantResolutionMiddleware`: resolve tenant from **host/domain** (own domain) or path/subdomain (common domain) via `platform.TenantDomain` | ⬜ | R5 |
-| L1.6.3 | Rework `SqlConnectionFactory` (A2) → resolve master/data connection from `DbCatalog` per `ITenantContext` | ⬜ | the single biggest infra change |
-| L1.6.4 | Cross-DB query strategy (master joins vs data joins) + per-request DB selection (master vs current-FY) | ⬜ | |
+| L1.6.1 | `ITenantContext` (TenantId, FiscalYearId, MasterDb, DataDb) | 🟩 | `HIS.Shared/Context/ITenantContext.cs`; populated per request |
+| L1.6.2 | `TenantResolutionMiddleware`: resolve tenant from **host/domain** (own domain) or **common-domain subdomain** + `X-Tenant` hint via `platform.TenantDomain`/`DbCatalog` | 🟩 | all 3 paths verified (D4) |
+| L1.6.3 | Tenant-aware connection resolution from `DbCatalog` per `ITenantContext` | 🟩 | new `ITenantConnectionFactory` (additive seam); legacy `SqlConnectionFactory` untouched until L1.8 cutover (D7) |
+| L1.6.4 | Per-request DB selection (master vs current-FY); cross-DB by-convention (no cross-DB FKs) | 🟩 | patients→master, bills→current-FY verified; isolation confirmed |
 
 ### Phase L1.7 — Onboarding wizard + domain↔login mapping (R3, R5)
 | # | Task | Status | Notes |
 |---|------|--------|-------|
 | L1.7.1 | Superadmin onboarding wizard with **fiscal-year dropdown** (R3) | 🟦 | `POST /api/platform/tenants/onboard` (fiscal-year selection drives provisioning) verified; wireframe wizard UI pending |
 | L1.7.2 | Capture hospital profile, primary domain, common-domain alias, initial modules/roles | 🟩 | code/name/primary+common domains captured; all modules enabled per FY; richer profile fields later |
-| L1.7.3 | Domain→tenant→login-realm mapping (which login page/branding per host) | 🟦 | `TenantDomain` stored + `ResolveTenantByHostAsync` repo; resolution middleware + login-realm wiring is L1.6 |
-| L1.7.4 | Tenant-scoped login (user authenticates within resolved tenant) | ⬜ | L1.6 |
+| L1.7.3 | Domain→tenant mapping (resolve tenant per host) | 🟩 | `TenantResolutionMiddleware` (L1.6) resolves host→tenant; login-realm branding per host pending |
+| L1.7.4 | Tenant-scoped login (user authenticates within resolved tenant) | ⬜ | user↔tenant binding at login still pending |
 
 ### Phase L1.8 — Cutover from single `dbo` DB
 | # | Task | Status | Notes |
