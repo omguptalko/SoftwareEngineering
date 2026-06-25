@@ -54,6 +54,11 @@
   .topback{position:absolute;top:20px;right:24px}
   .topback a{color:var(--muted);font-size:12.5px;font-weight:600;text-decoration:none}
   .topback a:hover{color:var(--brand)}
+  .alert{display:flex;gap:9px;align-items:center;background:#fdecea;border:1px solid #f5c6cb;color:#a4242f;
+      border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:16px}
+  .btn-login[disabled]{opacity:.7;cursor:progress}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid #ffffff66;border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
   @media(max-width:860px){body{grid-template-columns:1fr}.lp{display:none}}
 </style>
 </head>
@@ -80,77 +85,104 @@
     <div class="topback"><a href="../landing/index.html"><i class="bi bi-arrow-left"></i> Back to site</a></div>
     <form class="card-login" id="loginForm" autocomplete="off">
       <h2>Sign in</h2>
-      <p class="sub">Enter your credentials to access the ERP.</p>
+      <p class="sub">Enter your credentials to access the ERP. Your branch &amp; role are assigned by your account.</p>
 
-      <div class="row2">
-        <div class="fld">
-          <label>Branch <span class="req">*</span></label>
-          <div class="ctrl"><i class="bi bi-diagram-3 lead"></i>
-            <select class="inp" id="branch" tabindex="1" autofocus>
-              <option>Indl-North (BR1)</option>
-              <option>Indl-South (BR2)</option>
-              <option>City Central (BR3)</option>
-              <option>Refinery Unit (BR4)</option>
-            </select>
-          </div>
-        </div>
-        <div class="fld">
-          <label>Role <span class="req">*</span></label>
-          <div class="ctrl"><i class="bi bi-person-badge lead"></i>
-            <select class="inp" id="role" tabindex="2">
-              <option>Admin</option><option>Doctor</option><option>Nurse</option>
-              <option selected>Receptionist</option><option>Billing Staff</option>
-              <option>TPA / Insurance Desk</option><option>Ayushman Mitra (PMAM)</option>
-              <option>Pharmacist</option><option>Lab Technician</option>
-              <option>Occupational Health Officer</option><option>HR Manager</option>
-            </select>
-          </div>
-        </div>
+      <div class="alert" id="loginError" role="alert" hidden>
+        <i class="bi bi-exclamation-triangle-fill"></i> <span id="loginErrorMsg"></span>
       </div>
 
       <div class="fld">
         <label>User ID <span class="req">*</span></label>
         <div class="ctrl"><i class="bi bi-person lead"></i>
-          <input class="inp" id="user" type="text" value="rao.k" tabindex="3" placeholder="e.g. rao.k">
+          <input class="inp" id="user" type="text" value="superadmin" tabindex="1" autofocus
+                 autocomplete="username" placeholder="e.g. superadmin">
         </div>
       </div>
 
       <div class="fld">
         <label>Password <span class="req">*</span></label>
         <div class="ctrl"><i class="bi bi-lock lead"></i>
-          <input class="inp" id="pass" type="password" value="demo1234" tabindex="4" placeholder="••••••••">
+          <input class="inp" id="pass" type="password" value="" tabindex="2"
+                 autocomplete="current-password" placeholder="••••••••">
           <button type="button" class="toggle" id="togglePass" tabindex="-1" aria-label="Show password"><i class="bi bi-eye"></i></button>
         </div>
       </div>
 
       <div class="between">
-        <label><input type="checkbox" tabindex="5"> Remember this device</label>
+        <label><input type="checkbox" id="remember" tabindex="3"> Remember this device</label>
         <a href="#" tabindex="-1">Forgot password?</a>
       </div>
 
-      <button class="btn-login" type="submit" tabindex="6"><i class="bi bi-box-arrow-in-right"></i> Sign in</button>
+      <button class="btn-login" type="submit" id="loginBtn" tabindex="4"><i class="bi bi-box-arrow-in-right"></i> Sign in</button>
 
       <div class="or">or</div>
-      <button class="btn-abha" type="button" id="abhaBtn" tabindex="7"><i class="bi bi-fingerprint"></i> Sign in with ABHA / Aadhaar OTP</button>
+      <button class="btn-abha" type="button" id="abhaBtn" tabindex="5"><i class="bi bi-fingerprint"></i> Sign in with ABHA / Aadhaar OTP</button>
 
-      <p class="hint">Press <kbd>Enter</kbd> to sign in · <kbd>Tab</kbd> to move between fields</p>
+      <p class="hint">Dev demo: <kbd>superadmin</kbd> / <kbd>ChangeMe!2026</kbd> · or <kbd>billing.demo</kbd> / <kbd>Demo!2026</kbd></p>
     </form>
   </main>
 
+<script src="../assets/js/auth.js"></script>
 <script>
+  const $ = s => document.querySelector(s);
+  const btn = $('#loginBtn'), errBox = $('#loginError'), errMsg = $('#loginErrorMsg');
+
   // Show/hide password
-  document.getElementById('togglePass').addEventListener('click',function(){
-    const p=document.getElementById('pass'); const on=p.type==='password';
-    p.type=on?'text':'password'; this.querySelector('i').className=on?'bi bi-eye-slash':'bi bi-eye';
+  $('#togglePass').addEventListener('click', function () {
+    const p = $('#pass'); const on = p.type === 'password';
+    p.type = on ? 'text' : 'password';
+    this.querySelector('i').className = on ? 'bi bi-eye-slash' : 'bi bi-eye';
   });
-  // Submit -> enter app shell
-  document.getElementById('loginForm').addEventListener('submit',function(e){
+
+  function showError(msg) {
+    errMsg.textContent = msg; errBox.hidden = false;
+  }
+  function setBusy(on) {
+    btn.disabled = on;
+    btn.innerHTML = on ? '<span class="spin"></span> Signing in…'
+                       : '<i class="bi bi-box-arrow-in-right"></i> Sign in';
+  }
+
+  // Real authentication against the control plane (L1.2.7).
+  $('#loginForm').addEventListener('submit', async function (e) {
     e.preventDefault();
-    const b=document.getElementById('branch').value, r=document.getElementById('role').value, u=document.getElementById('user').value;
-    try{ sessionStorage.setItem('his_session', JSON.stringify({branch:b,role:r,user:u})); }catch(_){}
-    window.location.href='index.html';
+    errBox.hidden = true;
+    const userName = $('#user').value.trim();
+    const password = $('#pass').value;
+    const remember = $('#remember').checked;
+    if (!userName || !password) { showError('Please enter your User ID and password.'); return; }
+
+    setBusy(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ userName, password })
+      });
+
+      if (res.status === 401) { setBusy(false); showError('Invalid User ID or password.'); $('#pass').focus(); return; }
+      if (res.status === 400) { setBusy(false); showError('Please enter your User ID and password.'); return; }
+      if (!res.ok)            { setBusy(false); showError('Sign-in failed (' + res.status + '). Please try again.'); return; }
+
+      const r = await res.json(); // { token, expiresUtc, displayName, isSuperAdmin, tenantId, roles }
+      HIS.auth.save({
+        token: r.token,
+        expiresUtc: r.expiresUtc,
+        displayName: r.displayName,
+        isSuperAdmin: r.isSuperAdmin,
+        tenantId: r.tenantId,
+        roles: r.roles || [],
+        userName: userName
+      }, remember);
+
+      window.location.href = 'index.html';
+    } catch (err) {
+      setBusy(false);
+      showError('Cannot reach the server. Check your connection and try again.');
+    }
   });
-  document.getElementById('abhaBtn').addEventListener('click',function(){
+
+  document.getElementById('abhaBtn').addEventListener('click', function () {
     alert('ABHA / Aadhaar OTP login\n\n(Wireframe) In the live system this opens UIDAI/ABDM OTP verification.');
   });
 </script>

@@ -9,12 +9,22 @@ window.HIS = window.HIS || {};
   const modById = id => HIS.modules.find(m => m.id === id);
 
   /* ===================== Session / context ============================== */
+  // Returns false if the guard redirected to login (no/expired session).
   function initSession() {
-    let s = {};
-    try { s = JSON.parse(sessionStorage.getItem('his_session')) || {}; } catch (e) {}
-    if (s.branch) { $('#ctxBranch').textContent = s.branch; $('#sbBranch').textContent = s.branch.replace(/\s*\(/, ' · ').replace(')', ''); }
-    if (s.role)   { $('#ctxRole').textContent = s.role; }
-    if (s.user)   { $('#ctxUser').textContent = s.user; }
+    if (!HIS.auth || !HIS.auth.requireSession('login.html')) return false;
+    const p = HIS.auth.get() || {};
+    const role = p.isSuperAdmin ? 'Super Admin' : ((p.roles && p.roles[0]) || '—');
+    $('#ctxUser').textContent = p.displayName || p.userName || '—';
+    $('#ctxRole').textContent = role;
+    // Branch is assigned server-side (JWT claim / dev fallback); show the working branch label.
+    const branchLabel = p.branchLabel || $('#sbBranch').textContent || '—';
+    $('#ctxBranch').textContent = branchLabel;
+    return true;
+  }
+
+  function logout() {
+    if (HIS.auth) HIS.auth.clear();
+    window.location.href = 'login.html';
   }
 
   /* ===================== Clock ========================================== */
@@ -347,7 +357,7 @@ window.HIS = window.HIS || {};
       case 'find':    contextFind(); break;
       case 'closetab':if (HIS.activeTab) closeTab(HIS.activeTab); break;
       case 'nexttab': nextTab(); break;
-      case 'logout':  location.href = 'login.html'; break;
+      case 'logout':  logout(); break;
       case 'about':   toast('Finnid HIS ERP — interactive wireframe (SRS v2.0)', 'bi-info-circle'); break;
       case 'escape':  break;
       default: if (act) toast(act);
@@ -376,7 +386,7 @@ window.HIS = window.HIS || {};
 
   /* ===================== Boot ========================================= */
   (async function boot() {
-    initSession();
+    if (!initSession()) return;     // no/expired session → redirected to login; stop boot
     await HIS.bootstrap();          // load module registry + current patient from API
     renderTree();
     initModFilter();
