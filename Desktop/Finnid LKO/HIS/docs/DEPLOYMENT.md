@@ -71,3 +71,43 @@ onboarding (`POST /api/platform/tenants/onboard`) and year-shift — no manual s
 - **Connection routing (L1.9.4):** tenant resolution does one cached-able catalog lookup per
   request; for high fan-out, front `platform.DbCatalog`/`TenantDomain` with a short-TTL cache and
   use Azure SQL elastic pools (Decision D5) so per-tenant DBs share capacity.
+
+## 5. CI/CD — GitHub Actions → Azure Container Apps
+
+`Dockerfile` builds the API image (serves the wireframe + carries the provisioning templates;
+listens on **8080**, runs **non-root**, `Provisioning__TemplateRoot=/app/db/tenant-template`).
+`.github/workflows/deploy-containerapp.yml` runs: **build + test** (every push/PR) →
+**`az acr build`** the image → **optional DB migrations** → **`az containerapp update`** →
+**`/api/health` smoke check** (deploy only from `main`).
+
+### One-time Azure setup
+```bash
+az group create -n finnid-his -l centralindia
+az acr create  -n finnidhisacr -g finnid-his --sku Standard
+az containerapp env create -n his-env -g finnid-his -l centralindia
+# First revision (CI updates the image thereafter):
+az containerapp create -n his-api -g finnid-his --environment his-env \
+  --image mcr.microsoft.com/k8se/quickstart:latest \
+  --target-port 8080 --ingress external --min-replicas 1 \
+  --registry-server finnidhisacr.azurecr.io
+```
+Grant the Container App's managed identity **AcrPull** on the registry and **Key Vault Secrets
+User** on the vault, then configure app settings as **Key Vault references** (or secrets):
+`ConnectionStrings__Platform`, `Provisioning__BaseConnection`, `Jwt__SigningKey`,
+`Security__DataProtection__Key`, `KeyVault__Uri`, `Tenancy__CommonDomain`,
+`Platform__Bootstrap__Password`, and `ASPNETCORE_ENVIRONMENT=Production` (see §1).
+
+### OIDC federated credential (no stored client secret)
+Create an app registration / service principal with **Contributor** on the resource group and
+**AcrPush** on the registry, then add a federated credential for this repo, e.g. subject
+`repo:<org>/<repo>:ref:refs/heads/main` and `repo:<org>/<repo>:environment:production`.
+
+### GitHub configuration
+| Secrets | Variables |
+|---|---|
+| `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | `ACR_NAME` (e.g. `finnidhisacr`) |
+| `SQL_SERVER`, `SQL_DATABASE`, `SQL_USER`, `SQL_PASSWORD` (only if `RUN_DB_MIGRATIONS=true`) | `AZURE_RESOURCE_GROUP`, `CONTAINERAPP_NAME` |
+| | `RUN_DB_MIGRATIONS` (`true` to apply control-plane migrations in the pipeline) |
+
+App config/secrets live **on the Container App** (ideally Key Vault references) — the pipeline
+ships code/images, not secrets.

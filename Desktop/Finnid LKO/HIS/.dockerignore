@@ -1,0 +1,19 @@
+# Build artefacts
+**/bin/
+**/obj/
+**/out/
+# VCS + CI
+.git/
+.github/
+.gitignore
+# IDE / OS
+.vs/
+.vscode/
+*.user
+**/.DS_Store
+# Dev-only secrets must never enter the image
+**/appsettings.Development.json
+# Docs / tests are not needed in the runtime image
+docs/
+tests/
+*.md
