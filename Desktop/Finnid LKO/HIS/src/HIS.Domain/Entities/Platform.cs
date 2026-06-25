@@ -16,5 +16,6 @@ public sealed class PlatformUser
     public string PasswordSalt { get; set; } = "";
     public bool IsSuperAdmin { get; set; }
     public bool MfaEnabled { get; set; }
+    public string? MfaSecret { get; set; }
     public bool IsActive { get; set; } = true;
 }

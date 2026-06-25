@@ -1,6 +1,7 @@
 using FluentValidation;
 using HIS.Application.Abstractions;
 using HIS.Shared.Context;
+using Microsoft.Extensions.Configuration;
 
 namespace HIS.Application.Features.Platform;
 
@@ -15,6 +16,15 @@ internal static class FiscalCalc
         var code = $"FY{startYear}-{((startYear + 1) % 100):D2}";
         return (code, start, end);
     }
+}
+
+/// <summary>Per-FY subscription billing defaults — config-driven (nothing hardcoded), L1.4.2.</summary>
+internal static class BillingDefaults
+{
+    public static (string Plan, decimal AnnualFee, string Currency) Read(IConfiguration config) => (
+        config["Platform:Billing:DefaultPlan"] ?? "Standard",
+        config.GetValue("Platform:Billing:AnnualFee", 0m),
+        config["Platform:Billing:Currency"] ?? "INR");
 }
 
 // ============================ Onboard tenant (tenant.onboard) ============================
@@ -49,9 +59,10 @@ public sealed class OnboardTenantHandler : MediatR.IRequestHandler<OnboardTenant
     private readonly IProvisioningEngine _engine;
     private readonly IPlatformUserRepository _audit;
     private readonly IBranchContext _ctx;
+    private readonly IConfiguration _config;
 
-    public OnboardTenantHandler(ITenantAdminRepository tenants, IProvisioningEngine engine, IPlatformUserRepository audit, IBranchContext ctx)
-    { _tenants = tenants; _engine = engine; _audit = audit; _ctx = ctx; }
+    public OnboardTenantHandler(ITenantAdminRepository tenants, IProvisioningEngine engine, IPlatformUserRepository audit, IBranchContext ctx, IConfiguration config)
+    { _tenants = tenants; _engine = engine; _audit = audit; _ctx = ctx; _config = config; }
 
     public async Task<OnboardTenantResult> Handle(OnboardTenantCommand c, CancellationToken ct)
     {
@@ -77,6 +88,12 @@ public sealed class OnboardTenantHandler : MediatR.IRequestHandler<OnboardTenant
         await _tenants.RegisterDbAsync(tenantId, fyId, data.DbKind, data.DbName, $"Tenant:{c.Code}:{fyCode}", ct);
         await _tenants.EnableAllModulesAsync(tenantId, fyId, ct);
 
+        // Per-FY billing (L1.4.2): register the subscription + this year's subscription charge.
+        var (plan, fee, currency) = BillingDefaults.Read(_config);
+        await _tenants.CreateSubscriptionAsync(tenantId, fyId, plan, start, end, ct);
+        if (fee != 0)
+            await _tenants.WriteBillingLedgerAsync(tenantId, fyId, "Subscription", fee, currency, $"FY {fyCode} subscription ({plan})", ct);
+
         await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, tenantId,
             "OnboardTenant", "Tenant", c.Code, succeeded: true, error: null, ct);
 
@@ -100,9 +117,10 @@ public sealed class OpenFiscalYearHandler : MediatR.IRequestHandler<OpenFiscalYe
     private readonly IProvisioningEngine _engine;
     private readonly IPlatformUserRepository _audit;
     private readonly IBranchContext _ctx;
+    private readonly IConfiguration _config;
 
-    public OpenFiscalYearHandler(ITenantAdminRepository tenants, IProvisioningEngine engine, IPlatformUserRepository audit, IBranchContext ctx)
-    { _tenants = tenants; _engine = engine; _audit = audit; _ctx = ctx; }
+    public OpenFiscalYearHandler(ITenantAdminRepository tenants, IProvisioningEngine engine, IPlatformUserRepository audit, IBranchContext ctx, IConfiguration config)
+    { _tenants = tenants; _engine = engine; _audit = audit; _ctx = ctx; _config = config; }
 
     public async Task<OpenFiscalYearResult> Handle(OpenFiscalYearCommand c, CancellationToken ct)
     {
@@ -113,12 +131,33 @@ public sealed class OpenFiscalYearHandler : MediatR.IRequestHandler<OpenFiscalYe
         if (await _tenants.FiscalYearExistsAsync(tenantId, fyCode, ct))
             throw new InvalidOperationException($"Fiscal year '{fyCode}' already open for '{c.TenantCode}'.");
 
+        // Capture the outgoing current FY BEFORE clearing it — needed to carry entitlements
+        // and the billing balance forward (L1.4.3/L1.4.4/L1.4.2).
+        var priorFyId = await _tenants.GetCurrentFiscalYearIdAsync(tenantId, ct);
+
         await _tenants.ClearCurrentFiscalYearAsync(tenantId, ct);
         var fyId = await _tenants.CreateFiscalYearAsync(tenantId, fyCode, start, end, isCurrent: true, ct);
 
         var data = await _engine.ProvisionFiscalYearAsync(c.TenantCode, fyCode, ct);
         await _tenants.RegisterDbAsync(tenantId, fyId, data.DbKind, data.DbName, $"Tenant:{c.TenantCode}:{fyCode}", ct);
+
+        // Entitlement snapshot (L1.4.4): carry the prior year's per-module entitlements forward
+        // (preserving any modules the superadmin had disabled), THEN enable any modules added
+        // since (so the new year picks up new platform modules at their default-on state).
+        if (priorFyId is int pf) await _tenants.CopyModuleEntitlementsAsync(tenantId, pf, fyId, ct);
         await _tenants.EnableAllModulesAsync(tenantId, fyId, ct);
+
+        // Per-FY billing (L1.4.2): carry the prior-year balance forward, then this year's charge.
+        var (plan, fee, currency) = BillingDefaults.Read(_config);
+        if (priorFyId is int pb)
+        {
+            var balance = await _tenants.GetLedgerBalanceAsync(tenantId, pb, ct);
+            if (balance != 0)
+                await _tenants.WriteBillingLedgerAsync(tenantId, fyId, "CarryForward", balance, currency, "Carried forward from prior fiscal year", ct);
+        }
+        await _tenants.CreateSubscriptionAsync(tenantId, fyId, plan, start, end, ct);
+        if (fee != 0)
+            await _tenants.WriteBillingLedgerAsync(tenantId, fyId, "Subscription", fee, currency, $"FY {fyCode} subscription ({plan})", ct);
 
         await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, tenantId,
             "OpenFiscalYear", "FiscalYear", fyCode, succeeded: true, error: null, ct);

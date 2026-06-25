@@ -108,8 +108,16 @@
         </div>
       </div>
 
+      <div class="fld" id="mfaRow" hidden>
+        <label>Authenticator code <span class="req">*</span></label>
+        <div class="ctrl"><i class="bi bi-shield-lock lead"></i>
+          <input class="inp" id="mfaCode" type="text" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="6" placeholder="6-digit code" tabindex="3">
+        </div>
+      </div>
+
       <div class="between">
-        <label><input type="checkbox" id="remember" tabindex="3"> Remember this device</label>
+        <label><input type="checkbox" id="remember" tabindex="4"> Remember this device</label>
         <a href="#" tabindex="-1">Forgot password?</a>
       </div>
 
@@ -152,19 +160,35 @@
     const remember = $('#remember').checked;
     if (!userName || !password) { showError('Please enter your User ID and password.'); return; }
 
+    const mfaRow = $('#mfaRow');
+    const mfaCode = mfaRow.hidden ? null : ($('#mfaCode').value.trim() || null);
+
     setBusy(true);
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ userName, password })
+        body: JSON.stringify({ userName, password, mfaCode })
       });
 
-      if (res.status === 401) { setBusy(false); showError('Invalid User ID or password.'); $('#pass').focus(); return; }
+      if (res.status === 401) {
+        setBusy(false);
+        // The control plane signals an MFA challenge via the 401 detail (L1.2.5).
+        let detail = '';
+        try { detail = (await res.json()).title || ''; } catch (e) {}
+        if (/authenticator code/i.test(detail)) {
+          mfaRow.hidden = false;
+          showError(mfaCode ? 'Incorrect authenticator code — try again.' : 'Enter the 6-digit code from your authenticator app.');
+          $('#mfaCode').focus();
+        } else {
+          showError('Invalid User ID or password.'); $('#pass').focus();
+        }
+        return;
+      }
       if (res.status === 400) { setBusy(false); showError('Please enter your User ID and password.'); return; }
       if (!res.ok)            { setBusy(false); showError('Sign-in failed (' + res.status + '). Please try again.'); return; }
 
-      const r = await res.json(); // { token, expiresUtc, displayName, isSuperAdmin, tenantId, roles }
+      const r = await res.json(); // { token, expiresUtc, displayName, isSuperAdmin, tenantId, roles, mfaEnrollmentRequired }
       HIS.auth.save({
         token: r.token,
         expiresUtc: r.expiresUtc,

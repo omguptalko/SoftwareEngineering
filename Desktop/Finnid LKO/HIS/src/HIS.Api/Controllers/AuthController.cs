@@ -22,8 +22,12 @@ public sealed class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            // Invalid credentials → 401 (ValidationException for empty fields still bubbles to 400).
+            // Invalid credentials / MFA → 401 (ValidationException for empty fields still bubbles to 400).
             return Unauthorized(new { title = ex.Message });
         }
     }
+
+    /// <summary>Enrol the current user in TOTP MFA (L1.2.5). Returns the otpauth URI to scan.</summary>
+    [HttpPost("mfa/enroll")]
+    public Task<EnrollMfaResult> EnrollMfa(CancellationToken ct) => _mediator.Send(new EnrollMfaCommand(), ct);
 }

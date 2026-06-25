@@ -40,7 +40,7 @@ public sealed class PlatformUserRepository : IPlatformUserRepository
         using var c = await _f.CreateOpenConnectionAsync(ct);
         return await c.QuerySingleOrDefaultAsync<PlatformUser>(new CommandDefinition(
             @"SELECT UserId, TenantId, UserName, DisplayName, Email, PasswordHash, PasswordSalt,
-                     IsSuperAdmin, MfaEnabled, IsActive
+                     IsSuperAdmin, MfaEnabled, MfaSecret, IsActive
               FROM security.AppUser WHERE UserName = @userName",
             new { userName }, cancellationToken: ct));
     }
@@ -79,6 +79,23 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
             @"IF NOT EXISTS (SELECT 1 FROM security.UserRole WHERE UserId = @userId AND RoleId = @roleId)
                   INSERT security.UserRole (UserId, RoleId) VALUES (@userId, @roleId);",
             new { userId, roleId }, cancellationToken: ct));
+    }
+
+    public async Task<bool> HasPrivilegedRoleAsync(long userId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.ExecuteScalarAsync<int>(new CommandDefinition(
+            @"SELECT COUNT(1) FROM security.UserRole ur
+              INNER JOIN security.Role r ON r.RoleId = ur.RoleId
+              WHERE ur.UserId = @userId AND r.IsPrivileged = 1", new { userId }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task SetMfaSecretAsync(long userId, string secret, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE security.AppUser SET MfaSecret = @secret, MfaEnabled = 1 WHERE UserId = @userId",
+            new { userId, secret }, cancellationToken: ct));
     }
 
     public async Task WritePlatformAuditAsync(long? actorUserId, string? actorUserName, int? tenantId,
@@ -157,6 +174,21 @@ public sealed class ModuleAdminRepository : IModuleAdminRepository
         return n > 0;
     }
 
+    public async Task<bool> AssignPageActionToRoleAsync(string roleCode, string pageCode, string actionCode, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        var n = await c.ExecuteAsync(new CommandDefinition(
+            @"DECLARE @RoleId INT = (SELECT RoleId FROM security.Role WHERE Code = @roleCode);
+              DECLARE @ActionId INT = (SELECT a.ActionId FROM security.PageAction a
+                                       INNER JOIN security.AppPage p ON p.PageId = a.PageId
+                                       WHERE p.Code = @pageCode AND a.Code = @actionCode);
+              IF @RoleId IS NULL OR @ActionId IS NULL THROW 50000, 'Unknown role, page or action code.', 1;
+              IF NOT EXISTS (SELECT 1 FROM security.RolePageAction WHERE RoleId = @RoleId AND ActionId = @ActionId)
+                  INSERT security.RolePageAction (RoleId, ActionId) VALUES (@RoleId, @ActionId);",
+            new { roleCode, pageCode, actionCode }, cancellationToken: ct));
+        return n > 0;
+    }
+
     private const string MenuProjection =
         @"SELECT m.Code AS ModuleCode, m.Label AS ModuleLabel, m.Icon, m.SortOrder AS ModuleSort,
                  p.Code AS PageCode, p.Label AS PageLabel, p.Route, p.SortOrder AS PageSort";
@@ -173,14 +205,16 @@ public sealed class ModuleAdminRepository : IModuleAdminRepository
         return rows.ToList();
     }
 
-    public async Task<IReadOnlyList<(string, string, string?, int, string, string, string?, int)>> GetMenuForRolesAsync(IEnumerable<string> roleCodes, CancellationToken ct = default)
+    public async Task<IReadOnlyList<(string, string, string?, int, string, string, string?, int)>> GetMenuForRolesAsync(IEnumerable<string> roleCodes, int? tenantId, int? fiscalYearId, CancellationToken ct = default)
     {
         var codes = roleCodes?.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct().ToArray() ?? Array.Empty<string>();
         if (codes.Length == 0) return Array.Empty<(string, string, string?, int, string, string, string?, int)>();
 
         using var c = await _f.CreateOpenConnectionAsync(ct);
-        // A page is visible if any of the user's roles grants its module (RoleModule)
-        // or the page itself (RolePage).
+        // A page is visible if any of the user's roles grants its module (RoleModule) or the
+        // page itself (RolePage) — AND, when a tenant + fiscal year is resolved, the module is
+        // entitled for that tenant/FY (platform.TenantModule.Enabled, L1.3.5/R3). With no tenant
+        // resolved (@tenantId/@fyId NULL) the entitlement filter is skipped (role-only).
         var rows = await c.QueryAsync<(string, string, string?, int, string, string, string?, int)>(new CommandDefinition(
             MenuProjection + @"
               FROM security.AppModule m
@@ -194,7 +228,11 @@ public sealed class ModuleAdminRepository : IModuleAdminRepository
                           INNER JOIN security.Role r ON r.RoleId = rp.RoleId
                           WHERE rp.PageId = p.PageId AND r.Code IN @codes)
                 )
-              ORDER BY m.SortOrder, p.SortOrder", new { codes }, cancellationToken: ct));
+                AND (@tenantId IS NULL OR @fiscalYearId IS NULL OR EXISTS (
+                      SELECT 1 FROM platform.TenantModule tm
+                      WHERE tm.TenantId = @tenantId AND tm.FiscalYearId = @fiscalYearId
+                        AND tm.ModuleId = m.ModuleId AND tm.Enabled = 1))
+              ORDER BY m.SortOrder, p.SortOrder", new { codes, tenantId, fiscalYearId }, cancellationToken: ct));
         return rows.ToList();
     }
 }
@@ -254,6 +292,14 @@ public sealed class TenantAdminRepository : ITenantAdminRepository
             "UPDATE platform.FiscalYear SET IsCurrent = 0 WHERE TenantId = @tenantId", new { tenantId }, cancellationToken: ct));
     }
 
+    public async Task<int?> GetCurrentFiscalYearIdAsync(int tenantId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
+            "SELECT FiscalYearId FROM platform.FiscalYear WHERE TenantId = @tenantId AND IsCurrent = 1",
+            new { tenantId }, cancellationToken: ct));
+    }
+
     public async Task AddDomainAsync(int tenantId, string host, bool isPrimary, bool isCommon, CancellationToken ct = default)
     {
         using var c = await _f.CreateOpenConnectionAsync(ct);
@@ -300,6 +346,54 @@ public sealed class TenantAdminRepository : ITenantAdminRepository
                 AND NOT EXISTS (SELECT 1 FROM platform.TenantModule x
                                 WHERE x.TenantId = @tenantId AND x.FiscalYearId = @toFiscalYearId AND x.ModuleId = tm.ModuleId);",
             new { tenantId, fromFiscalYearId, toFiscalYearId }, cancellationToken: ct));
+    }
+
+    public async Task<bool> SetTenantModuleAsync(string tenantCode, string fyCode, string moduleCode, bool enabled, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        // Upsert the per-tenant, per-FY module entitlement (L1.3.3/L1.4.4).
+        var n = await c.ExecuteAsync(new CommandDefinition(
+            @"DECLARE @TenantId INT = (SELECT TenantId FROM platform.Tenant WHERE Code = @tenantCode);
+              DECLARE @FyId INT = (SELECT FiscalYearId FROM platform.FiscalYear WHERE TenantId = @TenantId AND Code = @fyCode);
+              DECLARE @ModuleId INT = (SELECT ModuleId FROM security.AppModule WHERE Code = @moduleCode);
+              IF @TenantId IS NULL OR @FyId IS NULL OR @ModuleId IS NULL
+                  THROW 50000, 'Unknown tenant, fiscal year or module code.', 1;
+              IF EXISTS (SELECT 1 FROM platform.TenantModule WHERE TenantId=@TenantId AND FiscalYearId=@FyId AND ModuleId=@ModuleId)
+                  UPDATE platform.TenantModule SET Enabled = @enabled
+                  WHERE TenantId=@TenantId AND FiscalYearId=@FyId AND ModuleId=@ModuleId;
+              ELSE
+                  INSERT platform.TenantModule (TenantId, FiscalYearId, ModuleId, Enabled)
+                  VALUES (@TenantId, @FyId, @ModuleId, @enabled);",
+            new { tenantCode, fyCode, moduleCode, enabled }, cancellationToken: ct));
+        return n > 0;
+    }
+
+    public async Task CreateSubscriptionAsync(int tenantId, int fiscalYearId, string plan, DateTime start, DateTime end, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        // One subscription per (tenant, fiscal year); idempotent so a retried onboarding/year-shift is safe.
+        await c.ExecuteAsync(new CommandDefinition(
+            @"IF NOT EXISTS (SELECT 1 FROM platform.Subscription WHERE TenantId = @tenantId AND FiscalYearId = @fiscalYearId)
+                  INSERT platform.Subscription (TenantId, FiscalYearId, [Plan], StartDate, EndDate, Status)
+                  VALUES (@tenantId, @fiscalYearId, @plan, @start, @end, 'Active');",
+            new { tenantId, fiscalYearId, plan, start, end }, cancellationToken: ct));
+    }
+
+    public async Task WriteBillingLedgerAsync(int tenantId, int fiscalYearId, string entryType, decimal amount, string currency, string? notes, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"INSERT platform.BillingLedger (TenantId, FiscalYearId, EntryType, Amount, Currency, Notes)
+              VALUES (@tenantId, @fiscalYearId, @entryType, @amount, @currency, @notes);",
+            new { tenantId, fiscalYearId, entryType, amount, currency, notes }, cancellationToken: ct));
+    }
+
+    public async Task<decimal> GetLedgerBalanceAsync(int tenantId, int fiscalYearId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.ExecuteScalarAsync<decimal>(new CommandDefinition(
+            "SELECT ISNULL(SUM(Amount),0) FROM platform.BillingLedger WHERE TenantId = @tenantId AND FiscalYearId = @fiscalYearId",
+            new { tenantId, fiscalYearId }, cancellationToken: ct));
     }
 
     public async Task<IReadOnlyList<(int, string, string, string?, string, string)>> GetTenantsAsync(CancellationToken ct = default)

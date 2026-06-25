@@ -73,6 +73,10 @@ public sealed class SuperAdminSeeder : IHostedService
             // Optional dev tenant — auto-provisioned so localhost (the wireframe) routes
             // to a real per-tenant DB for cut-over endpoints (L1.8).
             await SeedDevTenantAsync(scope, ct);
+
+            // Optional dev tenant-scoped user (L1.7.4) — bound to the dev tenant so tenant-scoped
+            // login can be exercised (logs in only within its own tenant realm).
+            await SeedDevTenantUserAsync(scope, users, hasher, ct);
         }
         catch (Exception ex)
         {
@@ -139,6 +143,44 @@ public sealed class SuperAdminSeeder : IHostedService
         await tenants.EnableAllModulesAsync(tenantId, fyId, ct);
 
         _log.LogInformation("Dev tenant '{Code}' provisioned ({Master} + {Data}).", code, master.DbName, data.DbName);
+    }
+
+    /// <summary>Seeds a tenant-scoped user bound to the dev tenant (TenantId set), so tenant-scoped
+    /// login (L1.7.4) can be demonstrated. Config-driven; a no-op if not configured or already present.</summary>
+    private async Task SeedDevTenantUserAsync(IServiceScope scope, IPlatformUserRepository users, IPasswordHasher hasher, CancellationToken ct)
+    {
+        var tenantCode = _config["Tenancy:DevDefaultTenant"];
+        var userName   = _config["Platform:Bootstrap:TenantAdmin:UserName"];
+        var password   = _config["Platform:Bootstrap:TenantAdmin:Password"];
+        var roleCode   = _config["Platform:Bootstrap:TenantAdmin:Role"] ?? "admin";
+        if (string.IsNullOrWhiteSpace(tenantCode) || string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
+            return;
+        if (await users.GetByUserNameAsync(userName, ct) is not null) return;
+
+        var tenants = scope.ServiceProvider.GetRequiredService<ITenantAdminRepository>();
+        var tenantId = await tenants.GetTenantIdByCodeAsync(tenantCode, ct);
+        if (tenantId is not int tid)
+        {
+            _log.LogInformation("Tenant user '{User}' skipped: dev tenant '{Code}' not found.", userName, tenantCode);
+            return;
+        }
+
+        var (hash, salt) = hasher.Hash(password);
+        var userId = await users.InsertUserAsync(new PlatformUser
+        {
+            TenantId = tid,                 // bound to the tenant → realm-checked at login (L1.7.4)
+            UserName = userName,
+            DisplayName = _config["Platform:Bootstrap:TenantAdmin:DisplayName"] ?? userName,
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            IsSuperAdmin = false,
+            IsActive = true
+        }, ct);
+
+        var roleId = await users.GetRoleIdByCodeAsync(roleCode, ct);
+        if (roleId is int rid) await users.AssignRoleAsync(userId, rid, ct);
+        _log.LogInformation("Dev tenant user '{User}' (tenant {Code}, role {Role}) created (id {Id}).",
+            userName, tenantCode, roleCode, userId);
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
