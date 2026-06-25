@@ -34,6 +34,14 @@ public sealed class PlatformController : ControllerBase
     [HttpPost("assign/page")]
     public Task<bool> AssignPage([FromBody] AssignPageToRoleCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 
+    /// <summary>Grant a page-action (view/create/edit/delete/…) to a role (gated by 'rbac.manage', L1.3.3).</summary>
+    [HttpPost("assign/action")]
+    public Task<bool> AssignPageAction([FromBody] AssignPageActionToRoleCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Enable/disable a module for a tenant's fiscal year (gated by 'module.manage', L1.3.3/L1.4.4).</summary>
+    [HttpPost("assign/tenant-module")]
+    public Task<bool> SetTenantModule([FromBody] SetTenantModuleCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
     // ---- Onboarding + provisioning (L1.5/L1.7) ----
 
     /// <summary>List onboarded tenants and their databases (gated by 'tenant.manage').</summary>
