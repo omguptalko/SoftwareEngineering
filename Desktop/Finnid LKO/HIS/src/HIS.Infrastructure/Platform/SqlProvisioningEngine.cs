@@ -22,6 +22,7 @@ public sealed class SqlProvisioningEngine : IProvisioningEngine
 
     private readonly string _baseConnection;
     private readonly string _templateRoot;
+    private readonly bool _rollbackOnFailure;
 
     public SqlProvisioningEngine(IConfiguration config)
     {
@@ -31,6 +32,9 @@ public sealed class SqlProvisioningEngine : IProvisioningEngine
 
         var root = config["Provisioning:TemplateRoot"] ?? "db/tenant-template";
         _templateRoot = Path.IsPathRooted(root) ? root : Path.Combine(Directory.GetCurrentDirectory(), root);
+
+        // Compensating rollback on partial provisioning failure (L1.5.5). On by default.
+        _rollbackOnFailure = config.GetValue("Provisioning:RollbackOnFailure", true);
     }
 
     public Task<ProvisionedDb> ProvisionMasterAsync(string tenantCode, CancellationToken ct = default)
@@ -46,28 +50,64 @@ public sealed class SqlProvisioningEngine : IProvisioningEngine
         if (!Directory.Exists(scriptFolder))
             throw new InvalidOperationException($"Provisioning template folder not found: '{scriptFolder}'.");
 
-        await CreateDatabaseIfNotExistsAsync(dbName, ct);
+        var created = await CreateDatabaseIfNotExistsAsync(dbName, ct);
 
-        var targetConn = WithCatalog(dbName);
-        foreach (var file in Directory.GetFiles(scriptFolder, "*.sql").OrderBy(f => f, StringComparer.Ordinal))
-            await RunScriptAsync(targetConn, await File.ReadAllTextAsync(file, ct), ct);
+        try
+        {
+            var targetConn = WithCatalog(dbName);
+            foreach (var file in Directory.GetFiles(scriptFolder, "*.sql").OrderBy(f => f, StringComparer.Ordinal))
+                await RunScriptAsync(targetConn, await File.ReadAllTextAsync(file, ct), ct);
+        }
+        catch when (created && _rollbackOnFailure)
+        {
+            // Compensating rollback (L1.5.5): a database WE created that failed to migrate is
+            // dropped so a failed onboarding/year-shift leaves no orphan, half-built DB.
+            // A pre-existing DB (created == false) is never dropped.
+            await TryDropDatabaseAsync(dbName);
+            throw;
+        }
 
         return new ProvisionedDb(dbKind, dbName);
     }
 
-    private async Task CreateDatabaseIfNotExistsAsync(string dbName, CancellationToken ct)
+    /// <summary>Creates the database if absent. Returns true only if THIS call created it.</summary>
+    private async Task<bool> CreateDatabaseIfNotExistsAsync(string dbName, CancellationToken ct)
     {
         await using var c = new SqlConnection(WithCatalog("master"));
         await c.OpenAsync(ct);
         // dbName already validated against SafeName; QUOTENAME guards it. EXEC needs a
-        // variable (it won't accept a function call inline).
-        await c.ExecuteAsync(new CommandDefinition(
+        // variable (it won't accept a function call inline). Returns 1 iff newly created.
+        return await c.ExecuteScalarAsync<int>(new CommandDefinition(
             @"IF DB_ID(@n) IS NULL
               BEGIN
                   DECLARE @sql NVARCHAR(300) = N'CREATE DATABASE ' + QUOTENAME(@n);
                   EXEC(@sql);
-              END",
-            new { n = dbName }, cancellationToken: ct));
+                  SELECT 1;
+              END
+              ELSE SELECT 0;",
+            new { n = dbName }, cancellationToken: ct)) == 1;
+    }
+
+    /// <summary>Best-effort drop of a database we created (compensating action, L1.5.5).</summary>
+    private async Task TryDropDatabaseAsync(string dbName)
+    {
+        try
+        {
+            // Release pooled connections to the target so the DROP isn't blocked by them.
+            SqlConnection.ClearAllPools();
+            await using var c = new SqlConnection(WithCatalog("master"));
+            await c.OpenAsync();
+            await c.ExecuteAsync(
+                @"IF DB_ID(@n) IS NOT NULL
+                  BEGIN
+                      DECLARE @sql NVARCHAR(400) =
+                          N'ALTER DATABASE ' + QUOTENAME(@n) + N' SET SINGLE_USER WITH ROLLBACK IMMEDIATE; ' +
+                          N'DROP DATABASE ' + QUOTENAME(@n) + N';';
+                      EXEC(@sql);
+                  END",
+                new { n = dbName });
+        }
+        catch { /* best-effort cleanup; the original provisioning exception is rethrown by the caller */ }
     }
 
     private static async Task RunScriptAsync(string connectionString, string script, CancellationToken ct)
