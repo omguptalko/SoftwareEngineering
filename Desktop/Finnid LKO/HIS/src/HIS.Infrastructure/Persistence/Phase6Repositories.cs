@@ -2,20 +2,22 @@ using Dapper;
 using HIS.Application.Abstractions;
 using HIS.Domain.Entities;
 using Microsoft.Extensions.Configuration;
+using HIS.Shared.Context;
 
 namespace HIS.Infrastructure.Persistence;
 
 public sealed class BillingRepository : IBillingRepository
 {
-    private readonly IDbConnectionFactory _f;
-    public BillingRepository(IDbConnectionFactory f) => _f = f;
+    private readonly ITenantConnectionFactory _f;
+    private readonly ITenantContext _tenant;
+    public BillingRepository(ITenantConnectionFactory f, ITenantContext tenant) { _f = f; _tenant = tenant; }
 
     public async Task<Tariff?> GetTariffByCodeAsync(int branchId, string code, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenMasterAsync(ct);   // Tariff master lives in the master DB
         // Prefer a branch-specific tariff, else fall back to the all-branches (NULL) row.
         return await c.QuerySingleOrDefaultAsync<Tariff>(new CommandDefinition(
-            @"SELECT TOP 1 * FROM dbo.Tariff
+            @"SELECT TOP 1 * FROM master.Tariff
               WHERE ServiceCode = @code AND IsActive = 1 AND (BranchId = @branchId OR BranchId IS NULL)
               ORDER BY CASE WHEN BranchId = @branchId THEN 0 ELSE 1 END",
             new { branchId, code }, cancellationToken: ct));
@@ -23,25 +25,26 @@ public sealed class BillingRepository : IBillingRepository
 
     public async Task<string> NextBillNoAsync(int branchId, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         return await c.QuerySingleAsync<string>(new CommandDefinition(
-            "EXEC dbo.usp_NextDocNo @BranchId=@branchId, @DocType='BILL', @Prefix='BILL'", new { branchId }, cancellationToken: ct));
+            "EXEC [proc].usp_NextDocNo @BranchId=@branchId, @DocType='BILL', @Prefix='BILL', @FyCode=@fy",
+            new { branchId, fy = _tenant.FiscalYearCode ?? "" }, cancellationToken: ct));
     }
 
     public async Task<long> CreateBillAsync(Bill bill, IReadOnlyList<BillLine> lines, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         using var tx = c.BeginTransaction();
         try
         {
             var billId = await c.QuerySingleAsync<long>(new CommandDefinition(
-                @"INSERT INTO dbo.Bill (BillNo, BranchId, PatientId, AdmissionId, CreatedUtc, GrossAmount, DiscountAmount, InsurancePays, PatientPays, Status)
+                @"INSERT INTO billing.Bill (BillNo, BranchId, PatientId, AdmissionId, CreatedUtc, GrossAmount, DiscountAmount, InsurancePays, PatientPays, Status)
                   VALUES (@BillNo, @BranchId, @PatientId, @AdmissionId, @CreatedUtc, @GrossAmount, @DiscountAmount, @InsurancePays, @PatientPays, @Status);
                   SELECT CAST(SCOPE_IDENTITY() AS BIGINT);", bill, tx, cancellationToken: ct));
 
             foreach (var l in lines)
                 await c.ExecuteAsync(new CommandDefinition(
-                    @"INSERT INTO dbo.BillLine (BillId, TariffId, Description, Qty, Rate)
+                    @"INSERT INTO billing.BillLine (BillId, TariffId, Description, Qty, Rate)
                       VALUES (@billId, @TariffId, @Description, @Qty, @Rate);",   // Amount is a computed column
                     new { billId, l.TariffId, l.Description, l.Qty, l.Rate }, tx, cancellationToken: ct));
 
@@ -53,25 +56,25 @@ public sealed class BillingRepository : IBillingRepository
 
     public async Task<Bill?> GetBillAsync(long billId, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         return await c.QuerySingleOrDefaultAsync<Bill>(new CommandDefinition(
-            "SELECT * FROM dbo.Bill WHERE BillId = @billId", new { billId }, cancellationToken: ct));
+            "SELECT * FROM billing.Bill WHERE BillId = @billId", new { billId }, cancellationToken: ct));
     }
 
     public async Task<IReadOnlyList<(string, decimal, decimal, decimal)>> GetBillLinesAsync(long billId, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         var rows = await c.QueryAsync<(string, decimal, decimal, decimal)>(new CommandDefinition(
-            "SELECT Description, Qty, Rate, Amount FROM dbo.BillLine WHERE BillId = @billId ORDER BY LineId",
+            "SELECT Description, Qty, Rate, Amount FROM billing.BillLine WHERE BillId = @billId ORDER BY LineId",
             new { billId }, cancellationToken: ct));
         return rows.ToList();
     }
 
     public async Task<long> InsertPaymentAsync(Payment p, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         const string sql = @"
-INSERT INTO dbo.Payment (BillId, PatientId, Mode, Gateway, Amount, GatewayRef, Status, CreatedUtc)
+INSERT INTO billing.Payment (BillId, PatientId, Mode, Gateway, Amount, GatewayRef, Status, CreatedUtc)
 VALUES (@BillId, @PatientId, @Mode, @Gateway, @Amount, @GatewayRef, @Status, @CreatedUtc);
 SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return await c.QuerySingleAsync<long>(new CommandDefinition(sql, p, cancellationToken: ct));
@@ -79,24 +82,24 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
 
     public async Task<decimal> GetPaidTotalAsync(long billId, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         return await c.ExecuteScalarAsync<decimal>(new CommandDefinition(
-            "SELECT ISNULL(SUM(Amount),0) FROM dbo.Payment WHERE BillId = @billId AND Status = 'Captured'",
+            "SELECT ISNULL(SUM(Amount),0) FROM billing.Payment WHERE BillId = @billId AND Status = 'Captured'",
             new { billId }, cancellationToken: ct));
     }
 
     public async Task UpdateBillStatusAsync(long billId, string status, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         await c.ExecuteAsync(new CommandDefinition(
-            "UPDATE dbo.Bill SET Status = @status WHERE BillId = @billId", new { billId, status }, cancellationToken: ct));
+            "UPDATE billing.Bill SET Status = @status WHERE BillId = @billId", new { billId, status }, cancellationToken: ct));
     }
 
     public async Task<long> InsertDepositAsync(PatientDeposit d, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         const string sql = @"
-INSERT INTO dbo.PatientDeposit (PatientId, Amount, Balance, CreatedUtc)
+INSERT INTO billing.PatientDeposit (PatientId, Amount, Balance, CreatedUtc)
 VALUES (@PatientId, @Amount, @Balance, @CreatedUtc);
 SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return await c.QuerySingleAsync<long>(new CommandDefinition(sql, d, cancellationToken: ct));
@@ -104,9 +107,9 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
 
     public async Task<decimal> GetDepositBalanceAsync(long patientId, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenDataAsync(ct);
         return await c.ExecuteScalarAsync<decimal>(new CommandDefinition(
-            "SELECT ISNULL((SELECT TOP 1 Balance FROM dbo.PatientDeposit WHERE PatientId = @patientId ORDER BY DepositId DESC), 0)",
+            "SELECT ISNULL((SELECT TOP 1 Balance FROM billing.PatientDeposit WHERE PatientId = @patientId ORDER BY DepositId DESC), 0)",
             new { patientId }, cancellationToken: ct));
     }
 }
