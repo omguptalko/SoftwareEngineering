@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenIssuer, JwtTokenIssuer>();
         services.AddSingleton<ITotpService, TotpService>();
+        services.AddSingleton<IFieldProtector, AesGcmFieldProtector>();
         services.AddScoped<IModuleRegistryRepository, ModuleRegistryRepository>();
         services.AddScoped<ILookupRepository, LookupRepository>();
         services.AddScoped<IPatientRepository, PatientRepository>();
