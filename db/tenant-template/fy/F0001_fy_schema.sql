@@ -233,6 +233,7 @@ CREATE TABLE audit.AuditEntry (
     Action        NVARCHAR(120) NOT NULL,
     Entity        NVARCHAR(120) NOT NULL,
     EntityId      NVARCHAR(80)  NULL,
+    PayloadJson   NVARCHAR(MAX) NULL,
     Succeeded     BIT NOT NULL,
     Error         NVARCHAR(MAX) NULL
 );

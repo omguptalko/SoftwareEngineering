@@ -12,7 +12,8 @@ public static class DependencyInjection
     /// <summary>Registers Dapper-backed persistence. Connection string resolved from config.</summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
-        services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
+        // L1.8.5: the single-DB SqlConnectionFactory is retired — all data access now flows
+        // through ITenantConnectionFactory (per-tenant master / current-FY DB).
         services.AddScoped<IAuditWriter, AuditWriter>();
 
         // L1 control plane (HIS_Platform): identity + auth.

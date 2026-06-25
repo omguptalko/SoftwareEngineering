@@ -9,22 +9,22 @@ namespace HIS.Infrastructure.Persistence;
 
 public sealed class ModuleRegistryRepository : IModuleRegistryRepository
 {
-    private readonly IDbConnectionFactory _f;
-    public ModuleRegistryRepository(IDbConnectionFactory f) => _f = f;
+    private readonly ITenantConnectionFactory _f;
+    public ModuleRegistryRepository(ITenantConnectionFactory f) => _f = f;
 
     public async Task<IReadOnlyList<ModuleGroup>> GetGroupsAsync(CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenMasterAsync(ct);
         var rows = await c.QueryAsync<ModuleGroup>(new CommandDefinition(
-            "SELECT GroupId, Label, Icon, SortOrder FROM dbo.ModuleGroup ORDER BY SortOrder", cancellationToken: ct));
+            "SELECT GroupId, Label, Icon, SortOrder FROM master.ModuleGroup ORDER BY SortOrder", cancellationToken: ct));
         return rows.ToList();
     }
 
     public async Task<IReadOnlyList<Module>> GetModulesAsync(CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenMasterAsync(ct);
         var rows = await c.QueryAsync<Module>(new CommandDefinition(
-            "SELECT ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef FROM dbo.Module ORDER BY SortOrder", cancellationToken: ct));
+            "SELECT ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef FROM master.Module ORDER BY SortOrder", cancellationToken: ct));
         return rows.ToList();
     }
 }
@@ -115,22 +115,22 @@ public sealed class LookupRepository : ILookupRepository
 
 public sealed class PatientRepository : IPatientRepository
 {
-    private readonly IDbConnectionFactory _f;
-    public PatientRepository(IDbConnectionFactory f) => _f = f;
+    private readonly ITenantConnectionFactory _f;
+    public PatientRepository(ITenantConnectionFactory f) => _f = f;
 
     public async Task<Patient?> GetByUhidAsync(string uhid, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenMasterAsync(ct);
         return await c.QuerySingleOrDefaultAsync<Patient>(new CommandDefinition(
-            "SELECT * FROM dbo.Patient WHERE Uhid = @uhid AND IsActive = 1", new { uhid }, cancellationToken: ct));
+            "SELECT * FROM patient.Patient WHERE Uhid = @uhid AND IsActive = 1", new { uhid }, cancellationToken: ct));
     }
 
     public async Task<IReadOnlyList<Patient>> SearchAsync(string? q, int branchId, int take, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenMasterAsync(ct);
         var like = "%" + (q ?? "").Trim() + "%";
         return (await c.QueryAsync<Patient>(new CommandDefinition(
-            @"SELECT TOP (@take) * FROM dbo.Patient
+            @"SELECT TOP (@take) * FROM patient.Patient
               WHERE IsActive = 1 AND (@all = 1 OR Uhid LIKE @like OR FullName LIKE @like OR Mobile LIKE @like)
               ORDER BY PatientId DESC",
             new { take, like, all = string.IsNullOrWhiteSpace(q) ? 1 : 0 }, cancellationToken: ct))).ToList();
@@ -138,26 +138,26 @@ public sealed class PatientRepository : IPatientRepository
 
     public async Task<IReadOnlyList<PatientVisit>> GetVisitsAsync(long patientId, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenMasterAsync(ct);
         return (await c.QueryAsync<PatientVisit>(new CommandDefinition(
             @"SELECT VisitId, PatientId, BranchId, VisitDate, VisitType, DoctorName, Diagnosis, PayerName
-              FROM dbo.PatientVisit WHERE PatientId = @patientId ORDER BY VisitDate DESC",
+              FROM patient.PatientVisit WHERE PatientId = @patientId ORDER BY VisitDate DESC",
             new { patientId }, cancellationToken: ct))).ToList();
     }
 
     public async Task<string> GetNextUhidAsync(int branchId, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenMasterAsync(ct);
         // UHID format BR{branch}-{yyyy}-{6-digit seq}; sequence is per branch+year, from DB.
         return await c.QuerySingleAsync<string>(new CommandDefinition(
-            "EXEC dbo.usp_NextUhid @BranchId = @branchId", new { branchId }, cancellationToken: ct));
+            "EXEC [proc].usp_NextUhid @BranchId = @branchId", new { branchId }, cancellationToken: ct));
     }
 
     public async Task<long> InsertAsync(Patient p, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenMasterAsync(ct);
         const string sql = @"
-INSERT INTO dbo.Patient
+INSERT INTO patient.Patient
  (Uhid, RegBranchId, RegisteredAtUtc, FullName, GuardianName, AgeYears, DateOfBirth, Sex, BloodGroup,
   Mobile, Email, MaritalStatus, Category, Address, City, State, Pincode, Occupation, EmployerPayerCode,
   AadhaarMasked, AbhaNumber, AbhaAddress, IsActive)
@@ -171,9 +171,9 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
 
     public async Task<bool> AadhaarExistsAsync(string aadhaarMasked, CancellationToken ct = default)
     {
-        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var c = await _f.OpenMasterAsync(ct);
         return await c.ExecuteScalarAsync<int>(new CommandDefinition(
-            "SELECT COUNT(1) FROM dbo.Patient WHERE AadhaarMasked = @aadhaarMasked AND IsActive = 1",
+            "SELECT COUNT(1) FROM patient.Patient WHERE AadhaarMasked = @aadhaarMasked AND IsActive = 1",
             new { aadhaarMasked }, cancellationToken: ct)) > 0;
     }
 }

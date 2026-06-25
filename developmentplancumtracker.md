@@ -117,6 +117,8 @@ How to run: see **`README.dev.md`**. Endpoints verified: `/api/health`, `/api/me
 
 **Phase 5.1 (Operation Theatre) — verified:** `POST /api/ot/schedule` (resolves patient + surgeon server-side, theatre/procedure per case → `Scheduled`), `GET /api/ot/board` (scheduled + completed cases with surgeon/theatre/procedure), `POST /api/ot/complete` (records post-op notes → `Completed`; re-complete → 409). Fixed a SQL reserved-keyword bug (`Procedure` alias must be bracketed) found in testing. Backed by `OtSchedule` table. All writes audited. **DB set now 13 migrations + 9 seeds.**
 
+**L1 SaaS re-platform (tracked in `L1EnhancementDevPlanCumTracker.md`) — data-plane cutover complete (2026-06-25):** the single `HIS`/`dbo` database + `SqlConnectionFactory` are **retired**. Every repository now routes through `ITenantConnectionFactory` to a per-tenant `{Tenant}_Master` DB (longitudinal: patient/clinical/masters/audit) or per-fiscal-year `{Tenant}_FY{…}` DB (billing/insurance/HR/pharmacy/…), schema-organised, auto-provisioned on onboarding. Verified end-to-end on the DEV tenant (patient register + FY-numbered billing across the two planes). See the L1 tracker for the full multi-tenant / RBAC / provisioning workstream and its remaining UI/MFA items.
+
 Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), Admin dashboards/compliance (Phase 12), non-functional hardening (Phase 13); plus external integrations (ABDM/NHCX/PM-JAY/ESIC/CGHS/ECHS/UIDAI/gateways/AI) and remaining per-module sub-features noted in the trackers below.
 
 ---
