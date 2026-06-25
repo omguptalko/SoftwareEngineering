@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Admin — Finnid HIS ERP</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/tokens.css">
+<style>
+  *{box-sizing:border-box}
+  body{font-family:var(--font-ui);margin:0;background:var(--bg);color:var(--ink);display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+  /* Sidebar */
+  .nav{background:linear-gradient(170deg,#0b5854,#0d7a74);color:#dff1ef;padding:18px 14px;display:flex;flex-direction:column;gap:4px}
+  .nav .brand{display:flex;gap:10px;align-items:center;font-weight:800;font-size:15px;color:#fff;margin-bottom:18px}
+  .nav .brand small{display:block;font-size:10.5px;font-weight:600;color:#bfe6e2}
+  .nav a{display:flex;gap:10px;align-items:center;color:#dff1ef;text-decoration:none;padding:9px 11px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer}
+  .nav a:hover{background:#ffffff1a}
+  .nav a.active{background:#ffffff26;color:#fff}
+  .nav .who{margin-top:auto;font-size:11.5px;color:#bfe6e2;border-top:1px solid #ffffff22;padding-top:12px}
+  .nav .who b{color:#fff;display:block}
+  .nav .signout{color:#cdeae7;font-size:12px;margin-top:8px}
+  /* Content */
+  main{padding:26px 30px;overflow:auto}
+  h1{font-size:21px;margin:0 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 20px}
+  .panel{display:none}
+  .panel.active{display:block}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:18px}
+  .card h2{font-size:15px;margin:0 0 14px;display:flex;gap:8px;align-items:center}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
+  label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  input,select{width:100%;height:38px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:0 11px;font-size:13.5px;font-family:var(--font-ui);color:var(--ink)}
+  input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px #1f6feb22;outline:none}
+  .btn{height:38px;border:0;border-radius:8px;background:var(--brand);color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;padding:0 16px;display:inline-flex;gap:7px;align-items:center;justify-content:center}
+  .btn:hover{background:var(--brand-600)}.btn:disabled{opacity:.6;cursor:progress}
+  .btn.sm{height:30px;font-size:12px;padding:0 11px}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+  .btn.ghost:hover{border-color:var(--brand);color:var(--brand)}
+  .btn.danger{background:var(--danger)}
+  .actions{display:flex;gap:8px;align-items:flex-end}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-2)}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+  tbody tr:hover{background:var(--bg-2)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+  .pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.no{background:var(--danger-bg);color:var(--danger)}
+  .toast{position:fixed;right:20px;bottom:20px;background:#0d2b29;color:#dff1ef;padding:11px 16px;border-radius:9px;font-size:13px;box-shadow:var(--shadow-2);opacity:0;transform:translateY(8px);transition:.2s;max-width:380px}
+  .toast.show{opacity:1;transform:none}
+  .toast.err{background:#5a1a1f}
+  .warn{background:var(--warn-bg);color:#7a5b00;border:1px solid #f3e0a8;border-radius:9px;padding:10px 13px;font-size:12.5px;margin-bottom:16px;display:none}
+  .muted{color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand"><i class="bi bi-shield-lock-fill"></i> <span>Platform Admin<small>Finnid HIS · superadmin</small></span></div>
+    <a data-tab="tenants" class="active"><i class="bi bi-buildings"></i> Tenants</a>
+    <a data-tab="onboard"><i class="bi bi-plus-square"></i> Onboard hospital</a>
+    <a data-tab="rbac"><i class="bi bi-diagram-3"></i> Modules &amp; Roles</a>
+    <a data-tab="entitlements"><i class="bi bi-toggles"></i> Entitlements</a>
+    <a data-tab="audit"><i class="bi bi-list-check"></i> Audit</a>
+    <div class="who"><span class="muted">Signed in as</span><b id="whoName">—</b>
+      <div class="signout"><a href="index.html" style="padding:0">← Workspace</a> · <a id="signout" style="padding:0;cursor:pointer">Sign out</a></div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="warn" id="notSuper"><i class="bi bi-exclamation-triangle"></i> You are not a platform superadmin — these actions require the <b>superadmin</b> role and will be rejected (403).</div>
+
+    <!-- ===== Tenants ===== -->
+    <section class="panel active" id="panel-tenants">
+      <h1>Tenants</h1><p class="sub">Onboarded hospitals and their per-fiscal-year databases.</p>
+      <div class="card">
+        <h2><i class="bi bi-buildings"></i> Registered tenants <button class="btn ghost sm" id="reloadTenants" style="margin-left:auto"><i class="bi bi-arrow-clockwise"></i> Refresh</button></h2>
+        <table><thead><tr><th>Code</th><th>Name</th><th>Fiscal year</th><th>DB kind</th><th>Database</th></tr></thead>
+        <tbody id="tenantsBody"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody></table>
+      </div>
+      <div class="card">
+        <h2><i class="bi bi-calendar-plus"></i> Open next fiscal year (year shift)</h2>
+        <div class="grid g3">
+          <div><label>Tenant code</label><input id="fy_code" placeholder="e.g. ACME"></div>
+          <div><label>Fiscal year start</label><select id="fy_year"></select></div>
+          <div class="actions"><button class="btn" id="openFyBtn"><i class="bi bi-calendar-plus"></i> Open fiscal year</button></div>
+        </div>
+        <p class="muted" style="margin:10px 0 0">Provisions the new FY data DB, carries module entitlements forward, and rolls the billing balance forward.</p>
+      </div>
+    </section>
+
+    <!-- ===== Onboard ===== -->
+    <section class="panel" id="panel-onboard">
+      <h1>Onboard a hospital</h1><p class="sub">Registers the tenant + fiscal year + domains and auto-provisions its master + fiscal-year databases — zero manual DB steps.</p>
+      <div class="card">
+        <h2><i class="bi bi-hospital"></i> New tenant</h2>
+        <div class="grid g2">
+          <div><label>Tenant code <span style="color:var(--danger)">*</span></label><input id="ob_code" placeholder="ACME (letters/digits/-)"></div>
+          <div><label>Hospital name <span style="color:var(--danger)">*</span></label><input id="ob_name" placeholder="ACME Multispeciality"></div>
+          <div><label>Fiscal year <span style="color:var(--danger)">*</span></label><select id="ob_year"></select></div>
+          <div><label>Primary domain <span style="color:var(--danger)">*</span></label><input id="ob_primary" placeholder="acme.hospital.in"></div>
+          <div><label>Common-domain alias</label><input id="ob_common" placeholder="acme.app.finnid.in (optional)"></div>
+          <div class="actions"><button class="btn" id="onboardBtn"><i class="bi bi-rocket-takeoff"></i> Provision &amp; onboard</button></div>
+        </div>
+        <pre id="ob_result" class="muted" style="white-space:pre-wrap;margin:14px 0 0"></pre>
+      </div>
+    </section>
+
+    <!-- ===== RBAC ===== -->
+    <section class="panel" id="panel-rbac">
+      <h1>Modules, Pages &amp; Role assignments</h1><p class="sub">Dynamic registry (R3). Create modules/pages and grant them to roles.</p>
+      <div class="card">
+        <h2><i class="bi bi-grid"></i> Create module</h2>
+        <div class="grid g4">
+          <div><label>Code</label><input id="m_code" placeholder="telemed"></div>
+          <div><label>Label</label><input id="m_label" placeholder="Telemedicine"></div>
+          <div><label>Icon</label><input id="m_icon" placeholder="bi-camera-video"></div>
+          <div class="actions"><button class="btn" id="createModuleBtn">Create module</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2><i class="bi bi-file-earmark"></i> Create page</h2>
+        <div class="grid g4">
+          <div><label>Module code</label><input id="p_mod" placeholder="telemed"></div>
+          <div><label>Page code</label><input id="p_code" placeholder="tele.consult"></div>
+          <div><label>Label</label><input id="p_label" placeholder="Tele Consultation"></div>
+          <div class="actions"><button class="btn" id="createPageBtn">Create page</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2><i class="bi bi-person-check"></i> Assign to role</h2>
+        <div class="grid g4">
+          <div><label>Role code</label><input id="a_role" placeholder="doctor"></div>
+          <div><label>Module code</label><input id="a_mod" placeholder="telemed"></div>
+          <div class="actions"><button class="btn ghost" id="assignModuleBtn">Grant module</button></div>
+          <div></div>
+          <div><label>Page code</label><input id="a_page" placeholder="tele.consult"></div>
+          <div><label>Action (view/create/edit/delete)</label><input id="a_action" placeholder="edit"></div>
+          <div class="actions"><button class="btn ghost" id="assignPageBtn">Grant page</button></div>
+          <div class="actions"><button class="btn ghost" id="assignActionBtn">Grant action</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Entitlements ===== -->
+    <section class="panel" id="panel-entitlements">
+      <h1>Per-fiscal-year entitlements</h1><p class="sub">Enable/disable a module for a tenant's fiscal year (R3 — module/rights/page per FY). Drives the effective menu.</p>
+      <div class="card">
+        <h2><i class="bi bi-toggles"></i> Set tenant module</h2>
+        <div class="grid g4">
+          <div><label>Tenant code</label><input id="e_tenant" placeholder="DEV"></div>
+          <div><label>Fiscal year code</label><input id="e_fy" placeholder="FY2026-27"></div>
+          <div><label>Module code</label><input id="e_mod" placeholder="pharmacy"></div>
+          <div><label>State</label><select id="e_state"><option value="true">Enabled</option><option value="false">Disabled</option></select></div>
+        </div>
+        <div style="margin-top:12px"><button class="btn" id="setEntBtn"><i class="bi bi-check2-circle"></i> Apply</button></div>
+      </div>
+    </section>
+
+    <!-- ===== Audit ===== -->
+    <section class="panel" id="panel-audit">
+      <h1>Control-plane audit</h1><p class="sub">Every onboarding, year-shift, RBAC change and login attempt.</p>
+      <div class="card">
+        <h2><i class="bi bi-list-check"></i> Recent events <button class="btn ghost sm" id="reloadAudit" style="margin-left:auto"><i class="bi bi-arrow-clockwise"></i> Refresh</button></h2>
+        <table><thead><tr><th>When (UTC)</th><th>Actor</th><th>Action</th><th>Entity</th><th>Id</th><th>OK</th></tr></thead>
+        <tbody id="auditBody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody></table>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+<script src="../assets/js/auth.js"></script>
+<script>
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+
+  // ---- Auth guard (superadmin surface) ----
+  if (!HIS.auth || !HIS.auth.requireSession('login.html')) { /* redirected */ }
+  const profile = (HIS.auth && HIS.auth.get()) || {};
+  $('#whoName').textContent = profile.displayName || profile.userName || '—';
+  if (!profile.isSuperAdmin) $('#notSuper').style.display = 'block';
+  $('#signout').addEventListener('click', () => { HIS.auth.clear(); location.href = 'login.html'; });
+
+  // ---- API helpers (Bearer) ----
+  async function api(method, path, body) {
+    const res = await fetch(path, {
+      method,
+      headers: Object.assign({ 'Accept': 'application/json' },
+        body ? { 'Content-Type': 'application/json' } : {},
+        HIS.auth.token() ? { 'Authorization': 'Bearer ' + HIS.auth.token() } : {}),
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if (res.status === 401) { HIS.auth.clear(); location.href = 'login.html'; throw new Error('401'); }
+    let data = null; try { data = await res.json(); } catch (e) {}
+    if (!res.ok) throw new Error((data && data.title) || (method + ' ' + path + ' → ' + res.status));
+    return data;
+  }
+  const toastEl = $('#toast');
+  function toast(msg, err) {
+    toastEl.textContent = msg; toastEl.className = 'toast show' + (err ? ' err' : '');
+    setTimeout(() => toastEl.className = 'toast', 3200);
+  }
+  function guard(fn) { return async () => { try { await fn(); } catch (e) { toast(e.message, true); } }; }
+
+  // ---- Tab nav ----
+  $$('.nav a[data-tab]').forEach(a => a.addEventListener('click', () => {
+    $$('.nav a[data-tab]').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    $$('.panel').forEach(p => p.classList.remove('active'));
+    $('#panel-' + a.dataset.tab).classList.add('active');
+  }));
+
+  // ---- Fiscal-year dropdowns (current ± a few years; nothing hardcoded as a literal list) ----
+  (function fillYears() {
+    const now = new Date(); const base = now.getUTCMonth() + 1 >= 4 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+    const opts = [];
+    for (let y = base - 1; y <= base + 3; y++) opts.push(`<option value="${y}"${y === base ? ' selected' : ''}>FY ${y}-${String((y + 1) % 100).padStart(2, '0')}</option>`);
+    $('#ob_year').innerHTML = opts.join(''); $('#fy_year').innerHTML = opts.join('');
+  })();
+
+  // ---- Tenants ----
+  async function loadTenants() {
+    const rows = await api('GET', '/api/platform/tenants');
+    $('#tenantsBody').innerHTML = rows.length
+      ? rows.map(r => `<tr><td><b>${r.code}</b></td><td>${r.name}</td><td>${r.fiscalYear || '—'}</td><td>${r.dbKind}</td><td><code>${r.dbName}</code></td></tr>`).join('')
+      : '<tr><td colspan="5" class="muted">No tenants yet — onboard one.</td></tr>';
+  }
+  $('#reloadTenants').addEventListener('click', guard(loadTenants));
+  $('#openFyBtn').addEventListener('click', guard(async () => {
+    const r = await api('POST', '/api/platform/fiscal-years/open', { tenantCode: $('#fy_code').value.trim(), fiscalYearStart: +$('#fy_year').value });
+    toast(`Opened ${r.fiscalYearCode} → ${r.dataDb}`); loadTenants();
+  }));
+
+  // ---- Onboard ----
+  $('#onboardBtn').addEventListener('click', guard(async () => {
+    const btn = $('#onboardBtn'); btn.disabled = true;
+    try {
+      const r = await api('POST', '/api/platform/tenants/onboard', {
+        code: $('#ob_code').value.trim(), name: $('#ob_name').value.trim(),
+        fiscalYearStart: +$('#ob_year').value, primaryHost: $('#ob_primary').value.trim(),
+        commonHost: $('#ob_common').value.trim() || null
+      });
+      $('#ob_result').textContent = `✓ Onboarded ${r.tenantId}\n  ${r.fiscalYearCode}\n  master: ${r.masterDb}\n  data:   ${r.dataDb}`;
+      toast(`Onboarded — provisioned ${r.masterDb} + ${r.dataDb}`); loadTenants();
+    } finally { btn.disabled = false; }
+  }));
+
+  // ---- RBAC ----
+  $('#createModuleBtn').addEventListener('click', guard(async () => {
+    await api('POST', '/api/platform/modules', { code: $('#m_code').value.trim(), label: $('#m_label').value.trim(), icon: $('#m_icon').value.trim() || null, sortOrder: 50 });
+    toast('Module created');
+  }));
+  $('#createPageBtn').addEventListener('click', guard(async () => {
+    await api('POST', '/api/platform/pages', { moduleCode: $('#p_mod').value.trim(), code: $('#p_code').value.trim(), label: $('#p_label').value.trim(), route: null, sortOrder: 50 });
+    toast('Page created');
+  }));
+  $('#assignModuleBtn').addEventListener('click', guard(async () => {
+    await api('POST', '/api/platform/assign/module', { roleCode: $('#a_role').value.trim(), moduleCode: $('#a_mod').value.trim() }); toast('Module granted to role');
+  }));
+  $('#assignPageBtn').addEventListener('click', guard(async () => {
+    await api('POST', '/api/platform/assign/page', { roleCode: $('#a_role').value.trim(), pageCode: $('#a_page').value.trim() }); toast('Page granted to role');
+  }));
+  $('#assignActionBtn').addEventListener('click', guard(async () => {
+    await api('POST', '/api/platform/assign/action', { roleCode: $('#a_role').value.trim(), pageCode: $('#a_page').value.trim(), actionCode: $('#a_action').value.trim() }); toast('Action granted to role');
+  }));
+
+  // ---- Entitlements ----
+  $('#setEntBtn').addEventListener('click', guard(async () => {
+    await api('POST', '/api/platform/assign/tenant-module', {
+      tenantCode: $('#e_tenant').value.trim(), fiscalYearCode: $('#e_fy').value.trim(),
+      moduleCode: $('#e_mod').value.trim(), enabled: $('#e_state').value === 'true'
+    });
+    toast('Entitlement updated — the tenant menu reflects it immediately');
+  }));
+
+  // ---- Audit ----
+  async function loadAudit() {
+    const rows = await api('GET', '/api/platform/audit?take=50');
+    $('#auditBody').innerHTML = rows.length
+      ? rows.map(r => {
+          const when = (r.occurredUtc || '').replace('T', ' ').slice(0, 19);
+          const ok = r.succeeded ? '<span class="pill ok">ok</span>' : '<span class="pill no">fail</span>';
+          return `<tr><td>${when}</td><td>${r.actor || '—'}</td><td>${r.action}</td><td>${r.entity}</td><td>${r.entityId || ''}</td><td>${ok}</td></tr>`;
+        }).join('')
+      : '<tr><td colspan="6" class="muted">No events.</td></tr>';
+  }
+  $('#reloadAudit').addEventListener('click', guard(loadAudit));
+
+  // ---- Initial load ----
+  guard(loadTenants)();
+  guard(loadAudit)();
+</script>
+</body>
+</html>
