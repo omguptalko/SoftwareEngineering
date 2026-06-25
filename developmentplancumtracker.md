@@ -134,7 +134,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | 0.4 | MS SQL schema baseline + migrations + **all reference/master tables seeded from scripts** | §9 | 🟩 | | 0001–0011 + seed, idempotent, verified |
 | 0.5 | Config & secrets via appsettings + Azure App Config + **Key Vault** (no inline secrets) | §8.1/§8.2 | 🟦 | | Config-driven done; Key Vault wiring pending |
 | 0.6 | JWT auth + **RBAC** (14 roles, permission tables) | §2.2/§8.1 | 🟩 | | JWT + token issuance (`POST /api/auth/login`); per-command **AuthorizationBehavior** (L1.2.6); **14 tenant roles granted modules** (L1.2.4); dynamic module/page/action + tenant-FY entitlement assignment (L1.3) |
-| 0.7 | AES-256 at rest, TLS in transit, MFA for privileged roles, Aadhaar/PII masking | §8.1/§8.2 | 🟦 | | Aadhaar masked; **MFA (TOTP) for privileged roles done** (L1.2.5); AES-at-rest still pending |
+| 0.7 | AES-256 at rest, TLS in transit, MFA for privileged roles, Aadhaar/PII masking | §8.1/§8.2 | 🟦 | | Aadhaar masked; **MFA (TOTP)** for privileged roles done (L1.2.5); **AES-256-GCM at-rest** field protector done (encrypts MFA secret; key from config/Key Vault) — verified; TLS-in-transit is a deployment concern |
 | 0.8 | Immutable audit-trail behavior (all writes) | §8.1/§3.22 | 🟩 | | Verified writing rows |
 | 0.9 | SignalR infrastructure (hubs, groups per branch) | §9 | ⬜ | | |
 | 0.10 | FHIR R4 model library + HL7 interoperability scaffolding | §8.6 | ⬜ | | |
