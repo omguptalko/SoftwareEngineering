@@ -33,16 +33,20 @@ public sealed class PlatformConnectionFactory : IPlatformConnectionFactory
 public sealed class PlatformUserRepository : IPlatformUserRepository
 {
     private readonly IPlatformConnectionFactory _f;
-    public PlatformUserRepository(IPlatformConnectionFactory f) => _f = f;
+    private readonly IFieldProtector _protector;
+    public PlatformUserRepository(IPlatformConnectionFactory f, IFieldProtector protector) { _f = f; _protector = protector; }
 
     public async Task<PlatformUser?> GetByUserNameAsync(string userName, CancellationToken ct = default)
     {
         using var c = await _f.CreateOpenConnectionAsync(ct);
-        return await c.QuerySingleOrDefaultAsync<PlatformUser>(new CommandDefinition(
+        var user = await c.QuerySingleOrDefaultAsync<PlatformUser>(new CommandDefinition(
             @"SELECT UserId, TenantId, UserName, DisplayName, Email, PasswordHash, PasswordSalt,
                      IsSuperAdmin, MfaEnabled, MfaSecret, IsActive
               FROM security.AppUser WHERE UserName = @userName",
             new { userName }, cancellationToken: ct));
+        // Decrypt the MFA secret at read (AES-at-rest, parent 0.7). Tolerates legacy plaintext.
+        if (user?.MfaSecret is not null) user.MfaSecret = _protector.Unprotect(user.MfaSecret);
+        return user;
     }
 
     public async Task<IReadOnlyList<string>> GetRoleCodesAsync(long userId, CancellationToken ct = default)
@@ -93,9 +97,11 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
     public async Task SetMfaSecretAsync(long userId, string secret, CancellationToken ct = default)
     {
         using var c = await _f.CreateOpenConnectionAsync(ct);
+        // Encrypt the TOTP secret at rest (AES-256-GCM) before persisting.
+        var stored = _protector.Protect(secret);
         await c.ExecuteAsync(new CommandDefinition(
-            "UPDATE security.AppUser SET MfaSecret = @secret, MfaEnabled = 1 WHERE UserId = @userId",
-            new { userId, secret }, cancellationToken: ct));
+            "UPDATE security.AppUser SET MfaSecret = @stored, MfaEnabled = 1 WHERE UserId = @userId",
+            new { userId, stored }, cancellationToken: ct));
     }
 
     public async Task WritePlatformAuditAsync(long? actorUserId, string? actorUserName, int? tenantId,

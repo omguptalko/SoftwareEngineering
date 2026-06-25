@@ -6,6 +6,10 @@
 SET NOCOUNT ON;
 GO
 
+-- NVARCHAR(256): wide enough for the AES-GCM "enc:v1:" envelope (parent 0.7), not just
+-- the raw Base32 secret. Add if absent, else widen — idempotent.
 IF COL_LENGTH('security.AppUser', 'MfaSecret') IS NULL
-    ALTER TABLE security.AppUser ADD MfaSecret NVARCHAR(64) NULL;
+    ALTER TABLE security.AppUser ADD MfaSecret NVARCHAR(256) NULL;
+ELSE
+    ALTER TABLE security.AppUser ALTER COLUMN MfaSecret NVARCHAR(256) NULL;
 GO

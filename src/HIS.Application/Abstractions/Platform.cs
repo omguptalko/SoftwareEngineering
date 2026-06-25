@@ -35,6 +35,19 @@ public interface ITotpService
     bool Verify(string secret, string code, int window = 1);
 }
 
+/// <summary>
+/// Reversible field-level encryption at rest (AES-256-GCM) for sensitive values
+/// (parent 0.7 — "AES-256 at rest"). The key comes from config / Key Vault
+/// (Security:DataProtection:Key) — never hardcoded. When no key is configured the
+/// methods are pass-through (so dev works), and Unprotect tolerates legacy plaintext.
+/// </summary>
+public interface IFieldProtector
+{
+    bool IsEnabled { get; }
+    string Protect(string plaintext);
+    string Unprotect(string stored);
+}
+
 /// <summary>Control-plane identity store (HIS_Platform.security.*).</summary>
 public interface IPlatformUserRepository
 {
