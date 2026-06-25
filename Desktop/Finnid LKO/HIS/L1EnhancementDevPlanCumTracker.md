@@ -120,7 +120,15 @@ Implemented & verified so far:
 
 - **L1.2.7 — login UI wired (DONE & verified 2026-06-25)** — the wireframe login is now a real authentication flow, not a static redirect. `app/login.html` posts `{userName,password}` to `POST /api/auth/login`, and a new shared `assets/js/auth.js` stores the returned JWT + profile (sessionStorage, or localStorage with "remember this device") and enforces token expiry. `api.js` attaches `Authorization: Bearer <token>` on every request and redirects to login on a mid-session 401. The app shell (`shell.js`) **guards boot on a valid session**, renders the real `displayName` / role / super-admin badge from the profile, and **logout clears the token**. Misleading self-selected Branch/Role dropdowns were removed (both are assigned server-side from the user's grants). **Verified:** wrong password → 401 inline error; empty fields → 400; `superadmin`/`ChangeMe!2026` → JWT + redirect + full `/api/menu`; `billing.demo`/`Demo!2026` → scoped menu (billing + telemed only); JS `node --check` clean; all assets served 200.
 
-Pending in these phases (post-L1.8): tenant-role *permission* grants (platform permission set is admin-only today); per-page action assignment + tenant/FY entitlement filtering of the menu; MFA (L1.2.5); tenant-scoped login + login-realm branding (L1.7.4); admin UI wiring (L1.3.4 / L1.7.1). **The L1.8 data-plane cutover is complete** — `SqlConnectionFactory` is gone and all repositories run on the per-tenant master / per-FY databases.
+- **Platform backend completion (DONE & verified 2026-06-25)** — six coordinated backend batches closed the remaining R3/R4/R5 platform gaps, each verified end-to-end against the running app + LocalDB:
+  - **Dynamic RBAC (L1.2.4/L1.3.3/L1.3.5)** — seeded the 14 tenant roles' module grants (`P0102`); added `assign/action` (RolePageAction) + `assign/tenant-module` (TenantModule enable/disable per tenant×FY) APIs; the effective menu now intersects role grants with the resolved tenant's enabled modules for the current FY (disabling `pharmacy` for DEV dropped it live from dev.admin's menu).
+  - **Per-FY entitlements + year-shift carry-forward (L1.4.3/L1.4.4)** — `OpenFiscalYearCommand` copies the prior year's `TenantModule` snapshot forward then enables newly-added modules (a disabled module stayed disabled across the shift).
+  - **Per-FY billing (L1.4.2)** — `Subscription` scoped to FY (`P0002`); onboarding writes the FY subscription + ledger charge, year-shift writes a `CarryForward` of the prior balance (verified ledger = CarryForward 120000 + Subscription 120000).
+  - **Tenant-scoped login (L1.7.4)** — login binds a tenant user to the resolved realm (401 cross-realm); platform users stay realm-agnostic.
+  - **Provisioning rollback (L1.5.5)** — a DB whose templates fail is dropped (compensating), pre-existing DBs never are; a broken-template onboard left no DB and no platform rows.
+  - **MFA (L1.2.5)** — RFC-6238 TOTP enrollment (`/api/auth/mfa/enroll`) + login enforcement for enrolled/privileged users; the login page reveals an MFA field on challenge.
+
+Pending in these phases (post-L1.8): per-host **login-realm branding** (L1.7.4 cosmetic); **AES-at-rest** posture (L1.2.5/parent 0.7); superadmin **admin UI** screens (L1.3.4) + onboarding **wizard UI** (L1.7.1); and the **L1.9 NFR/isolation/load** test execution. **The L1.8 data-plane cutover is complete** — `SqlConnectionFactory` is gone and all repositories run on the per-tenant master / per-FY databases.
 
 > **Dev-only note:** `appsettings.Development.json` now carries a dev `Jwt:SigningKey` and a bootstrap superadmin password (`ChangeMe!2026`). Both are **dev placeholders** — prod must supply them via environment / Key Vault, and the superadmin must rotate the password on first login (future task).
 
@@ -152,8 +160,8 @@ Pending in these phases (post-L1.8): tenant-role *permission* grants (platform p
 | L1.2.1 | Password hashing (PBKDF2) — `PasswordHasher`, config-driven iterations | 🟩 | `src/HIS.Infrastructure/Security/PasswordHasher.cs`; verified |
 | L1.2.2 | `POST /api/auth/login` → validate creds, mint JWT (closes parent tracker **0.6**) | 🟩 | `JwtTokenIssuer` + `AuthController`; verified 200/401/400 |
 | L1.2.3 | Seed **superadmin** user + `superadmin` role + full permission grants | 🟩 | startup `SuperAdminSeeder` (config bootstrap) + `P0100` grants all perms to superadmin |
-| L1.2.4 | Seed **Permission** rows + `RolePermission` | 🟦 | platform perms + superadmin grants done; **14 tenant-role** grants pending (need L1.3 page model) |
-| L1.2.5 | MFA for privileged roles (`IsPrivileged`) + AES/TLS posture (parent **0.7**) | ⬜ | |
+| L1.2.4 | Seed **Permission** rows + `RolePermission` | 🟩 | platform perms + superadmin grants (P0100); **14 tenant-role module grants** seeded (`P0102`: admin→9, doctor→8, nurse→4, …). Verified: dev.admin (role admin) menu = 9 modules |
+| L1.2.5 | MFA for privileged roles (`IsPrivileged`) + AES/TLS posture (parent **0.7**) | 🟩 | RFC-6238 TOTP (`TotpService`) + `MfaSecret` (P0003); `POST /api/auth/mfa/enroll` (otpauth URI); login enforces a valid code when enrolled, flags privileged-but-unenrolled users (`Security:RequireMfaForPrivileged`); login page reveals an MFA field on challenge. **Verified:** enroll → 401 w/o code → 200 w/ valid TOTP → 401 wrong code; non-privileged unaffected. (AES-at-rest posture still pending) |
 | L1.2.6 | RBAC **authorization pipeline behavior** (parent **0.2** authz pending) | 🟩 | `IAuthorizable` + `AuthorizationBehavior` + `IPermissionResolver`; verified 401/403/200 on `GET /api/platform/audit` |
 | L1.2.7 | Login UI wired in wireframe (`app/login.html` exists, currently static) | 🟩 | **Done & verified.** `login.html` posts real creds to `POST /api/auth/login`, stores the JWT+profile via new `assets/js/auth.js` (session/local storage + remember-me + expiry), shows inline 401/400 errors + busy state. `api.js` now attaches `Authorization: Bearer` on every call and bounces to login on a mid-session 401. App shell (`shell.js`) **guards on a valid session**, shows the real `displayName`/role/super-admin from the token, and **logout clears it**. Self-selected Branch/Role dropdowns removed (assigned server-side). Verified: bad creds→401, empty→400, superadmin→token+full `/api/menu`, `billing.demo`→scoped menu (billing+telemed). |
 
@@ -162,17 +170,17 @@ Pending in these phases (post-L1.8): tenant-role *permission* grants (platform p
 |---|------|--------|-------|
 | L1.3.1 | `security.AppModule` (supersedes static `Module`) — superadmin CRUD | 🟩 | `POST /api/platform/modules` (gated `module.manage`); seeded 10 modules (P0101) |
 | L1.3.2 | `security.AppPage` (pages within a module) + `security.PageAction` (view/create/edit/delete/print…) | 🟩 | `POST /api/platform/pages`; seeded 21 pages + 84 actions |
-| L1.3.3 | Assignment tables: `RoleModule`, `RolePage`, `RolePageAction` (+ `TenantModule` from L1.0.5) | 🟩 | `POST /api/platform/assign/module|page` (gated `rbac.manage`); RolePageAction/TenantModule tables exist (action/tenant-FY assignment APIs pending) |
+| L1.3.3 | Assignment tables: `RoleModule`, `RolePage`, `RolePageAction` (+ `TenantModule` from L1.0.5) | 🟩 | `POST /api/platform/assign/module\|page` + **`assign/action`** (RolePageAction, `rbac.manage`) + **`assign/tenant-module`** (TenantModule enable/disable per tenant×FY, `module.manage`) — all verified (403 for non-privileged) |
 | L1.3.4 | Superadmin admin screens: manage modules/pages, assign to roles & tenants | 🟦 | APIs done & verified; wireframe admin UI deferred |
-| L1.3.5 | Menu/registry API returns **effective** modules/pages for (user, tenant, fiscalYear) | 🟩 | `GET /api/menu` (auth-only): superadmin → all; role-scoped otherwise; tenant/FY entitlement filter pending |
+| L1.3.5 | Menu/registry API returns **effective** modules/pages for (user, tenant, fiscalYear) | 🟩 | `GET /api/menu`: superadmin → all; tenant user → role-granted modules **intersected with `platform.TenantModule` for the resolved tenant + current FY**. **Verified:** disabling `pharmacy` for DEV/FY2026-27 removed it from dev.admin's live menu (9→8) |
 
 ### Phase L1.4 — Fiscal-year model & per-FY billing/variables (R3)
 | # | Task | Status | Notes |
 |---|------|--------|-------|
 | L1.4.1 | Fiscal-year-aware numbering (UHID/Doc counters key on FiscalYearId, not calendar year — fixes A8) | 🟦 | **Doc numbers FY-aware:** `[proc].usp_NextDocNo` keyed on `@FyCode` from `ITenantContext.FiscalYearCode` (verified `BILL-FY2026-27-…`, `PO-FY…`). UHID intentionally stays calendar+branch (longitudinal master, per D3). |
-| L1.4.2 | Per-FY billing: subscription/invoice rows scoped to `TenantFiscalYear`; rollover carries balances | ⬜ | R3 "billing per fiscal year" |
-| L1.4.3 | "Year shift" workflow (superadmin): open next FY → provision next-FY DB (L1.5) → migrate entitlements/rights/modules | ⬜ | R3 "on next year shift on superadmin" |
-| L1.4.4 | Per-FY variability of module/rights/page (entitlements snapshot per FY) | ⬜ | R3 "module, rights, page etc." |
+| L1.4.2 | Per-FY billing: subscription/invoice rows scoped to `TenantFiscalYear`; rollover carries balances | 🟩 | `platform.Subscription` scoped to FY (P0002); onboarding writes a per-FY `Subscription` + `BillingLedger` `Subscription` charge (config `Platform:Billing:*`); year-shift writes a **`CarryForward`** of the prior balance + the new FY charge. **Verified:** RBK FY2027-28 ledger = CarryForward 120000 + Subscription 120000 |
+| L1.4.3 | "Year shift" workflow (superadmin): open next FY → provision next-FY DB (L1.5) → migrate entitlements/rights/modules | 🟩 | `OpenFiscalYearCommand` now **carries entitlements forward** (`CopyModuleEntitlementsAsync` prior→new) then enables newly-added modules, and rolls billing forward. **Verified:** module disabled in FY2026-27 stayed disabled in FY2027-28 |
+| L1.4.4 | Per-FY variability of module/rights/page (entitlements snapshot per FY) | 🟩 | `platform.TenantModule` is the per-(tenant×FY×module) snapshot; `assign/tenant-module` toggles it; year-shift snapshots it forward; the effective menu honours it (L1.3.5). Verified end-to-end |
 
 ### Phase L1.5 — Automated multi-DB provisioning engine (R4)
 | # | Task | Status | Notes |
@@ -181,7 +189,7 @@ Pending in these phases (post-L1.8): tenant-role *permission* grants (platform p
 | L1.5.2 | Programmatic migration runner (apply schema-split scripts to each new DB; idempotent) | 🟩 | GO-split runner over `db/tenant-template/{master,fy}`; idempotent |
 | L1.5.3 | Auto-seed masters into `{Tenant}_Master`; register DBs in `platform.DbCatalog` | 🟩 | blood groups seeded; DbCatalog rows registered + verified |
 | L1.5.4 | Next-FY DB auto-creation on year shift (L1.4.3); carry-forward entitlements | 🟩 | `OpenFiscalYearCommand` → ACME_FY2027_28 created; modules enabled per FY |
-| L1.5.5 | Idempotent/retry-safe + rollback on partial failure; provisioning audit | 🟦 | provision-before-write ordering avoids orphan tenants; scripts idempotent; audited. Full compensating drop of created DBs on later failure pending |
+| L1.5.5 | Idempotent/retry-safe + rollback on partial failure; provisioning audit | 🟩 | `SqlProvisioningEngine` now **drops a DB it created if that DB's templates fail** (compensating rollback, config `Provisioning:RollbackOnFailure`); pre-existing DBs are never dropped; provision-before-write keeps platform rows consistent. **Verified:** a deliberately broken FY template → onboard 409, the half-built `RBX_FY` DB was dropped, **0 platform rows** for the tenant |
 
 ### Phase L1.6 — Tenant/domain resolution & connection routing (R4, R5)
 | # | Task | Status | Notes |
@@ -197,7 +205,7 @@ Pending in these phases (post-L1.8): tenant-role *permission* grants (platform p
 | L1.7.1 | Superadmin onboarding wizard with **fiscal-year dropdown** (R3) | 🟦 | `POST /api/platform/tenants/onboard` (fiscal-year selection drives provisioning) verified; wireframe wizard UI pending |
 | L1.7.2 | Capture hospital profile, primary domain, common-domain alias, initial modules/roles | 🟩 | code/name/primary+common domains captured; all modules enabled per FY; richer profile fields later |
 | L1.7.3 | Domain→tenant mapping (resolve tenant per host) | 🟩 | `TenantResolutionMiddleware` (L1.6) resolves host→tenant; login-realm branding per host pending |
-| L1.7.4 | Tenant-scoped login (user authenticates within resolved tenant) | ⬜ | user↔tenant binding at login still pending |
+| L1.7.4 | Tenant-scoped login (user authenticates within resolved tenant) | 🟩 | `LoginHandler` binds a tenant user (`AppUser.TenantId`) to the resolved realm (`ITenantContext`): a tenant user may authenticate **only** within its own tenant (uniform 401 + audited reason otherwise); platform users (superadmin/demo) stay realm-agnostic. JWT carries `tenantId`. A dev tenant user `dev.admin` (bound to DEV) is seeded. **Verified:** dev.admin → 200 on DEV realm, 401 on a foreign/unresolved realm; superadmin → 200 anywhere |
 
 ### Phase L1.8 — Cutover from single `dbo` DB
 | # | Task | Status | Notes |
