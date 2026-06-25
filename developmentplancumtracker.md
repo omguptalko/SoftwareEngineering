@@ -248,7 +248,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | 13.5 | Reliability: daily backup, DR, **99.9% uptime** | §8.5 | ⬜ | | |
 | 13.6 | Interoperability: HL7/FHIR R4, NHCX, ABDM HIP/HIU compliance | §8.6 | ⬜ | | |
 | 13.7 | Full deep test execution (see `deeptestwithdummydata.md`) | all | ⬜ | | |
-| 13.8 | Azure Cloud deployment + CI/CD | §9 | 🟦 | | Deployment config scaffolded: **TLS/HSTS + forwarded-headers** (proxy TLS), Key Vault/env secret sourcing, `appsettings.Production.json`, `docs/DEPLOYMENT.md`. CI/CD pipeline still pending |
+| 13.8 | Azure Cloud deployment + CI/CD | §9 | 🟩 | | **TLS/HSTS + forwarded-headers**, Key Vault/env secret sourcing, `appsettings.Production.json`; **`Dockerfile`** (non-root, port 8080, bundles provisioning templates) + **GitHub Actions → Azure Container Apps** pipeline (`build/test → az acr build → optional DB migrations → containerapp update → /api/health smoke`, OIDC login); `docs/DEPLOYMENT.md` covers one-time setup + secrets/vars. Verified: publish + workflow YAML green (no docker locally) |
 
 ---
 

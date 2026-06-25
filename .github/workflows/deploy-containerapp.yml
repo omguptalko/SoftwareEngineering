@@ -1,0 +1,97 @@
+name: Deploy to Azure Container Apps
+
+# Build + test on every push/PR; build the image and deploy only from main (or manual run).
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: containerapp-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write      # OIDC federated login to Azure
+  contents: read
+
+env:
+  IMAGE_NAME: his-api
+
+jobs:
+  # ---------------------------------------------------------------- build + test
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet restore HIS.sln
+      - run: dotnet build HIS.sln -c Release --no-restore
+      # No-op today (no test projects); gates once tests are added under tests/.
+      - run: dotnet test HIS.sln -c Release --no-build --verbosity normal
+
+  # ---------------------------------------------------------------- image + deploy
+  deploy:
+    needs: build-test
+    # Don't deploy from PRs or non-main branches.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Build the image server-side in ACR (no docker daemon / registry creds needed).
+      - name: Build & push image (ACR Tasks)
+        run: |
+          az acr build \
+            --registry "${{ vars.ACR_NAME }}" \
+            --image "${IMAGE_NAME}:${{ github.sha }}" \
+            --image "${IMAGE_NAME}:latest" \
+            --file Dockerfile .
+
+      # Apply idempotent control-plane migrations to Azure SQL (HIS_Platform).
+      # Per-tenant DBs are migrated automatically by the app on onboarding.
+      # Enable by setting repo variable RUN_DB_MIGRATIONS = true and the SQL_* secrets.
+      - name: Apply platform DB migrations
+        if: ${{ vars.RUN_DB_MIGRATIONS == 'true' }}
+        run: |
+          set -euo pipefail
+          for f in $(ls db/platform/P*.sql | sort); do
+            echo "→ applying $f"
+            docker run --rm -v "$PWD:/work" mcr.microsoft.com/mssql-tools \
+              /opt/mssql-tools/bin/sqlcmd \
+              -S "${{ secrets.SQL_SERVER }}" -d "${{ secrets.SQL_DATABASE }}" \
+              -U "${{ secrets.SQL_USER }}" -P "${{ secrets.SQL_PASSWORD }}" \
+              -b -i "/work/$f"
+          done
+
+      - name: Deploy image to Container Apps
+        run: |
+          az containerapp update \
+            --name "${{ vars.CONTAINERAPP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "${{ vars.ACR_NAME }}.azurecr.io/${IMAGE_NAME}:${{ github.sha }}"
+
+      - name: Smoke check (/api/health)
+        run: |
+          fqdn=$(az containerapp show \
+            --name "${{ vars.CONTAINERAPP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "Probing https://$fqdn/api/health"
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://$fqdn/api/health" || echo 000)
+            if [ "$code" = "200" ]; then echo "healthy"; exit 0; fi
+            sleep 6
+          done
+          echo "health check did not return 200 in time"; exit 1
