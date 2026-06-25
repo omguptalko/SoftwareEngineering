@@ -10,8 +10,23 @@ HIS.api = (function () {
   // (If ever hosted separately, set window.HIS_API_BASE — still not hardcoded here.)
   const base = (window.HIS_API_BASE || '').replace(/\/$/, '');
 
+  // Attach the JWT (if signed in) so RBAC-gated endpoints + per-request context work (L1.2.7).
+  function headers(extra) {
+    const h = Object.assign({ 'Accept': 'application/json' }, extra || {});
+    const tok = window.HIS && HIS.auth && HIS.auth.token();
+    if (tok) h['Authorization'] = 'Bearer ' + tok;
+    return h;
+  }
+
+  // A 401 mid-session means the token expired/was revoked → bounce to login.
+  function onUnauthorized() {
+    if (window.HIS && HIS.auth) HIS.auth.clear();
+    if (/\/app\//.test(location.pathname)) location.href = 'login.html';
+  }
+
   async function get(path) {
-    const res = await fetch(base + path, { headers: { 'Accept': 'application/json' } });
+    const res = await fetch(base + path, { headers: headers() });
+    if (res.status === 401) { onUnauthorized(); throw new Error(`GET ${path} → 401`); }
     if (res.status === 204) return null;
     if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
     return res.json();
@@ -20,9 +35,10 @@ HIS.api = (function () {
   async function post(path, body) {
     const res = await fetch(base + path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: headers({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body)
     });
+    if (res.status === 401) { onUnauthorized(); throw new Error(`POST ${path} → 401`); }
     if (!res.ok) {
       let detail = '';
       try { detail = JSON.stringify(await res.json()); } catch (e) {}
@@ -33,6 +49,8 @@ HIS.api = (function () {
 
   return {
     get, post,
+    // L1.2 — auth / control plane
+    menu:            () => get('/api/menu'),
     registry:        () => get('/api/meta/registry'),
     lookup:          (type, q) => get(`/api/lookups/${encodeURIComponent(type)}${q ? `?q=${encodeURIComponent(q)}` : ''}`),
     defaultPatient:  () => get('/api/patients/default'),
