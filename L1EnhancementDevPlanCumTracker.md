@@ -223,8 +223,8 @@ Remaining (small / deployment-grade): **TLS-in-transit** + production key/secret
 |---|------|--------|-------|
 | L1.9.1 | Execute new L1 test sections in `deeptestwithdummydata.md` (§8–§13 added) | ⬜ | |
 | L1.9.2 | Tenant **isolation** tests (no cross-tenant/cross-FY data bleed) | 🟩 | Wrote a uniquely-named patient to DEV and RBK via `X-Tenant` routing; each landed in its own `{Tenant}_Master` only — **0 cross-tenant bleed** (`DEV_has_RBK=0`, `RBK_has_DEV=0`), independent identity sequences. Earlier L1.6 work also confirmed per-FY billing isolation |
-| L1.9.3 | Provisioning load/soak (onboard N tenants × M fiscal years unattended) | ⬜ | |
-| L1.9.4 | Connection-routing performance under concurrency (parent **13.3**) | ⬜ | |
+| L1.9.3 | Provisioning load/soak (onboard N tenants × M fiscal years unattended) | 🟩 | Soak: 8 tenants onboarded + year-shifted unattended → **24 DBs (8 master + 16 FY), 0 failures**; onboard median 1.55s (2 DBs + ~80 tables), year-shift median 0.8s (1 DB). Idempotent + rollback-safe. Cleaned up after |
+| L1.9.4 | Connection-routing performance under concurrency (parent **13.3**) | 🟩 | 2000 reqs @ 64 concurrency across **9 tenants** → **0 errors, 0 routing mismatches** (no cross-tenant bleed under load). Warm steady-state: ~580 req/s, p50 65ms / p95 253ms / p99 538ms on dev LocalDB. Absolute throughput is LocalDB-bound; prod scales via Azure SQL elastic pool + `DbCatalog` caching (see `docs/DEPLOYMENT.md`) |
 
 ---
 

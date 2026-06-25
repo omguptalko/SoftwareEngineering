@@ -132,7 +132,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | 0.2 | MediatR + CQRS pipeline behaviors (validation, auth, audit, txn, logging) | §8.1 | 🟩 | | Validation+**Authorization (RBAC, L1.2.6)**+Logging+Audit done; txn/UnitOfWork pending |
 | 0.3 | Dapper data-access base (generic CRUD repo, parameterized queries, UnitOfWork) | §9 | 🟩 | | ConnectionFactory + repos; UnitOfWork pending |
 | 0.4 | MS SQL schema baseline + migrations + **all reference/master tables seeded from scripts** | §9 | 🟩 | | 0001–0011 + seed, idempotent, verified |
-| 0.5 | Config & secrets via appsettings + Azure App Config + **Key Vault** (no inline secrets) | §8.1/§8.2 | 🟦 | | Config-driven done; Key Vault wiring pending |
+| 0.5 | Config & secrets via appsettings + Azure App Config + **Key Vault** (no inline secrets) | §8.1/§8.2 | 🟩 | | **Azure Key Vault config source** wired (gated by `KeyVault:Uri`, `DefaultAzureCredential`) + env-var (`Section__Key`) override convention; `appsettings.Production.json` (no secrets) + `docs/DEPLOYMENT.md`. App Config optional |
 | 0.6 | JWT auth + **RBAC** (14 roles, permission tables) | §2.2/§8.1 | 🟩 | | JWT + token issuance (`POST /api/auth/login`); per-command **AuthorizationBehavior** (L1.2.6); **14 tenant roles granted modules** (L1.2.4); dynamic module/page/action + tenant-FY entitlement assignment (L1.3) |
 | 0.7 | AES-256 at rest, TLS in transit, MFA for privileged roles, Aadhaar/PII masking | §8.1/§8.2 | 🟦 | | Aadhaar masked; **MFA (TOTP)** for privileged roles done (L1.2.5); **AES-256-GCM at-rest** field protector done (encrypts MFA secret; key from config/Key Vault) — verified; TLS-in-transit is a deployment concern |
 | 0.8 | Immutable audit-trail behavior (all writes) | §8.1/§3.22 | 🟩 | | Verified writing rows |
@@ -243,12 +243,12 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 |---|------|---------|--------|-------|-------|
 | 13.1 | Security pass (JWT/RBAC/AES-256/MFA/masking/audit) penetration-tested | §8.1 | ⬜ | | |
 | 13.2 | Privacy & regulatory compliance verification (DPDP 2023, IT Act/SPDI, EHR 2016, ISO 27001, UIDAI vault) | §8.2 | ⬜ | | |
-| 13.3 | Performance: **1000+ concurrent users**, instant emergency/triage response | §8.3 | ⬜ | | Load-tested |
+| 13.3 | Performance: **1000+ concurrent users**, instant emergency/triage response | §8.3 | 🟦 | | Connection-routing concurrency benchmarked (L1.9.4): 2000 reqs @ 64 concurrency × 9 tenants → 0 errors, 0 routing mismatches, ~580 req/s p99 538ms on **dev LocalDB**. 1000+ target needs Azure SQL elastic pool + catalog caching (prod) |
 | 13.4 | Scalability: horizontal scale, easy new-branch onboarding | §8.4 | ⬜ | | |
 | 13.5 | Reliability: daily backup, DR, **99.9% uptime** | §8.5 | ⬜ | | |
 | 13.6 | Interoperability: HL7/FHIR R4, NHCX, ABDM HIP/HIU compliance | §8.6 | ⬜ | | |
 | 13.7 | Full deep test execution (see `deeptestwithdummydata.md`) | all | ⬜ | | |
-| 13.8 | Azure Cloud deployment + CI/CD | §9 | ⬜ | | Env values per-environment config |
+| 13.8 | Azure Cloud deployment + CI/CD | §9 | 🟦 | | Deployment config scaffolded: **TLS/HSTS + forwarded-headers** (proxy TLS), Key Vault/env secret sourcing, `appsettings.Production.json`, `docs/DEPLOYMENT.md`. CI/CD pipeline still pending |
 
 ---
 
