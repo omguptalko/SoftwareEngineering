@@ -136,7 +136,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | 0.6 | JWT auth + **RBAC** (14 roles, permission tables) | §2.2/§8.1 | 🟩 | | JWT + token issuance (`POST /api/auth/login`); per-command **AuthorizationBehavior** (L1.2.6); **14 tenant roles granted modules** (L1.2.4); dynamic module/page/action + tenant-FY entitlement assignment (L1.3) |
 | 0.7 | AES-256 at rest, TLS in transit, MFA for privileged roles, Aadhaar/PII masking | §8.1/§8.2 | 🟦 | | Aadhaar masked; **MFA (TOTP)** for privileged roles done (L1.2.5); **AES-256-GCM at-rest** field protector done (encrypts MFA secret; key from config/Key Vault) — verified; TLS-in-transit is a deployment concern |
 | 0.8 | Immutable audit-trail behavior (all writes) | §8.1/§3.22 | 🟩 | | Verified writing rows |
-| 0.9 | SignalR infrastructure (hubs, groups per branch) | §9 | ⬜ | | |
+| 0.9 | SignalR infrastructure (hubs, groups per branch) | §9 | 🟦 | | **Infra wired** — `AddSignalR()` + `QueueHub` mapped at `/hubs/queue`; `QueueController` pushes `queueChanged` on token issue/call-next; the wireframe Queue board subscribes (`@microsoft/signalr`) and live-refreshes with a "Live" badge + auto-reconnect. **Verified:** a token issued by a *separate* client appeared on the board with no manual refresh (0 console errors). Remaining: per-branch groups + alert/GPS hubs |
 | 0.10 | FHIR R4 model library + HL7 interoperability scaffolding | §8.6 | ⬜ | | |
 | 0.11 | Multi-branch context resolver + branch master | §3.21 | 🟩 | | Middleware + Branch master/seed |
 
@@ -219,7 +219,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | 10.1 | Certificate & Document Management (Birth/Death/Referral/Fitness/Medical/Discharge; approval workflow → PDF) | §3.16 | 🟩 | | Templates + issue(Draft)→doctor-approve(Issued+PDF url) — verified (API). PDF render pending |
 | 10.2 | Consent & e-Document Management (digital consent, e-sign/thumb, multilingual templates, versioning, audit) | §3.29 | 🟩 | | Multilingual templates (en/hi) + capture (e-sign/thumb) — verified (API) |
 | 10.3 | Feedback, Grievance & Patient Experience (NABH surveys, grievance SLA/TAT, escalation, analytics) | §3.30 | 🟩 | | Survey (score 1–5 validated→400) + grievance (SLA from config) → resolve(TAT) — verified; screen wired |
-| 10.4 | Queue & Digital Signage (token queues OPD/pharmacy/billing, real-time boards via SignalR, load-balancing) | §3.31 | 🟩 | | Counters + issue token (per-counter/day) + call-next + live board — verified; screen wired. SignalR push pending |
+| 10.4 | Queue & Digital Signage (token queues OPD/pharmacy/billing, real-time boards via SignalR, load-balancing) | §3.31 | 🟩 | | Counters + issue token (per-counter/day) + call-next + live board — verified; screen wired. **SignalR live push done** — board auto-updates on token issue/call-next across clients (0.9), verified end-to-end |
 
 ### Phase 11 — AI Modules (Azure AI + Python ML, consumed via API)
 | # | Module / Task | SRS Ref | Status | Owner | Notes |

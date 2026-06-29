@@ -720,7 +720,8 @@ window.HIS = window.HIS || {};
         `<button class="btn btn--ghost btn--sm" data-act="refresh"><i class="bi bi-arrow-clockwise"></i> Refresh</button>`)}
       <div class="panel"><div class="panel__head"><i class="bi bi-ui-radios-grid"></i> Counters</div>
         <div class="panel__body" id="qCounters"><span class="muted">Loading…</span></div></div>
-      <div class="panel"><div class="panel__head"><i class="bi bi-list-ol"></i> Live Board</div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-list-ol"></i> Live Board
+        <span id="qLive" class="pill pill--warn" style="margin-left:auto"><i class="bi bi-broadcast"></i> Connecting…</span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>Area</th><th>Counter</th><th>Token</th><th>Status</th></tr></thead>
           <tbody id="qBoard">${emptyRow(4, 'Loading…')}</tbody>
@@ -858,8 +859,35 @@ window.HIS = window.HIS || {};
     catch (e) { HIS.toast('Create failed: ' + e.message); }
   }
 
-  /* ---- Phase 10: Queue ----------------------------------------------- */
+  /* ---- Phase 10: Queue — live board over SignalR (task 0.9) ----------- */
+  let queueLiveDoc = null;          // the currently-open queue screen
+  function ensureQueueHub() {
+    if (HIS._queueHub || !window.signalR) return;
+    const conn = new signalR.HubConnectionBuilder()
+      .withUrl((window.HIS_API_BASE || '') + '/hubs/queue')
+      .withAutomaticReconnect()
+      .build();
+    // A token issued/called on ANY screen pushes "queueChanged" → re-fetch the board.
+    conn.on('queueChanged', () => {
+      if (queueLiveDoc && document.body.contains(queueLiveDoc)) {
+        loadBoard(queueLiveDoc);
+        setQueueLive(queueLiveDoc, true);
+      }
+    });
+    conn.onreconnecting(() => queueLiveDoc && setQueueLive(queueLiveDoc, false));
+    conn.onreconnected(() => queueLiveDoc && setQueueLive(queueLiveDoc, true));
+    conn.start().then(() => queueLiveDoc && setQueueLive(queueLiveDoc, true)).catch(() => {});
+    HIS._queueHub = conn;
+  }
+  function setQueueLive(doc, on) {
+    const el = doc.querySelector('#qLive'); if (!el) return;
+    el.className = 'pill ' + (on ? 'pill--ok' : 'pill--warn');
+    el.innerHTML = `<i class="bi bi-broadcast"></i> ${on ? 'Live' : 'Reconnecting…'}`;
+  }
+
   async function initQueue(doc) {
+    queueLiveDoc = doc;
+    ensureQueueHub();
     try {
       const counters = await HIS.api.queueCounters();
       const host = doc.querySelector('#qCounters');
