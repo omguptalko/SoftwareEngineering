@@ -14,4 +14,8 @@ public sealed class DashboardController : ControllerBase
     /// <summary>Admin dashboard KPIs + service activity (replaces hardcoded HTML in modules.js).</summary>
     [HttpGet]
     public Task<DashboardDto> Get(CancellationToken ct) => _mediator.Send(new GetDashboardQuery(), ct);
+
+    /// <summary>Live alerts feed (low blood/stock, pending claims, maintenance-due) — Phase 12.1.</summary>
+    [HttpGet("alerts")]
+    public Task<IReadOnlyList<AlertDto>> Alerts(CancellationToken ct) => _mediator.Send(new GetDashboardAlertsQuery(), ct);
 }

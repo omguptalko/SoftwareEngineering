@@ -105,8 +105,8 @@ window.HIS = window.HIS || {};
         </div>
         <div class="panel">
           <div class="panel__head"><i class="bi bi-bell"></i> Alerts &amp; Tasks</div>
-          <div class="panel__body tight"><div class="alist">
-            <div class="aitem"><i class="ai-ico ico-info bi bi-info-circle"></i><div class="a-txt"><b>Alerts feed</b><span>Binds to module alerts API (Phases 3–7)</span></div></div>
+          <div class="panel__body tight"><div class="alist" id="alerts">
+            <div class="aitem"><i class="ai-ico ico-info bi bi-hourglass-split"></i><div class="a-txt"><b>Loading alerts…</b><span>Fetching live operational signals</span></div></div>
           </div></div>
         </div>
       </div>
@@ -1431,6 +1431,23 @@ window.HIS = window.HIS || {};
       doc.querySelector('#svcRevenue').textContent = (d.totalRevenue || 0).toLocaleString('en-IN');
     } catch (e) {
       doc.querySelector('#kpis').innerHTML = '<div class="muted" style="padding:12px">Dashboard API unavailable</div>';
+    }
+    loadAlerts(doc);
+  }
+
+  /* ---- dashboard: live alerts feed from /api/dashboard/alerts (Phase 12.1) ---- */
+  async function loadAlerts(doc) {
+    const host = doc.querySelector('#alerts');
+    if (!host) return;
+    const sev = { danger: 'ico-danger', warn: 'ico-warn', info: 'ico-info', ok: 'ico-ok' };
+    try {
+      const alerts = await HIS.api.dashboardAlerts();
+      host.innerHTML = (alerts || []).map(a =>
+        `<div class="aitem"><i class="ai-ico ${sev[a.severity] || 'ico-info'} bi ${a.icon || 'bi-info-circle'}"></i>
+          <div class="a-txt"><b>${a.title}</b><span>${a.detail || ''}</span></div></div>`
+      ).join('') || '<div class="aitem"><i class="ai-ico ico-ok bi bi-check-circle"></i><div class="a-txt"><b>All clear</b><span>No active alerts.</span></div></div>';
+    } catch (e) {
+      host.innerHTML = '<div class="aitem"><i class="ai-ico ico-warn bi bi-exclamation-triangle"></i><div class="a-txt"><b>Alerts unavailable</b><span>Could not reach the alerts API.</span></div></div>';
     }
   }
 

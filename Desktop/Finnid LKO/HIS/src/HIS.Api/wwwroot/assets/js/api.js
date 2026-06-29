@@ -57,6 +57,7 @@ HIS.api = (function () {
     patientByUhid:   (uhid) => get(`/api/patients/${encodeURIComponent(uhid)}`),
     registerPatient: (cmd) => post('/api/patients', cmd),
     dashboard:       () => get('/api/dashboard'),
+    dashboardAlerts: () => get('/api/dashboard/alerts'),
     health:          () => get('/api/health'),
     // Phase 2 — Appointments & OPD
     apptQueue:       (doctorCode) => get(`/api/appointments/queue${doctorCode ? `?doctorCode=${encodeURIComponent(doctorCode)}` : ''}`),
