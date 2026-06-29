@@ -1,6 +1,8 @@
+using HIS.Api.RealTime;
 using HIS.Application.Features.Support;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace HIS.Api.Controllers;
 
@@ -93,10 +95,27 @@ public sealed class FeedbackController : ControllerBase
 [Route("api/queue")]
 public sealed class QueueController : ControllerBase
 {
-    private readonly IMediator _m; public QueueController(IMediator m) => _m = m;
+    private readonly IMediator _m;
+    private readonly IHubContext<QueueHub> _hub;
+    public QueueController(IMediator m, IHubContext<QueueHub> hub) { _m = m; _hub = hub; }
+
     [HttpGet("counters")] public Task<IReadOnlyList<CounterDto>> Counters(CancellationToken ct) => _m.Send(new GetCountersQuery(), ct);
     [HttpGet] public Task<IReadOnlyList<QueueRowDto>> Board(CancellationToken ct) => _m.Send(new GetQueueQuery(), ct);
-    [HttpPost("counters/{id:int}/token")] public Task<string> Issue(int id, [FromBody] IssueBody? b, CancellationToken ct) => _m.Send(new IssueTokenCommand(id, b?.PatientUhid), ct);
-    [HttpPost("counters/{id:int}/call-next")] public Task<string?> CallNext(int id, CancellationToken ct) => _m.Send(new CallNextCommand(id), ct);
+
+    [HttpPost("counters/{id:int}/token")]
+    public async Task<string> Issue(int id, [FromBody] IssueBody? b, CancellationToken ct)
+    {
+        var token = await _m.Send(new IssueTokenCommand(id, b?.PatientUhid), ct);
+        await _hub.Clients.All.SendAsync("queueChanged", new { counterId = id, action = "issued", token }, ct);
+        return token;
+    }
+
+    [HttpPost("counters/{id:int}/call-next")]
+    public async Task<string?> CallNext(int id, CancellationToken ct)
+    {
+        var token = await _m.Send(new CallNextCommand(id), ct);
+        await _hub.Clients.All.SendAsync("queueChanged", new { counterId = id, action = "called", token }, ct);
+        return token;
+    }
     public sealed record IssueBody(string? PatientUhid);
 }

@@ -40,6 +40,7 @@ if (!string.IsNullOrWhiteSpace(templateRoot) && !Path.IsPathRooted(templateRoot)
 
 builder.Services.AddApplication();        // MediatR + CQRS behaviors + validators
 builder.Services.AddInfrastructure();     // Dapper repositories (config-driven connection string)
+builder.Services.AddSignalR();            // real-time hubs (queue boards / signage, task 0.9)
 
 // Per-request branch/user context (SRS §3.21). Populated by BranchContextMiddleware.
 builder.Services.AddScoped<IBranchContext, BranchContext>();
@@ -146,6 +147,7 @@ app.UseMiddleware<BranchContextMiddleware>();
 app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.MapControllers();
+app.MapHub<HIS.Api.RealTime.QueueHub>("/hubs/queue");   // real-time queue board (task 0.9)
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", utc = DateTime.UtcNow }));
 
 app.Run();
