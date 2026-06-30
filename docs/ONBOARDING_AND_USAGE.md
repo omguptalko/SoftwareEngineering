@@ -85,7 +85,7 @@ in the title bar opens the console (`/app/admin.html`).
 
 | What | How (today) | Status |
 |---|---|---|
-| **Create the hospital's login users** (admin, doctors, nurses…) | Currently seeded from config (`Platform:Bootstrap:TenantAdmin`) on startup. Each tenant user is bound to its tenant (`AppUser.TenantId`) and can log in only to that hospital. | ⚠️ **A "create tenant user" admin screen/API is a pending item** — see §7. |
+| **Create the hospital's login users** (admin, doctors, nurses…) | Platform Admin → **Users**: enter tenant code + user id + password + display name + role, then **Create user**. Each user is bound to its tenant (`AppUser.TenantId`), PBKDF2-hashed, and can log in **only** to that hospital. Backed by `POST /api/platform/tenants/users` (+ `GET /api/platform/roles`, `GET /api/platform/tenants/{code}/users`), gated by `tenant.manage`. | ✅ live |
 | **Assign modules / pages to roles** (RBAC) | Platform Admin → **Modules & Roles** → assign module/page/action to a role. The sidebar + APIs scope to these grants. | ✅ live |
 | **Enable/disable a module per fiscal year** | Platform Admin → **Entitlements** → toggle a module for tenant × FY. The effective menu honours it. | ✅ live |
 | **Point the domain** | DNS: point `acme.hospital.in` (and/or the common subdomain) at the app. The platform resolves host → tenant automatically. | ops |
@@ -153,7 +153,7 @@ MFA + AES-at-rest, audit trail, the full clinical/financial module set, real-tim
 (queue/alerts/GPS), AI assists (risk/forecast/pre-scrub), FHIR R4 export.
 
 **Pending (needs work before a real hospital go-live):**
-- **Create / manage tenant users from the admin UI** (today they are config-seeded).
+- **Edit / deactivate / reset-password** for tenant users (creation is live; lifecycle management is not yet in the UI). Tenant-admin *self-service* user management (a tenant admin managing only its own staff) is also future — today user creation is superadmin-driven.
 - A self-service **tenant decommission** flow (today it's manual SQL — §7).
 - Real external integrations (UIDAI/ABDM/NHCX/PM-JAY/ESIC/CGHS/ECHS/payment
   gateways) and real Azure-ML AI — these are scaffolded/mocked.

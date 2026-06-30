@@ -60,6 +60,7 @@
     <a data-tab="onboard"><i class="bi bi-plus-square"></i> Onboard hospital</a>
     <a data-tab="rbac"><i class="bi bi-diagram-3"></i> Modules &amp; Roles</a>
     <a data-tab="entitlements"><i class="bi bi-toggles"></i> Entitlements</a>
+    <a data-tab="users"><i class="bi bi-person-plus"></i> Users</a>
     <a data-tab="audit"><i class="bi bi-list-check"></i> Audit</a>
     <div class="who"><span class="muted">Signed in as</span><b id="whoName">—</b>
       <div class="signout"><a href="index.html" style="padding:0">← Workspace</a> · <a id="signout" style="padding:0;cursor:pointer">Sign out</a></div>
@@ -153,6 +154,32 @@
           <div><label>State</label><select id="e_state"><option value="true">Enabled</option><option value="false">Disabled</option></select></div>
         </div>
         <div style="margin-top:12px"><button class="btn" id="setEntBtn"><i class="bi bi-check2-circle"></i> Apply</button></div>
+      </div>
+    </section>
+
+    <!-- ===== Users ===== -->
+    <section class="panel" id="panel-users">
+      <h1>Tenant users</h1><p class="sub">Create login users for a hospital, bound to that tenant with a role. Users sign in only to their own hospital (realm-checked).</p>
+      <div class="card">
+        <h2><i class="bi bi-person-plus"></i> Create user</h2>
+        <div class="grid g2">
+          <div><label>Tenant code <span style="color:var(--danger)">*</span></label><input id="u_tenant" placeholder="DEV"></div>
+          <div><label>Role <span style="color:var(--danger)">*</span></label><select id="u_role"></select></div>
+          <div><label>User ID <span style="color:var(--danger)">*</span></label><input id="u_user" placeholder="dr.rakesh"></div>
+          <div><label>Password <span style="color:var(--danger)">*</span></label><input id="u_pass" type="text" placeholder="min 8 chars"></div>
+          <div><label>Display name <span style="color:var(--danger)">*</span></label><input id="u_name" placeholder="Dr. Rakesh Nigam"></div>
+          <div><label>Email</label><input id="u_email" placeholder="optional"></div>
+          <div class="actions"><button class="btn" id="createUserBtn"><i class="bi bi-person-check"></i> Create user</button></div>
+        </div>
+        <pre id="u_result" class="muted" style="white-space:pre-wrap;margin:14px 0 0"></pre>
+      </div>
+      <div class="card">
+        <h2><i class="bi bi-people"></i> Existing users
+          <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <input id="u_listcode" placeholder="tenant code" style="width:140px">
+            <button class="btn ghost sm" id="loadUsersBtn"><i class="bi bi-search"></i> Load</button></span></h2>
+        <div class="tablewrap"><table><thead><tr><th>User ID</th><th>Display name</th><th>Roles</th><th>Email</th><th>Active</th></tr></thead>
+          <tbody id="usersBody"><tr><td colspan="5" class="muted">Enter a tenant code and Load.</td></tr></tbody></table></div>
       </div>
     </section>
 
@@ -286,9 +313,41 @@
   }
   $('#reloadAudit').addEventListener('click', guard(loadAudit));
 
+  // ---- Tenant users ----
+  async function fillRoles() {
+    const roles = await api('GET', '/api/platform/roles');
+    $('#u_role').innerHTML = roles.map(r => `<option value="${r.code}">${r.name} (${r.code})</option>`).join('');
+  }
+  $('#createUserBtn').addEventListener('click', guard(async () => {
+    const btn = $('#createUserBtn'); btn.disabled = true;
+    try {
+      const r = await api('POST', '/api/platform/tenants/users', {
+        tenantCode:  $('#u_tenant').value.trim(),
+        userName:    $('#u_user').value.trim(),
+        password:    $('#u_pass').value,
+        displayName: $('#u_name').value.trim(),
+        email:       $('#u_email').value.trim() || null,
+        roleCode:    $('#u_role').value
+      });
+      $('#u_result').textContent = `✓ Created user '${r.userName}' (id ${r.userId})\n  tenant: ${r.tenantCode}\n  role:   ${r.roleCode}`;
+      toast(`User '${r.userName}' created for ${r.tenantCode}`);
+      $('#u_pass').value = '';
+      $('#u_listcode').value = r.tenantCode; loadUsers();
+    } finally { btn.disabled = false; }
+  }));
+  async function loadUsers() {
+    const code = $('#u_listcode').value.trim(); if (!code) return;
+    const rows = await api('GET', `/api/platform/tenants/${encodeURIComponent(code)}/users`);
+    $('#usersBody').innerHTML = rows.length
+      ? rows.map(u => `<tr><td><b>${u.userName}</b></td><td>${u.displayName}</td><td>${u.roles || '—'}</td><td>${u.email || '—'}</td><td>${u.isActive ? '<span class="pill ok">yes</span>' : '<span class="pill no">no</span>'}</td></tr>`).join('')
+      : '<tr><td colspan="5" class="muted">No users for this tenant.</td></tr>';
+  }
+  $('#loadUsersBtn').addEventListener('click', guard(loadUsers));
+
   // ---- Initial load ----
   guard(loadTenants)();
   guard(loadAudit)();
+  guard(fillRoles)();
 </script>
 </body>
 </html>

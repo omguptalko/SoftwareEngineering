@@ -57,4 +57,18 @@ public sealed class PlatformController : ControllerBase
     /// (gated by 'fiscalyear.manage').</summary>
     [HttpPost("fiscal-years/open")]
     public Task<OpenFiscalYearResult> OpenFiscalYear([FromBody] OpenFiscalYearCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    // ---- Tenant login users (L1.2 / L1.7.4) ----
+
+    /// <summary>Assignable tenant roles, for the create-user form (gated by 'tenant.manage').</summary>
+    [HttpGet("roles")]
+    public Task<IReadOnlyList<RoleDto>> Roles(CancellationToken ct) => _mediator.Send(new GetRolesQuery(), ct);
+
+    /// <summary>List a tenant's login users (gated by 'tenant.manage').</summary>
+    [HttpGet("tenants/{code}/users")]
+    public Task<IReadOnlyList<TenantUserRow>> TenantUsers(string code, CancellationToken ct) => _mediator.Send(new GetTenantUsersQuery(code), ct);
+
+    /// <summary>Create a hospital (tenant) login user with a role (gated by 'tenant.manage').</summary>
+    [HttpPost("tenants/users")]
+    public Task<CreateTenantUserResult> CreateTenantUser([FromBody] CreateTenantUserCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }

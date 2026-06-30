@@ -85,6 +85,30 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
             new { userId, roleId }, cancellationToken: ct));
     }
 
+    public async Task<IReadOnlyList<(string Code, string Name)>> ListRolesAsync(CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return (await c.QueryAsync<(string Code, string Name)>(new CommandDefinition(
+            "SELECT Code, Name FROM security.Role WHERE Scope = 'tenant' ORDER BY Name", cancellationToken: ct))).ToList();
+    }
+
+    public async Task<IReadOnlyList<(string UserName, string DisplayName, string? Email, bool IsActive, string Roles)>>
+        ListUsersByTenantAsync(int tenantId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return (await c.QueryAsync<(string UserName, string DisplayName, string? Email, bool IsActive, string Roles)>(
+            new CommandDefinition(
+            @"SELECT u.UserName, u.DisplayName, u.Email, u.IsActive,
+                     ISNULL(STRING_AGG(r.Code, ', '), '') AS Roles
+              FROM security.AppUser u
+              LEFT JOIN security.UserRole ur ON ur.UserId = u.UserId
+              LEFT JOIN security.Role r ON r.RoleId = ur.RoleId
+              WHERE u.TenantId = @tenantId
+              GROUP BY u.UserName, u.DisplayName, u.Email, u.IsActive
+              ORDER BY u.UserName",
+            new { tenantId }, cancellationToken: ct))).ToList();
+    }
+
     public async Task<bool> HasPrivilegedRoleAsync(long userId, CancellationToken ct = default)
     {
         using var c = await _f.CreateOpenConnectionAsync(ct);

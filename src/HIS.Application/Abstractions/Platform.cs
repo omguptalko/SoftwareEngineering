@@ -56,6 +56,10 @@ public interface IPlatformUserRepository
     Task<int?> GetRoleIdByCodeAsync(string code, CancellationToken ct = default);
     Task<long> InsertUserAsync(PlatformUser user, CancellationToken ct = default);
     Task AssignRoleAsync(long userId, int roleId, CancellationToken ct = default);
+    /// <summary>Assignable tenant-scope roles (for the create-user form).</summary>
+    Task<IReadOnlyList<(string Code, string Name)>> ListRolesAsync(CancellationToken ct = default);
+    /// <summary>Users belonging to a tenant, with their comma-joined role codes.</summary>
+    Task<IReadOnlyList<(string UserName, string DisplayName, string? Email, bool IsActive, string Roles)>> ListUsersByTenantAsync(int tenantId, CancellationToken ct = default);
     /// <summary>True if any of the user's roles is flagged IsPrivileged (MFA policy, L1.2.5).</summary>
     Task<bool> HasPrivilegedRoleAsync(long userId, CancellationToken ct = default);
     /// <summary>Store the user's TOTP secret and enable MFA.</summary>
