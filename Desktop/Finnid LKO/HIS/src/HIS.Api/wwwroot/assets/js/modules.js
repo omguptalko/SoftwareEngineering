@@ -771,10 +771,51 @@ window.HIS = window.HIS || {};
   };
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, opd, ipd, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback };
+  HIS.screens = { dashboard, registration, appointments, opd, ipd, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
+
+  /* ====================== COMPLIANCE & AUDIT (SRS §3.22) ========= */
+  function compliance() {
+    return `<div class="screen">
+      ${head('bi-shield-check', 'Compliance &amp; Audit', 'Immutable audit trail · every action logged (SRS §8.1)',
+        `<button class="btn btn--ghost btn--sm" data-act="refresh"><i class="bi bi-arrow-clockwise"></i> Refresh <span class="fk">F5</span></button>
+         <button class="btn btn--primary btn--sm" data-act="print"><i class="bi bi-printer"></i> Export <span class="fk">F12</span></button>`)}
+      <div class="kpis" id="cmpKpis"><div class="muted" style="padding:12px">Loading…</div></div>
+      <div class="panel mt12"><div class="panel__head"><i class="bi bi-list-columns-reverse"></i> Audit Trail — most recent
+        <span id="cmpCount" class="pill pill--warn" style="margin-left:auto">—</span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Time (UTC)</th><th>User</th><th>Action</th><th>Entity</th><th>Ref</th><th>Result</th></tr></thead>
+          <tbody id="cmpTrail">${emptyRow(6, 'Loading…')}</tbody>
+        </table></div></div></div>
+    </div>`;
+  }
+  async function loadCompliance(doc) {
+    const tb = doc.querySelector('#cmpTrail'); if (!tb) return;
+    try {
+      const rows = await HIS.api.auditTrail(100);
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const t = new Date(r.occurredUtc);
+        const when = isNaN(t) ? r.occurredUtc : t.toISOString().slice(0, 19).replace('T', ' ');
+        const ok = r.succeeded;
+        return `<tr><td class="tnum">${when}</td><td>${r.user || '—'}</td><td>${r.action}</td><td>${r.entity}</td><td>${r.entityId || '—'}</td>
+          <td><span class="pill ${ok ? 'pill--ok' : 'pill--danger'}">${ok ? 'OK' : 'Failed'}</span></td></tr>`;
+      }).join('') : emptyRow(6, 'No audit entries yet');
+      doc.querySelector('#cmpCount').textContent = `${rows.length} shown`;
+      // Compliance summary KPIs derived from the trail.
+      const total = rows.length, failed = rows.filter(r => !r.succeeded).length;
+      const actors = new Set(rows.map(r => r.user).filter(Boolean)).size;
+      doc.querySelector('#cmpKpis').innerHTML =
+        `<div class="kpi"><div class="v tnum">${total}</div><div class="l">Entries shown</div></div>
+         <div class="kpi"><div class="v tnum">${total - failed}</div><div class="l">Successful</div></div>
+         <div class="kpi"><div class="v tnum">${failed}</div><div class="l">Failed / denied</div></div>
+         <div class="kpi"><div class="v tnum">${actors}</div><div class="l">Distinct users</div></div>`;
+    } catch (e) {
+      tb.innerHTML = emptyRow(6, 'Audit API unavailable');
+      doc.querySelector('#cmpKpis').innerHTML = '<div class="muted" style="padding:12px">Audit API unavailable</div>';
+    }
+  }
 
   /* ============================ afterRender ========================= */
   HIS.afterRender = function (id, doc) {
@@ -802,6 +843,7 @@ window.HIS = window.HIS || {};
     if (id === 'mlc') { initMlc(doc); HIS.saveHandlers.mlc = () => doCreateMlc(doc); }
     if (id === 'queue') { initQueue(doc); }
     if (id === 'feedback') { initFeedback(doc); HIS.saveHandlers.feedback = () => doSubmitSurvey(doc); }
+    if (id === 'compliance') loadCompliance(doc);
   };
 
   /* ---- Phase 10: ambulance ------------------------------------------- */
