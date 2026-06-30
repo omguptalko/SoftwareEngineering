@@ -227,9 +227,9 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | 11.1 | AI Patient Risk Prediction (vitals + history) | §4.1 | 🟦 | | **Working explainable scorer live** — `POST /api/ai/risk` (`AssessPatientRiskQuery`, auth) computes a deterministic NEWS2-aggregate early-warning score from vitals with per-parameter contributions + banded recommendation; band cut-offs config-driven (`Ai:Risk:*`). New **AI · Clinical Risk Prediction** screen (vitals form → score/band/flags). **Verified:** high case=16/High, normal=0/Low, 401 unauth, screen renders 0 errors. Seam (`AiController`) lets an Azure ML model replace the handler — that swap + history features pending |
 | 11.2 | AI Smart Scheduling (slot optimisation) | §4.2 | ⬜ | | |
 | 11.3 | AI Chatbot Support (24x7 appointments/reports/reminders/emergency) | §4.3 | ⬜ | | |
-| 11.4 | AI Inventory Forecasting (demand predict + auto-reorder) | §4.4 | ⬜ | | |
+| 11.4 | AI Inventory Forecasting (demand predict + auto-reorder) | §4.4 | 🟦 | | **Working reorder-point forecaster** — `GET /api/ai/inventory-forecast` infers implied avg daily use from each item's reorder level + config lead time (`Ai:Forecast:*`), projects days-of-cover, suggests order qty, bands urgency (Critical/High/Monitor). AI Suite → Inventory Forecast tab. **Verified:** 8 items projected, 401 unauth, 0 console errors. ML demand model can replace the handler via the AI seam |
 | 11.5 | AI Fraud Detection (billing anomalies, insurance/scheme fraud) | §4.5 | ⬜ | | |
-| 11.6 | AI Claim Pre-Scrubbing (validate pre-auth/claim vs payer/package rules) | §4.6 | ⬜ | | |
+| 11.6 | AI Claim Pre-Scrubbing (validate pre-auth/claim vs payer/package rules) | §4.6 | 🟦 | | **Working rule engine** — `POST /api/ai/claim-prescrub` validates a claim pre-submission: package-rate ceiling (HBP master), policy balance & sum-insured, co-pay estimate, required-doc completeness (config `Ai:PreScrub:RequiredDocs`) → verdict Clean/Review/Reject + per-rule checks. AI Suite → Claim Pre-Scrub tab. **Verified:** over-package claim → Reject (rate breach + missing docs flagged), 401 unauth, 0 console errors. Reuses claims/package/patient repos |
 
 ### Phase 12 — Dashboards, Compliance & Audit
 | # | Module / Task | SRS Ref | Status | Owner | Notes |

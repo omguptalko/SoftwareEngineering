@@ -821,8 +821,14 @@ window.HIS = window.HIS || {};
   /* ====================== AI — Clinical Risk (SRS §4.1) ========== */
   function ai() {
     return `<div class="screen">
-      ${head('bi-cpu', 'AI · Clinical Risk Prediction', 'Early-warning score from vitals (SRS §4.1) · explainable model')}
-      <div class="cols-side">
+      ${head('bi-cpu', 'AI Suite', 'Explainable AI assists (SRS §4) · risk · forecasting · claim pre-scrub')}
+      <div class="itabs">
+        <div class="itab active" data-tab="risk">Risk Prediction</div>
+        <div class="itab" data-tab="fc">Inventory Forecast</div>
+        <div class="itab" data-tab="ps">Claim Pre-Scrub</div>
+      </div>
+
+      <div data-pane="risk"><div class="cols-side">
         <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-pulse"></i> Vitals</div><div class="panel__body">
           <div class="form-grid" style="gap:8px">
             <div class="f"><label>Respiratory rate (/min)</label><div class="field"><input class="ctl" id="aiRr" type="number" value="28"></div></div>
@@ -837,12 +843,72 @@ window.HIS = window.HIS || {};
         <div class="panel"><div class="panel__head"><i class="bi bi-activity"></i> Assessment</div><div class="panel__body">
           <div id="aiResult"><div class="muted" style="padding:12px">Enter vitals and compute.</div></div>
         </div></div>
+      </div></div>
+
+      <div data-pane="fc" hidden>
+        <div class="panel"><div class="panel__head"><i class="bi bi-box-seam"></i> Demand Forecast &amp; Reorder
+          <button class="btn btn--primary btn--sm" id="aiRunForecast" style="margin-left:auto"><i class="bi bi-graph-up-arrow"></i> Run Forecast</button></div>
+          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>Code</th><th>Item</th><th class="num">Stock</th><th class="num">Avg/day</th><th class="num">Days cover</th><th class="num">Suggest order</th><th>Urgency</th></tr></thead>
+            <tbody id="aiFcBody">${emptyRow(7, 'Run the forecast to project reorder needs')}</tbody>
+          </table></div></div></div>
       </div>
+
+      <div data-pane="ps" hidden><div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-check"></i> Claim Details</div><div class="panel__body">
+          <div class="form-grid one" style="gap:8px">
+            <div class="f"><label>Package code</label><div class="field"><input class="ctl" id="psPkg" value="CD-014" placeholder="e.g. CD-014"></div></div>
+            <div class="f"><label>Claimed amount (₹)</label><div class="field"><input class="ctl" id="psAmt" type="number" value="70000"></div></div>
+            <div class="f"><label>Patient UHID (optional)</label><div class="field"><input class="ctl" id="psUhid" placeholder="optional — enables policy checks"></div></div>
+            <div class="f"><label>Documents attached</label><div class="field" id="psDocs" style="display:flex;flex-wrap:wrap;gap:10px;padding:6px 0">
+              <label><input type="checkbox" value="Discharge Summary" checked> Discharge Summary</label>
+              <label><input type="checkbox" value="Final Bill" checked> Final Bill</label>
+              <label><input type="checkbox" value="ID Proof"> ID Proof</label>
+              <label><input type="checkbox" value="Pre-Auth Approval"> Pre-Auth Approval</label>
+            </div></div>
+          </div>
+          <button class="btn btn--primary mt12" id="aiRunPreScrub" style="width:100%"><i class="bi bi-shield-check"></i> Pre-Scrub Claim</button>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-list-check"></i> Pre-Submission Checks</div><div class="panel__body">
+          <div id="psResult"><div class="muted" style="padding:12px">Enter claim details and pre-scrub.</div></div>
+        </div></div>
+      </div></div>
     </div>`;
   }
   function initAi(doc) {
-    const btn = doc.querySelector('#aiCompute');
-    if (btn) btn.addEventListener('click', () => computeRisk(doc));
+    const rb = doc.querySelector('#aiCompute'); if (rb) rb.addEventListener('click', () => computeRisk(doc));
+    const fb = doc.querySelector('#aiRunForecast'); if (fb) fb.addEventListener('click', () => runForecast(doc));
+    const pb = doc.querySelector('#aiRunPreScrub'); if (pb) pb.addEventListener('click', () => runPreScrub(doc));
+  }
+  async function runForecast(doc) {
+    const tb = doc.querySelector('#aiFcBody');
+    tb.innerHTML = emptyRow(7, 'Forecasting…');
+    const band = { 'Critical': 'pill--danger', 'High': 'pill--warn', 'Monitor': 'pill--ok' };
+    try {
+      const rows = await HIS.api.aiForecast();
+      tb.innerHTML = rows.length ? rows.map(r =>
+        `<tr><td>${r.code}</td><td>${r.name}</td><td class="num">${r.stock}</td><td class="num">${r.avgDailyUse}</td>
+          <td class="num">${r.daysOfCover}</td><td class="num"><b>${r.suggestedOrderQty}</b></td>
+          <td><span class="pill ${band[r.urgency] || 'pill--muted'}">${r.urgency}</span></td></tr>`).join('') : emptyRow(7, 'No stock items');
+    } catch (e) { tb.innerHTML = emptyRow(7, 'Forecast API error'); }
+  }
+  async function runPreScrub(doc) {
+    const docs = Array.from(doc.querySelectorAll('#psDocs input:checked')).map(c => c.value);
+    const input = { packageCode: val(doc, 'psPkg') || null, claimedAmount: Number(val(doc, 'psAmt')) || 0, patientUhid: val(doc, 'psUhid') || null, documents: docs };
+    const host = doc.querySelector('#psResult');
+    host.innerHTML = '<div class="muted" style="padding:12px">Scrubbing…</div>';
+    const sev = { pass: 'pill--ok', warn: 'pill--warn', fail: 'pill--danger' };
+    const verdictBand = { Clean: 'pill--ok', Review: 'pill--warn', Reject: 'pill--danger' };
+    try {
+      const r = await HIS.api.aiPreScrub(input);
+      host.innerHTML =
+        `<div class="kpis"><div class="kpi"><div class="v"><span class="pill ${verdictBand[r.verdict] || 'pill--muted'}" style="font-size:14px">${r.verdict}</span></div><div class="l">Verdict</div></div>
+           <div class="kpi"><div class="v tnum">${r.passed}</div><div class="l">Passed</div></div>
+           <div class="kpi"><div class="v tnum">${r.warnings}</div><div class="l">Warnings</div></div>
+           <div class="kpi"><div class="v tnum">${r.failures}</div><div class="l">Failures</div></div></div>
+         <div class="grid-wrap mt12" style="border:0"><table class="grid"><thead><tr><th>Result</th><th>Rule</th><th>Detail</th></tr></thead>
+         <tbody>${r.checks.map(c => `<tr><td><span class="pill ${sev[c.severity] || 'pill--muted'}">${c.severity}</span></td><td>${c.rule}</td><td>${c.detail}</td></tr>`).join('')}</tbody></table></div>`;
+    } catch (e) { host.innerHTML = '<div class="muted" style="padding:12px">Pre-scrub API error: ' + e.message + '</div>'; }
   }
   async function computeRisk(doc) {
     const num = id => { const v = doc.querySelector('#' + id).value; return v === '' ? null : Number(v); };
