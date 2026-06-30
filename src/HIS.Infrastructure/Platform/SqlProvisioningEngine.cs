@@ -89,24 +89,28 @@ public sealed class SqlProvisioningEngine : IProvisioningEngine
     }
 
     /// <summary>Best-effort drop of a database we created (compensating action, L1.5.5).</summary>
+    /// <summary>Drops a database (single-user + drop). Surfaces errors — used by decommission.</summary>
+    public async Task DropDatabaseAsync(string dbName, CancellationToken ct = default)
+    {
+        // Release pooled connections to the target so the DROP isn't blocked by them.
+        SqlConnection.ClearAllPools();
+        await using var c = new SqlConnection(WithCatalog("master"));
+        await c.OpenAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"IF DB_ID(@n) IS NOT NULL
+              BEGIN
+                  DECLARE @sql NVARCHAR(400) =
+                      N'ALTER DATABASE ' + QUOTENAME(@n) + N' SET SINGLE_USER WITH ROLLBACK IMMEDIATE; ' +
+                      N'DROP DATABASE ' + QUOTENAME(@n) + N';';
+                  EXEC(@sql);
+              END",
+            new { n = dbName }, cancellationToken: ct));
+    }
+
+    // Best-effort variant used by provisioning rollback (swallows errors, L1.5.5).
     private async Task TryDropDatabaseAsync(string dbName)
     {
-        try
-        {
-            // Release pooled connections to the target so the DROP isn't blocked by them.
-            SqlConnection.ClearAllPools();
-            await using var c = new SqlConnection(WithCatalog("master"));
-            await c.OpenAsync();
-            await c.ExecuteAsync(
-                @"IF DB_ID(@n) IS NOT NULL
-                  BEGIN
-                      DECLARE @sql NVARCHAR(400) =
-                          N'ALTER DATABASE ' + QUOTENAME(@n) + N' SET SINGLE_USER WITH ROLLBACK IMMEDIATE; ' +
-                          N'DROP DATABASE ' + QUOTENAME(@n) + N';';
-                      EXEC(@sql);
-                  END",
-                new { n = dbName });
-        }
+        try { await DropDatabaseAsync(dbName); }
         catch { /* best-effort cleanup; the original provisioning exception is rethrown by the caller */ }
     }
 

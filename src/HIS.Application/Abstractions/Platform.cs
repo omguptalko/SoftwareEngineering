@@ -125,6 +125,8 @@ public interface IProvisioningEngine
     Task<ProvisionedDb> ProvisionMasterAsync(string tenantCode, CancellationToken ct = default);
     /// <summary>Ensures {Tenant}_FY{fyCode} exists + schema applied. Returns its DB name.</summary>
     Task<ProvisionedDb> ProvisionFiscalYearAsync(string tenantCode, string fyCode, CancellationToken ct = default);
+    /// <summary>Drops a tenant database (single-user + drop). Surfaces errors (decommission, L1.7).</summary>
+    Task DropDatabaseAsync(string dbName, CancellationToken ct = default);
 }
 
 /// <summary>Control-plane tenant/fiscal-year/domain/db-catalog operations (L1.7).</summary>
@@ -151,6 +153,10 @@ public interface ITenantAdminRepository
     Task<decimal> GetLedgerBalanceAsync(int tenantId, int fiscalYearId, CancellationToken ct = default);
     Task<IReadOnlyList<(int TenantId, string Code, string Name, string? FyCode, string DbKind, string DbName)>> GetTenantsAsync(CancellationToken ct = default);
     Task<(int TenantId, string Code)?> ResolveTenantByHostAsync(string host, CancellationToken ct = default);
+    /// <summary>Distinct database names registered for a tenant (for decommission).</summary>
+    Task<IReadOnlyList<string>> GetTenantDatabaseNamesAsync(int tenantId, CancellationToken ct = default);
+    /// <summary>Delete all control-plane rows + users for a tenant (FK order). Audit is retained.</summary>
+    Task DeleteTenantAsync(int tenantId, CancellationToken ct = default);
     /// <summary>Full routing for a host (own domain or registered common-domain alias).</summary>
     Task<TenantRouting?> GetRoutingByHostAsync(string host, CancellationToken ct = default);
     /// <summary>Full routing for a tenant code (common-domain subdomain / explicit hint).</summary>

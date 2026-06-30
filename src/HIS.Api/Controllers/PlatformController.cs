@@ -58,6 +58,11 @@ public sealed class PlatformController : ControllerBase
     [HttpPost("fiscal-years/open")]
     public Task<OpenFiscalYearResult> OpenFiscalYear([FromBody] OpenFiscalYearCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 
+    /// <summary>Permanently decommission a tenant — drops its DBs + deletes its control-plane
+    /// rows (gated by 'tenant.manage'; requires Confirm == TenantCode).</summary>
+    [HttpPost("tenants/decommission")]
+    public Task<DecommissionTenantResult> Decommission([FromBody] DecommissionTenantCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
     // ---- Tenant login users (L1.2 / L1.7.4) ----
 
     /// <summary>Assignable tenant roles, for the create-user form (gated by 'tenant.manage').</summary>

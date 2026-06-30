@@ -125,7 +125,15 @@ history intact):
 
 ## 7. Decommission a tenant (cleanup)
 
-There is no UI for this yet; it is a deliberate DBA action:
+**Self-service (superadmin):** Platform Admin → **Tenants** → the red **Decommission
+a tenant** card. Enter the tenant code, re-type it to confirm, and **Decommission**.
+`POST /api/platform/tenants/decommission` (gated `tenant.manage`, requires
+`Confirm == TenantCode`) **drops all the tenant's databases first**, then deletes its
+control-plane rows + users (FK order); the immutable `audit.PlatformAudit` trail is
+retained. Tenant admins cannot do this (403). Verified: onboard → decommission drops
+both DBs, zero platform rows remain, audit kept.
+
+**Manual fallback (DBA)** — the equivalent SQL, if ever needed:
 
 ```sql
 -- 1. Drop the tenant's databases (master + every FY)
@@ -154,7 +162,6 @@ MFA + AES-at-rest, audit trail, the full clinical/financial module set, real-tim
 (queue/alerts/GPS), AI assists (risk/forecast/pre-scrub), FHIR R4 export.
 
 **Pending (needs work before a real hospital go-live):**
-- A self-service **tenant decommission** flow (today it's manual SQL — §7).
 - Real external integrations and Azure-ML AI (scaffolded/mocked — see below).
 - Real external integrations (UIDAI/ABDM/NHCX/PM-JAY/ESIC/CGHS/ECHS/payment
   gateways) and real Azure-ML AI — these are scaffolded/mocked.

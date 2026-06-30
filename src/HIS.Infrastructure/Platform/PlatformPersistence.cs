@@ -314,6 +314,31 @@ public sealed class TenantAdminRepository : ITenantAdminRepository
             "SELECT COUNT(1) FROM platform.Tenant WHERE Code = @code", new { code }, cancellationToken: ct)) > 0;
     }
 
+    public async Task<IReadOnlyList<string>> GetTenantDatabaseNamesAsync(int tenantId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return (await c.QueryAsync<string>(new CommandDefinition(
+            "SELECT DISTINCT DbName FROM platform.DbCatalog WHERE TenantId = @tenantId",
+            new { tenantId }, cancellationToken: ct))).ToList();
+    }
+
+    public async Task DeleteTenantAsync(int tenantId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        // Child-first; audit.PlatformAudit is intentionally retained (immutable trail).
+        await c.ExecuteAsync(new CommandDefinition(@"
+DELETE ur FROM security.UserRole ur JOIN security.AppUser u ON u.UserId = ur.UserId WHERE u.TenantId = @t;
+DELETE FROM security.AppUser       WHERE TenantId = @t;
+DELETE FROM platform.TenantModule  WHERE TenantId = @t;
+DELETE FROM platform.Subscription  WHERE TenantId = @t;
+DELETE FROM platform.BillingLedger WHERE TenantId = @t;
+DELETE FROM platform.DbCatalog     WHERE TenantId = @t;
+DELETE FROM platform.TenantDomain  WHERE TenantId = @t;
+DELETE FROM platform.FiscalYear    WHERE TenantId = @t;
+DELETE FROM platform.Tenant        WHERE TenantId = @t;",
+            new { t = tenantId }, cancellationToken: ct));
+    }
+
     public async Task<int> CreateTenantAsync(string code, string name, byte fyStartMonth, byte fyStartDay, CancellationToken ct = default)
     {
         using var c = await _f.CreateOpenConnectionAsync(ct);

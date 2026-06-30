@@ -87,6 +87,15 @@
         </div>
         <p class="muted" style="margin:10px 0 0">Provisions the new FY data DB, carries module entitlements forward, and rolls the billing balance forward.</p>
       </div>
+      <div class="card" style="border-color:#f5c6cb">
+        <h2 style="color:var(--danger)"><i class="bi bi-exclamation-octagon"></i> Decommission a tenant</h2>
+        <p class="sub" style="margin-top:0">Permanently drops <b>all</b> of the tenant's databases and removes its control-plane rows. <b>This cannot be undone.</b></p>
+        <div class="grid g3">
+          <div><label>Tenant code</label><input id="dc_code" placeholder="ACME"></div>
+          <div><label>Re-type the code to confirm</label><input id="dc_confirm" placeholder="ACME"></div>
+          <div class="actions"><button class="btn" id="decommBtn" style="background:var(--danger);border-color:var(--danger)"><i class="bi bi-trash3"></i> Decommission</button></div>
+        </div>
+      </div>
     </section>
 
     <!-- ===== Onboard ===== -->
@@ -258,6 +267,17 @@
   $('#openFyBtn').addEventListener('click', guard(async () => {
     const r = await api('POST', '/api/platform/fiscal-years/open', { tenantCode: $('#fy_code').value.trim(), fiscalYearStart: +$('#fy_year').value });
     toast(`Opened ${r.fiscalYearCode} → ${r.dataDb}`); loadTenants();
+  }));
+  $('#decommBtn').addEventListener('click', guard(async () => {
+    const code = $('#dc_code').value.trim();
+    if (!code) { toast('Enter the tenant code', true); return; }
+    if (!confirm(`Permanently decommission '${code}'?\n\nThis DROPS all of its databases and removes its control-plane rows. This cannot be undone.`)) return;
+    const btn = $('#decommBtn'); btn.disabled = true;
+    try {
+      const r = await api('POST', '/api/platform/tenants/decommission', { tenantCode: code, confirm: $('#dc_confirm').value.trim() });
+      toast(`Decommissioned ${r.tenantCode} — dropped ${r.databasesDropped} database(s)`);
+      $('#dc_code').value = ''; $('#dc_confirm').value = ''; loadTenants();
+    } finally { btn.disabled = false; }
   }));
 
   // ---- Onboard ----

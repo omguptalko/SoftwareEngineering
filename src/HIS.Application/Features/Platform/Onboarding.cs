@@ -184,3 +184,62 @@ public sealed class GetTenantsHandler : MediatR.IRequestHandler<GetTenantsQuery,
         return rows.Select(r => new TenantRow(r.Item1, r.Item2, r.Item3, r.Item4, r.Item5, r.Item6)).ToList();
     }
 }
+
+// ============================ Decommission a tenant (tenant.manage) ============================
+
+public sealed record DecommissionTenantResult(string TenantCode, int DatabasesDropped);
+
+/// <summary>
+/// Permanently removes a tenant (L1.7): drops its databases, then deletes all control-plane
+/// rows + users. Superadmin-only. Requires the caller to re-type the tenant code (Confirm)
+/// to guard against accidents. The immutable audit trail is retained.
+/// </summary>
+public sealed record DecommissionTenantCommand(string TenantCode, string Confirm) : ICommand<DecommissionTenantResult>, IAuthorizable
+{
+    public string RequiredPermission => "tenant.manage";
+}
+
+public sealed class DecommissionTenantValidator : AbstractValidator<DecommissionTenantCommand>
+{
+    public DecommissionTenantValidator()
+    {
+        RuleFor(x => x.TenantCode).NotEmpty();
+        RuleFor(x => x.Confirm).NotEmpty()
+            .Must((cmd, confirm) => string.Equals(confirm, cmd.TenantCode, System.StringComparison.OrdinalIgnoreCase))
+            .WithMessage("Type the tenant code to confirm decommission.");
+    }
+}
+
+public sealed class DecommissionTenantHandler : MediatR.IRequestHandler<DecommissionTenantCommand, DecommissionTenantResult>
+{
+    private readonly ITenantAdminRepository _tenants;
+    private readonly IProvisioningEngine _engine;
+    private readonly IPlatformUserRepository _audit;
+    private readonly IBranchContext _ctx;
+    public DecommissionTenantHandler(ITenantAdminRepository tenants, IProvisioningEngine engine, IPlatformUserRepository audit, IBranchContext ctx)
+    { _tenants = tenants; _engine = engine; _audit = audit; _ctx = ctx; }
+
+    public async Task<DecommissionTenantResult> Handle(DecommissionTenantCommand c, CancellationToken ct)
+    {
+        var tenantId = await _tenants.GetTenantIdByCodeAsync(c.TenantCode, ct)
+            ?? throw new InvalidOperationException($"Unknown tenant '{c.TenantCode}'.");
+
+        // Drop the databases first; if a drop fails the platform rows remain, so it is re-runnable.
+        var dbs = await _tenants.GetTenantDatabaseNamesAsync(tenantId, ct);
+        try
+        {
+            foreach (var db in dbs) await _engine.DropDatabaseAsync(db, ct);
+            await _tenants.DeleteTenantAsync(tenantId, ct);
+        }
+        catch
+        {
+            await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, tenantId,
+                "DecommissionTenant", "Tenant", c.TenantCode, false, "decommission failed", ct);
+            throw;
+        }
+
+        await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, tenantId,
+            "DecommissionTenant", "Tenant", c.TenantCode, true, null, ct);
+        return new DecommissionTenantResult(c.TenantCode, dbs.Count);
+    }
+}
