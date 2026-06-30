@@ -1,5 +1,6 @@
 using HIS.Api.RealTime;
 using HIS.Application.Features.Emergency;
+using HIS.Shared.Context;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -12,7 +13,8 @@ public sealed class EmergencyController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IHubContext<AlertsHub> _alerts;
-    public EmergencyController(IMediator mediator, IHubContext<AlertsHub> alerts) { _mediator = mediator; _alerts = alerts; }
+    private readonly ITenantContext _tenant;
+    public EmergencyController(IMediator mediator, IHubContext<AlertsHub> alerts, ITenantContext tenant) { _mediator = mediator; _alerts = alerts; _tenant = tenant; }
 
     /// <summary>Live ED triage board for today, ordered by severity (SRS §3.5).</summary>
     [HttpGet("triage")]
@@ -22,8 +24,8 @@ public sealed class EmergencyController : ControllerBase
     public async Task<RegisterTriageResult> Triage([FromBody] RegisterTriageCommand cmd, CancellationToken ct)
     {
         var result = await _mediator.Send(cmd, ct);
-        // Hospital-wide live alert (task 0.9): every connected board/station is notified.
-        await _alerts.Clients.All.SendAsync("emergencyAlert", new
+        // Tenant-scoped live alert (task 0.9): only this tenant's boards/stations are notified.
+        await _alerts.Clients.Group(TenantGroups.Name(_tenant)).SendAsync("emergencyAlert", new
         {
             triageId = result.TriageId,
             category = result.Category,
