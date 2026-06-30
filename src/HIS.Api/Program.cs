@@ -147,7 +147,8 @@ app.UseMiddleware<BranchContextMiddleware>();
 app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.MapControllers();
-app.MapHub<HIS.Api.RealTime.QueueHub>("/hubs/queue");   // real-time queue board (task 0.9)
+app.MapHub<HIS.Api.RealTime.QueueHub>("/hubs/queue");     // real-time queue board (task 0.9)
+app.MapHub<HIS.Api.RealTime.AlertsHub>("/hubs/alerts");  // hospital-wide emergency alerts (task 0.9)
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", utc = DateTime.UtcNow }));
 
 app.Run();
