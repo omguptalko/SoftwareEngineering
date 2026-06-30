@@ -137,6 +137,15 @@ public sealed class InventoryRepository : IInventoryRepository
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<(string, string, int, int)>> GetStockLevelsAsync(CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        var rows = await c.QueryAsync<(string, string, int, int)>(new CommandDefinition(
+            @"SELECT Code, Name, StockQty, ReorderLevel FROM master.Drug
+              WHERE IsActive = 1 ORDER BY (CAST(StockQty AS FLOAT) / NULLIF(ReorderLevel,0))", cancellationToken: ct));
+        return rows.ToList();
+    }
+
     public async Task<IReadOnlyList<Supplier>> GetSuppliersAsync(CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

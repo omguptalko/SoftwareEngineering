@@ -20,4 +20,14 @@ public sealed class AiController : ControllerBase
     [HttpPost("risk")]
     public Task<RiskResult> Risk([FromBody] RiskVitalsInput vitals, CancellationToken ct)
         => _mediator.Send(new AssessPatientRiskQuery(vitals), ct);
+
+    /// <summary>11.4 — inventory demand forecast + suggested reorder quantities (auth required).</summary>
+    [HttpGet("inventory-forecast")]
+    public Task<IReadOnlyList<ForecastRow>> InventoryForecast(CancellationToken ct)
+        => _mediator.Send(new GetInventoryForecastQuery(), ct);
+
+    /// <summary>11.6 — claim pre-scrubbing against payer/package rules before submission (auth required).</summary>
+    [HttpPost("claim-prescrub")]
+    public Task<PreScrubResult> PreScrub([FromBody] PreScrubInput input, CancellationToken ct)
+        => _mediator.Send(new PreScrubClaimQuery(input), ct);
 }

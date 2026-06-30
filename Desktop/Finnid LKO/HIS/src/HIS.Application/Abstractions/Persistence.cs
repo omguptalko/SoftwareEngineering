@@ -159,6 +159,8 @@ public interface IPharmacyRepository
 public interface IInventoryRepository
 {
     Task<IReadOnlyList<(string Code, string Name, int Stock, int ReorderLevel)>> GetLowStockAsync(CancellationToken ct = default);
+    /// <summary>All active stock items + their reorder levels (for demand forecasting, Phase 11.4).</summary>
+    Task<IReadOnlyList<(string Code, string Name, int Stock, int ReorderLevel)>> GetStockLevelsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<Supplier>> GetSuppliersAsync(CancellationToken ct = default);
     Task<string> NextPoNoAsync(int branchId, CancellationToken ct = default);
     Task<long> CreatePoAsync(PurchaseOrder po, IReadOnlyList<PurchaseOrderLine> lines, CancellationToken ct = default);

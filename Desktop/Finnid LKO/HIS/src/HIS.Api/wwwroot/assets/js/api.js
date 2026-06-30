@@ -61,6 +61,8 @@ HIS.api = (function () {
     auditTrail:      (take) => get(`/api/audit${take ? `?take=${take}` : ''}`),
     fhirPatient:     (uhid) => get(`/api/fhir/Patient/${encodeURIComponent(uhid)}`),
     aiRisk:          (vitals) => post('/api/ai/risk', vitals),
+    aiForecast:      () => get('/api/ai/inventory-forecast'),
+    aiPreScrub:      (input) => post('/api/ai/claim-prescrub', input),
     health:          () => get('/api/health'),
     // Phase 2 — Appointments & OPD
     apptQueue:       (doctorCode) => get(`/api/appointments/queue${doctorCode ? `?doctorCode=${encodeURIComponent(doctorCode)}` : ''}`),
