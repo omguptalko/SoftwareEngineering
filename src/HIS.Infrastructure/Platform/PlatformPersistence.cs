@@ -134,6 +134,15 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
             new { userName, hash, salt }, cancellationToken: ct)) > 0;
     }
 
+    public async Task ReplaceUserRoleAsync(long userId, int roleId, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"DELETE FROM security.UserRole WHERE UserId = @userId;
+              INSERT security.UserRole (UserId, RoleId) VALUES (@userId, @roleId);",
+            new { userId, roleId }, cancellationToken: ct));
+    }
+
     public async Task<bool> HasPrivilegedRoleAsync(long userId, CancellationToken ct = default)
     {
         using var c = await _f.CreateOpenConnectionAsync(ct);

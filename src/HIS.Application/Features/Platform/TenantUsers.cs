@@ -217,3 +217,33 @@ public sealed class ResetTenantUserPasswordHandler : MediatR.IRequestHandler<Res
         return true;
     }
 }
+
+/// <summary>Change a tenant user's role (replaces all role grants with the given role).
+/// Takes effect on the user's next login (their current token keeps its old roles).</summary>
+public sealed record ChangeTenantUserRoleCommand(string UserName, string RoleCode) : ICommand<bool>, IAuthorizable
+{
+    public string RequiredPermission => "tenant.manage";
+}
+public sealed class ChangeTenantUserRoleValidator : AbstractValidator<ChangeTenantUserRoleCommand>
+{
+    public ChangeTenantUserRoleValidator()
+    {
+        RuleFor(x => x.UserName).NotEmpty();
+        RuleFor(x => x.RoleCode).NotEmpty().MaximumLength(40);
+    }
+}
+public sealed class ChangeTenantUserRoleHandler : MediatR.IRequestHandler<ChangeTenantUserRoleCommand, bool>
+{
+    private readonly IPlatformUserRepository _users; private readonly IBranchContext _ctx;
+    public ChangeTenantUserRoleHandler(IPlatformUserRepository users, IBranchContext ctx) { _users = users; _ctx = ctx; }
+    public async Task<bool> Handle(ChangeTenantUserRoleCommand c, CancellationToken ct)
+    {
+        var u = await TenantUserGuard.RequireTenantUserAsync(_users, c.UserName, ct);
+        var roleId = await _users.GetRoleIdByCodeAsync(c.RoleCode, ct)
+            ?? throw new InvalidOperationException($"Unknown role '{c.RoleCode}'.");
+        await _users.ReplaceUserRoleAsync(u.UserId, roleId, ct);
+        await _users.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, u.TenantId,
+            "ChangeTenantUserRole", "AppUser", $"{c.UserName} -> {c.RoleCode}", true, null, ct);
+        return true;
+    }
+}

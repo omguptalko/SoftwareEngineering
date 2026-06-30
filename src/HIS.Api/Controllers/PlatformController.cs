@@ -83,4 +83,8 @@ public sealed class PlatformController : ControllerBase
     /// <summary>Reset a tenant user's password (gated by 'tenant.manage').</summary>
     [HttpPost("tenants/users/reset-password")]
     public Task<bool> ResetTenantUserPassword([FromBody] ResetTenantUserPasswordCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Change a tenant user's role (gated by 'tenant.manage').</summary>
+    [HttpPost("tenants/users/change-role")]
+    public Task<bool> ChangeTenantUserRole([FromBody] ChangeTenantUserRoleCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }

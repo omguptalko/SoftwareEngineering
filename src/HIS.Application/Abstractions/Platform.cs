@@ -65,6 +65,8 @@ public interface IPlatformUserRepository
     Task<bool> UpdateUserProfileAsync(string userName, string displayName, string? email, CancellationToken ct = default);
     Task<bool> SetUserActiveAsync(string userName, bool isActive, CancellationToken ct = default);
     Task<bool> SetUserPasswordAsync(string userName, string hash, string salt, CancellationToken ct = default);
+    /// <summary>Replace all of a user's roles with the single given role.</summary>
+    Task ReplaceUserRoleAsync(long userId, int roleId, CancellationToken ct = default);
     /// <summary>True if any of the user's roles is flagged IsPrivileged (MFA policy, L1.2.5).</summary>
     Task<bool> HasPrivilegedRoleAsync(long userId, CancellationToken ct = default);
     /// <summary>Store the user's TOTP secret and enable MFA.</summary>
