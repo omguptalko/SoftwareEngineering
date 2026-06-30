@@ -30,12 +30,80 @@ jobs:
           dotnet-version: '9.0.x'
       - run: dotnet restore HIS.sln
       - run: dotnet build HIS.sln -c Release --no-restore
-      # No-op today (no test projects); gates once tests are added under tests/.
+      # No-op today (no xUnit projects); gates once dotnet test projects are added.
       - run: dotnet test HIS.sln -c Release --no-build --verbosity normal
+
+  # ---------------------------------------------------------------- functional smoke
+  # Boots the API against a real SQL Server and runs the deep functional smoke
+  # harness (tests/smoke/deeptest.js) over HTTP — every implemented module.
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "Ci_Str0ng!Passw0rd"
+        ports:
+          - 1433:1433
+    env:
+      SA_PASSWORD: "Ci_Str0ng!Passw0rd"
+      ASPNETCORE_ENVIRONMENT: Development          # loads appsettings.Development.json (Jwt/MFA/bootstrap/DevDefaultTenant=DEV)
+      ASPNETCORE_URLS: http://localhost:5142
+      HIS_BASE: http://localhost:5142
+      # Connection strings overridden to the CI SQL service (Section__Key convention).
+      ConnectionStrings__Platform: "Server=localhost,1433;Database=HIS_Platform;User Id=sa;Password=Ci_Str0ng!Passw0rd;TrustServerCertificate=True;Encrypt=False"
+      ConnectionStrings__His: "Server=localhost,1433;Database=master;User Id=sa;Password=Ci_Str0ng!Passw0rd;TrustServerCertificate=True;Encrypt=False"
+      Provisioning__BaseConnection: "Server=localhost,1433;Database=master;User Id=sa;Password=Ci_Str0ng!Passw0rd;TrustServerCertificate=True;Encrypt=False"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: dotnet build HIS.sln -c Release
+
+      - name: Provision control-plane DB (HIS_Platform)
+        run: |
+          set -euo pipefail
+          SQLCMD="docker run --rm --network host -v $PWD:/work mcr.microsoft.com/mssql-tools18 /opt/mssql-tools18/bin/sqlcmd -S localhost,1433 -U sa -P $SA_PASSWORD -C"
+          echo "Waiting for SQL Server..."
+          for i in $(seq 1 30); do
+            if $SQLCMD -Q "SELECT 1" >/dev/null 2>&1; then echo "SQL up"; break; fi
+            sleep 3
+          done
+          $SQLCMD -b -Q "IF DB_ID('HIS_Platform') IS NULL CREATE DATABASE [HIS_Platform];"
+          for f in $(ls db/platform/P*.sql | sort); do
+            echo "-> applying $f"
+            $SQLCMD -d HIS_Platform -b -i "/work/$f"
+          done
+
+      - name: Start API (auto-provisions DEV tenant on boot)
+        run: |
+          nohup dotnet run --no-build --no-launch-profile -c Release --project src/HIS.Api > api.log 2>&1 &
+          echo "started API pid $!"
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 50); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5142/api/health || echo 000)
+            if [ "$code" = "200" ]; then echo "API healthy"; exit 0; fi
+            sleep 3
+          done
+          echo "API did not become healthy"; tail -n 80 api.log; exit 1
+
+      - name: Run deep functional smoke harness
+        run: node tests/smoke/deeptest.js
+
+      - name: API logs (on failure)
+        if: failure()
+        run: tail -n 200 api.log || true
 
   # ---------------------------------------------------------------- image + deploy
   deploy:
-    needs: build-test
+    needs: [ build-test, smoke ]
     # Don't deploy from PRs or non-main branches.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
