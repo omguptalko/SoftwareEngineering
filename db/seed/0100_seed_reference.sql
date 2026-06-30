@@ -24,7 +24,7 @@ INSERT dbo.ModuleGroup (GroupId, Label, Icon, SortOrder) VALUES
  ('diag',     'Diagnostics & Pharmacy',      'bi-capsule',          3),
  ('ins',      'Insurance & Schemes',         'bi-shield-plus',      4),
  ('support',  'Support Services',            'bi-life-preserver',   5),
- ('admin',    'Admin · HR · Compliance',     'bi-sliders',          6);
+ ('admin',    'Admin / HR / Compliance',     'bi-sliders',          6);
 GO
 
 IF NOT EXISTS (SELECT 1 FROM dbo.Module)
