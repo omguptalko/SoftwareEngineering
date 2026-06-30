@@ -1,5 +1,6 @@
 using HIS.Api.RealTime;
 using HIS.Application.Features.Support;
+using HIS.Shared.Context;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -14,7 +15,8 @@ public sealed class AmbulanceController : ControllerBase
     private readonly IMediator _m;
     private readonly IHubContext<GpsHub> _gps;
     private readonly IConfiguration _config;
-    public AmbulanceController(IMediator m, IHubContext<GpsHub> gps, IConfiguration config) { _m = m; _gps = gps; _config = config; }
+    private readonly ITenantContext _tenant;
+    public AmbulanceController(IMediator m, IHubContext<GpsHub> gps, IConfiguration config, ITenantContext tenant) { _m = m; _gps = gps; _config = config; _tenant = tenant; }
 
     [HttpGet] public Task<IReadOnlyList<AmbulanceDto>> List(CancellationToken ct) => _m.Send(new GetAmbulancesQuery(), ct);
     [HttpGet("dispatches")] public Task<IReadOnlyList<DispatchRowDto>> Dispatches(CancellationToken ct) => _m.Send(new GetDispatchesQuery(), ct);
@@ -38,7 +40,7 @@ public sealed class AmbulanceController : ControllerBase
         var minLng = Bound("MinLng", 80.85m); var maxLng = Bound("MaxLng", 81.10m);
         decimal Pct(decimal v, decimal lo, decimal hi) => hi <= lo ? 50m : Math.Clamp((v - lo) / (hi - lo) * 100m, 0m, 100m);
 
-        await _gps.Clients.All.SendAsync("ambulanceMoved", new
+        await _gps.Clients.Group(TenantGroups.Name(_tenant)).SendAsync("ambulanceMoved", new
         {
             ambulanceId = id,
             lat = b.Lat,
@@ -131,7 +133,8 @@ public sealed class QueueController : ControllerBase
 {
     private readonly IMediator _m;
     private readonly IHubContext<QueueHub> _hub;
-    public QueueController(IMediator m, IHubContext<QueueHub> hub) { _m = m; _hub = hub; }
+    private readonly ITenantContext _tenant;
+    public QueueController(IMediator m, IHubContext<QueueHub> hub, ITenantContext tenant) { _m = m; _hub = hub; _tenant = tenant; }
 
     [HttpGet("counters")] public Task<IReadOnlyList<CounterDto>> Counters(CancellationToken ct) => _m.Send(new GetCountersQuery(), ct);
     [HttpGet] public Task<IReadOnlyList<QueueRowDto>> Board(CancellationToken ct) => _m.Send(new GetQueueQuery(), ct);
@@ -140,7 +143,7 @@ public sealed class QueueController : ControllerBase
     public async Task<string> Issue(int id, [FromBody] IssueBody? b, CancellationToken ct)
     {
         var token = await _m.Send(new IssueTokenCommand(id, b?.PatientUhid), ct);
-        await _hub.Clients.All.SendAsync("queueChanged", new { counterId = id, action = "issued", token }, ct);
+        await _hub.Clients.Group(TenantGroups.Name(_tenant)).SendAsync("queueChanged", new { counterId = id, action = "issued", token }, ct);
         return token;
     }
 
@@ -148,7 +151,7 @@ public sealed class QueueController : ControllerBase
     public async Task<string?> CallNext(int id, CancellationToken ct)
     {
         var token = await _m.Send(new CallNextCommand(id), ct);
-        await _hub.Clients.All.SendAsync("queueChanged", new { counterId = id, action = "called", token }, ct);
+        await _hub.Clients.Group(TenantGroups.Name(_tenant)).SendAsync("queueChanged", new { counterId = id, action = "called", token }, ct);
         return token;
     }
     public sealed record IssueBody(string? PatientUhid);
