@@ -3,6 +3,7 @@ using HIS.Application.Features.Support;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 
 namespace HIS.Api.Controllers;
 
@@ -10,12 +11,45 @@ namespace HIS.Api.Controllers;
 [Route("api/ambulance")]
 public sealed class AmbulanceController : ControllerBase
 {
-    private readonly IMediator _m; public AmbulanceController(IMediator m) => _m = m;
+    private readonly IMediator _m;
+    private readonly IHubContext<GpsHub> _gps;
+    private readonly IConfiguration _config;
+    public AmbulanceController(IMediator m, IHubContext<GpsHub> gps, IConfiguration config) { _m = m; _gps = gps; _config = config; }
+
     [HttpGet] public Task<IReadOnlyList<AmbulanceDto>> List(CancellationToken ct) => _m.Send(new GetAmbulancesQuery(), ct);
     [HttpGet("dispatches")] public Task<IReadOnlyList<DispatchRowDto>> Dispatches(CancellationToken ct) => _m.Send(new GetDispatchesQuery(), ct);
     [HttpPost("dispatch")] public Task<DispatchAmbulanceResult> Dispatch([FromBody] DispatchAmbulanceCommand cmd, CancellationToken ct) => _m.Send(cmd, ct);
     [HttpPost("dispatches/{id:long}/arrive")] public Task<bool> Arrive(long id, [FromBody] ArriveBody? b, CancellationToken ct) => _m.Send(new ArriveDispatchCommand(id, b?.Lat, b?.Lng), ct);
     public sealed record ArriveBody(decimal? Lat, decimal? Lng);
+
+    public sealed record LocationBody(decimal Lat, decimal Lng, decimal? SpeedKmph);
+
+    /// <summary>Live GPS ping for a vehicle — broadcast to the tracking board (task 0.9, no persistence).</summary>
+    [HttpPost("{id:long}/location")]
+    public async Task<IActionResult> Location(long id, [FromBody] LocationBody b, CancellationToken ct)
+    {
+        if (b.Lat < -90 || b.Lat > 90 || b.Lng < -180 || b.Lng > 180)
+            throw new InvalidOperationException("Latitude/longitude out of range.");
+
+        // Map the lat/lng into a 0-100 plot position using config-driven display bounds
+        // (the control-room mini-map normalises here; nothing hardcoded client-side).
+        decimal Bound(string key, decimal dflt) => _config.GetValue($"Gps:Bounds:{key}", dflt);
+        var minLat = Bound("MinLat", 26.70m); var maxLat = Bound("MaxLat", 26.95m);
+        var minLng = Bound("MinLng", 80.85m); var maxLng = Bound("MaxLng", 81.10m);
+        decimal Pct(decimal v, decimal lo, decimal hi) => hi <= lo ? 50m : Math.Clamp((v - lo) / (hi - lo) * 100m, 0m, 100m);
+
+        await _gps.Clients.All.SendAsync("ambulanceMoved", new
+        {
+            ambulanceId = id,
+            lat = b.Lat,
+            lng = b.Lng,
+            speedKmph = b.SpeedKmph,
+            x = Math.Round(Pct(b.Lng, minLng, maxLng), 1),
+            y = Math.Round(Pct(b.Lat, minLat, maxLat), 1),
+            ts = DateTime.UtcNow
+        }, ct);
+        return Ok(new { tracked = true });
+    }
 }
 
 [ApiController]
