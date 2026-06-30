@@ -40,8 +40,13 @@ window.HIS = window.HIS || {};
   function renderTree() {
     const tree = $('#tree');
     tree.innerHTML = '';
+    const allow = HIS.menuAllowed;          // null = show all (superadmin); else a Set of granted module ids
+    let visibleCount = 0;
     HIS.groups.forEach(g => {
-      const mods = HIS.modules.filter(m => m.group === g.id);
+      let mods = HIS.modules.filter(m => m.group === g.id);
+      if (allow) mods = mods.filter(m => allow.has(m.id));
+      if (!mods.length) return;             // hide groups with no granted modules
+      visibleCount += mods.length;
       const grp = document.createElement('div');
       grp.className = 'tree__grp';
       grp.dataset.grp = g.id;
@@ -56,7 +61,7 @@ window.HIS = window.HIS || {};
         `</div>`;
       tree.appendChild(grp);
     });
-    $('#modCount').textContent = HIS.modules.length;
+    $('#modCount').textContent = allow ? visibleCount : HIS.modules.length;
     // group collapse
     $$('.tree__grp-h', tree).forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed')));
     // item open
@@ -417,6 +422,6 @@ window.HIS = window.HIS || {};
     initMenus();
     tick(); setInterval(tick, 1000);
     if (HIS.bootError) toast(HIS.bootError, 'bi-exclamation-triangle-fill');
-    openModule('dashboard');        // open dashboard by default
+    openModule(HIS.defaultModule || 'dashboard');   // first granted module (RBAC), else dashboard
   })();
 })();

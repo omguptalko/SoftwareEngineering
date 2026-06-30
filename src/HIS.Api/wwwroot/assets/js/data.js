@@ -65,6 +65,33 @@ HIS.bootstrap = async function () {
     console.warn('No default patient available', e);
     HIS.mock.currentPatient = null;
   }
+
+  /* ---- RBAC sidebar scoping (L1.3.5) -------------------------------------
+     Superadmin sees every module (bypasses RBAC by design → null = show all).
+     Any other user sees only the modules their roles grant, from GET /api/menu;
+     menu codes are aliased to the wireframe screen ids. On error we fail OPEN
+     (show all) so a menu hiccup never locks a user out of navigation. */
+  HIS.menuAllowed = null;       // null = no filter (all modules)
+  HIS.defaultModule = 'dashboard';
+  try {
+    const prof = (HIS.auth && HIS.auth.get()) || {};
+    if (!prof.isSuperAdmin) {
+      const menu = await HIS.api.menu();                 // [{ code, label, icon, pages }]
+      const alias = { emergency: 'icu', telemed: 'telemedicine', admin: null };
+      const allow = new Set();
+      (menu || []).forEach(m => {
+        const id = (m.code in alias) ? alias[m.code] : m.code;
+        if (id) allow.add(id);
+      });
+      HIS.menuAllowed = allow;
+      // Default-open the first granted module that has a real screen.
+      const first = (HIS.modules || []).find(m => allow.has(m.id));
+      if (first) HIS.defaultModule = first.id;
+    }
+  } catch (e) {
+    console.warn('Effective menu unavailable — showing all modules', e);
+    HIS.menuAllowed = null;
+  }
 };
 
 /* Fetch a lookup dataset on demand and cache it (shape matches the F3 modal). */
