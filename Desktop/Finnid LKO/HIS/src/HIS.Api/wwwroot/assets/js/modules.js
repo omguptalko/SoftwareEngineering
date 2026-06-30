@@ -116,7 +116,8 @@ window.HIS = window.HIS || {};
   /* ============================ REGISTRATION ========================== */
   function registration() {
     return `<div class="screen">
-      ${head('bi-person-vcard', 'Patient Registration &amp; UHID', 'New OPD/IPD registration · Aadhaar / ABHA linked')}
+      ${head('bi-person-vcard', 'Patient Registration &amp; UHID', 'New OPD/IPD registration · Aadhaar / ABHA linked',
+        `<button class="btn btn--ghost btn--sm" data-act="fhir-export"><i class="bi bi-diagram-3"></i> Export FHIR R4</button>`)}
       <div class="cols-side">
         <div>
           <div class="panel">
@@ -1520,6 +1521,22 @@ window.HIS = window.HIS || {};
       host.innerHTML = '<div class="aitem"><i class="ai-ico ico-warn bi bi-exclamation-triangle"></i><div class="a-txt"><b>Alerts unavailable</b><span>Could not reach the alerts API.</span></div></div>';
     }
   }
+
+  /* ---- FHIR R4 export: download the current patient as a FHIR resource (0.10) ---- */
+  HIS.exportFhir = async function () {
+    const p = HIS.mock.currentPatient;
+    if (!p || !p.uhid) { HIS.toast('No patient loaded — F3 to select first'); return; }
+    try {
+      const res = await HIS.api.fhirPatient(p.uhid);
+      const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/fhir+json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Patient-${p.uhid}.fhir.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      HIS.toast(`FHIR R4 Patient exported (${p.uhid})`, 'bi-diagram-3');
+    } catch (e) { HIS.toast('FHIR export failed: ' + e.message); }
+  };
 
   /* ---- registration: stamp date, load history if a patient is current ---- */
   function initRegistration(doc) {

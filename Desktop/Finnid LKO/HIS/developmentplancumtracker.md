@@ -137,7 +137,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | 0.7 | AES-256 at rest, TLS in transit, MFA for privileged roles, Aadhaar/PII masking | §8.1/§8.2 | 🟦 | | Aadhaar masked; **MFA (TOTP)** for privileged roles done (L1.2.5); **AES-256-GCM at-rest** field protector done (encrypts MFA secret; key from config/Key Vault) — verified; TLS-in-transit is a deployment concern |
 | 0.8 | Immutable audit-trail behavior (all writes) | §8.1/§3.22 | 🟩 | | Verified writing rows |
 | 0.9 | SignalR infrastructure (hubs, groups per branch) | §9 | 🟦 | | **Infra wired** — `AddSignalR()` + `QueueHub` mapped at `/hubs/queue`; `QueueController` pushes `queueChanged` on token issue/call-next; the wireframe Queue board subscribes (`@microsoft/signalr`) and live-refreshes with a "Live" badge + auto-reconnect. **Verified:** a token issued by a *separate* client appeared on the board with no manual refresh (0 console errors). Remaining: per-branch groups + alert/GPS hubs |
-| 0.10 | FHIR R4 model library + HL7 interoperability scaffolding | §8.6 | ⬜ | | |
+| 0.10 | FHIR R4 model library + HL7 interoperability scaffolding | §8.6 | 🟦 | | **FHIR R4 model library started** (`HIS.Shared/Fhir/FhirR4.cs`: Patient + Identifier/HumanName/ContactPoint/Coding/CodeableConcept) + `FhirJson` conformant serializer. `GetFhirPatientQuery` maps a patient → FHIR R4 Patient (config-driven identifier systems `Fhir:*`); `GET /api/fhir/Patient/{uhid}` serves `application/fhir+json` (auth-gated); registration screen has an **Export FHIR R4** action. **Verified:** 401 unauth, conformant resource (resourceType/identifier/name/gender/telecom) downloaded, 0 console errors. Remaining: more resources (Encounter/Observation/Claim/Bundle) + HL7 v2 |
 | 0.11 | Multi-branch context resolver + branch master | §3.21 | 🟩 | | Middleware + Branch master/seed |
 
 ### Phase 1 — Core Platform & Identity
@@ -246,7 +246,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | 13.3 | Performance: **1000+ concurrent users**, instant emergency/triage response | §8.3 | 🟦 | | Connection-routing concurrency benchmarked (L1.9.4): 2000 reqs @ 64 concurrency × 9 tenants → 0 errors, 0 routing mismatches, ~580 req/s p99 538ms on **dev LocalDB**. 1000+ target needs Azure SQL elastic pool + catalog caching (prod) |
 | 13.4 | Scalability: horizontal scale, easy new-branch onboarding | §8.4 | ⬜ | | |
 | 13.5 | Reliability: daily backup, DR, **99.9% uptime** | §8.5 | ⬜ | | |
-| 13.6 | Interoperability: HL7/FHIR R4, NHCX, ABDM HIP/HIU compliance | §8.6 | ⬜ | | |
+| 13.6 | Interoperability: HL7/FHIR R4, NHCX, ABDM HIP/HIU compliance | §8.6 | 🟦 | | **FHIR R4 export live** — `GET /api/fhir/Patient/{uhid}` serves a conformant `application/fhir+json` Patient resource (0.10), the HIP export shape reusable by ABDM/NHCX. Remaining: NHCX FHIR message bundles + ABDM HIU consent flows |
 | 13.7 | Full deep test execution (see `deeptestwithdummydata.md`) | all | ⬜ | | |
 | 13.8 | Azure Cloud deployment + CI/CD | §9 | 🟩 | | **TLS/HSTS + forwarded-headers**, Key Vault/env secret sourcing, `appsettings.Production.json`; **`Dockerfile`** (non-root, port 8080, bundles provisioning templates) + **GitHub Actions → Azure Container Apps** pipeline (`build/test → az acr build → optional DB migrations → containerapp update → /api/health smoke`, OIDC login); `docs/DEPLOYMENT.md` covers one-time setup + secrets/vars. Verified: publish + workflow YAML green (no docker locally) |
 

@@ -360,6 +360,7 @@ window.HIS = window.HIS || {};
       case 'closetab':if (HIS.activeTab) closeTab(HIS.activeTab); break;
       case 'nexttab': nextTab(); break;
       case 'logout':  logout(); break;
+      case 'fhir-export': HIS.exportFhir && HIS.exportFhir(); break;
       case 'about':   toast('Finnid HIS ERP — interactive wireframe (SRS v2.0)', 'bi-info-circle'); break;
       case 'escape':  break;
       default: if (act) toast(act);
