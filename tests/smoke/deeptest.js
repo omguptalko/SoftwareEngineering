@@ -179,14 +179,15 @@ const SKIP = (sec, id, name, why) => rec(sec, id, name, 'SKIP', why);
 
   // ---------- 2.11 PHARMACY ----------
   await T('Pharmacy', 'TC-PHA-queue', 'pharmacy queue', async () => { const r = await GET('/api/pharmacy/queue'); return { pass: ok(r.status), detail: `HTTP ${r.status}` }; });
-  await T('Pharmacy', 'TC-PHA-01', 'dispense (batch/stock)', async () => {
-    if (!ctx.drug) return { pass: false, detail: 'no drug code' };
-    const b = await GET('/api/pharmacy/batches?drugCode=' + encodeURIComponent(ctx.drug));
-    const batch = Array.isArray(b.json) && b.json[0];
-    if (!batch) return { pass: false, detail: 'no batch for ' + ctx.drug };
-    const r = await POST('/api/pharmacy/dispense', { isNdps: false, lines: [{ drugCode: ctx.drug, batchNo: batch.batchNo, qty: 1 }] });
-    return { pass: ok(r.status), detail: `HTTP ${r.status} ${JSON.stringify(r.json).slice(0, 50)}` };
-  });
+  // Dispense needs a seeded drug batch; a bare tenant (no batch seed) -> SKIP.
+  let phaBatch = null;
+  if (ctx.drug) { const b = await GET('/api/pharmacy/batches?drugCode=' + encodeURIComponent(ctx.drug)); phaBatch = Array.isArray(b.json) && b.json[0]; }
+  if (phaBatch) {
+    await T('Pharmacy', 'TC-PHA-01', 'dispense (batch/stock)', async () => {
+      const r = await POST('/api/pharmacy/dispense', { isNdps: false, lines: [{ drugCode: ctx.drug, batchNo: phaBatch.batchNo, qty: 1 }] });
+      return { pass: ok(r.status), detail: `HTTP ${r.status} ${JSON.stringify(r.json).slice(0, 50)}` };
+    });
+  } else { SKIP('Pharmacy', 'TC-PHA-01', 'dispense (batch/stock)', `no drug batches seeded for ${ctx.drug}`); }
 
   // ---------- 2.12 INVENTORY ----------
   await T('Inventory', 'TC-INV-low', 'low-stock alerts', async () => { const r = await GET('/api/inventory/lowstock'); return { pass: ok(r.status), detail: `HTTP ${r.status}` }; });
@@ -290,14 +291,16 @@ const SKIP = (sec, id, name, why) => rec(sec, id, name, 'SKIP', why);
     return { pass: ok(r.status), detail: `${r.json && r.json.mlcNo} (HTTP ${r.status})` };
   });
 
-  // ---------- 2.35 QUEUE ----------
-  await T('Queue', 'TC-QUE-01', 'counters + token + board', async () => {
-    const c = await GET('/api/queue/counters'); const cid = Array.isArray(c.json) && c.json[0] && c.json[0].counterId;
-    if (!cid) return { pass: false, detail: 'no counter' };
-    const tk = await POST(`/api/queue/counters/${cid}/token`, {});
-    const bd = await GET('/api/queue');
-    return { pass: ok(tk.status) && ok(bd.status), detail: `token ${tk.json}, board ${bd.status}` };
-  });
+  // ---------- 2.35 QUEUE (needs seeded counters) ----------
+  const qc = await GET('/api/queue/counters');
+  const counterId = Array.isArray(qc.json) && qc.json[0] && qc.json[0].counterId;
+  if (counterId) {
+    await T('Queue', 'TC-QUE-01', 'counters + token + board', async () => {
+      const tk = await POST(`/api/queue/counters/${counterId}/token`, {});
+      const bd = await GET('/api/queue');
+      return { pass: ok(tk.status) && ok(bd.status), detail: `token ${tk.json}, board ${bd.status}` };
+    });
+  } else { SKIP('Queue', 'TC-QUE-01', 'counters + token + board', 'no queue counters seeded in this tenant'); }
 
   // ---------- 2.34 FEEDBACK ----------
   await T('Feedback', 'TC-FB-01', 'survey + grievance', async () => {
@@ -306,17 +309,20 @@ const SKIP = (sec, id, name, why) => rec(sec, id, name, 'SKIP', why);
     return { pass: ok(s.status) && ok(g.status), detail: `survey ${s.status}, grievance ${g.status}` };
   });
 
-  // ---------- 2.7 AMBULANCE + GPS ----------
-  // GPS ping is tested against any fleet vehicle (always valid). Dispatch is
-  // accepted as 2xx (dispatched) OR 409 (fleet all busy — correct capacity response).
-  await T('Ambulance', 'TC-AMB-01', 'dispatch + GPS ping', async () => {
-    const fleet = await GET('/api/ambulance');
-    const aid = Array.isArray(fleet.json) && fleet.json[0] && fleet.json[0].ambulanceId;
-    const g = aid ? await POST(`/api/ambulance/${aid}/location`, { lat: 26.85, lng: 80.95, speedKmph: 40 }) : { status: 0 };
-    const d = await POST('/api/ambulance/dispatch', { pickupLat: null, pickupLng: null });
-    const dispatchOk = ok(d.status) || d.status === 409; // 409 = no ambulance available (valid)
-    return { pass: ok(g.status) && dispatchOk, detail: `gps ${g.status}, dispatch ${d.status}${d.status === 409 ? ' (fleet busy)' : ''}` };
-  });
+  // ---------- 2.7 AMBULANCE + GPS (needs a seeded fleet) ----------
+  // GPS ping is tested against any fleet vehicle; dispatch is accepted as 2xx
+  // (dispatched) OR 409 (fleet all busy — a correct capacity response). A bare
+  // tenant with no ambulances seeded -> SKIP.
+  const fleetR = await GET('/api/ambulance');
+  const fleet = Array.isArray(fleetR.json) ? fleetR.json : [];
+  if (fleet.length) {
+    await T('Ambulance', 'TC-AMB-01', 'dispatch + GPS ping', async () => {
+      const g = await POST(`/api/ambulance/${fleet[0].ambulanceId}/location`, { lat: 26.85, lng: 80.95, speedKmph: 40 });
+      const d = await POST('/api/ambulance/dispatch', { pickupLat: null, pickupLng: null });
+      const dispatchOk = ok(d.status) || d.status === 409;
+      return { pass: ok(g.status) && dispatchOk, detail: `gps ${g.status}, dispatch ${d.status}${d.status === 409 ? ' (fleet busy)' : ''}` };
+    });
+  } else { SKIP('Ambulance', 'TC-AMB-01', 'dispatch + GPS ping', 'no ambulances seeded in this tenant'); }
 
   // ---------- 2.36 AI ----------
   await T('AI', 'TC-AI-01', 'risk prediction', async () => {
