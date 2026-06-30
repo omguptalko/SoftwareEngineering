@@ -1,0 +1,10 @@
+# .NET build artifacts
+[Bb]in/
+[Oo]bj/
+*.user
+.vs/
+
+# Local secrets / env
+appsettings.*.local.json
+*.mdf
+*.ldf

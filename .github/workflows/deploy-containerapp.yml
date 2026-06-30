@@ -66,19 +66,25 @@ jobs:
           node-version: '20'
       - run: dotnet build HIS.sln -c Release
 
+      - name: Install sqlcmd (mssql-tools18)
+        run: |
+          set -euo pipefail
+          . /etc/os-release
+          curl -fsSL -O "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          sudo apt-get update -qq
+          sudo ACCEPT_EULA=Y apt-get install -y -qq mssql-tools18 unixodbc-dev
+
       - name: Provision control-plane DB (HIS_Platform)
         run: |
           set -euo pipefail
-          SQLCMD="docker run --rm --network host -v $PWD:/work mcr.microsoft.com/mssql-tools18 /opt/mssql-tools18/bin/sqlcmd -S localhost,1433 -U sa -P $SA_PASSWORD -C"
+          SQLCMD="/opt/mssql-tools18/bin/sqlcmd -S localhost,1433 -U sa -P $SA_PASSWORD -C"
           echo "Waiting for SQL Server..."
-          for i in $(seq 1 30); do
-            if $SQLCMD -Q "SELECT 1" >/dev/null 2>&1; then echo "SQL up"; break; fi
-            sleep 3
-          done
+          for i in $(seq 1 40); do $SQLCMD -Q "SELECT 1" >/dev/null 2>&1 && { echo "SQL up"; break; }; sleep 3; done
           $SQLCMD -b -Q "IF DB_ID('HIS_Platform') IS NULL CREATE DATABASE [HIS_Platform];"
           for f in $(ls db/platform/P*.sql | sort); do
             echo "-> applying $f"
-            $SQLCMD -d HIS_Platform -b -i "/work/$f"
+            $SQLCMD -b -d HIS_Platform -i "$f"
           done
 
       - name: Start API (auto-provisions DEV tenant on boot)
@@ -106,7 +112,8 @@ jobs:
   deploy:
     needs: [ build-test, smoke ]
     # Don't deploy from PRs or non-main branches.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # Opt-in: set repo variable ENABLE_DEPLOY=true (+ Azure secrets/vars) to deploy.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.ENABLE_DEPLOY == 'true'
     runs-on: ubuntu-latest
     environment: production
     steps:
