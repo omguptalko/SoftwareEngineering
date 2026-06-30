@@ -224,7 +224,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 ### Phase 11 — AI Modules (Azure AI + Python ML, consumed via API)
 | # | Module / Task | SRS Ref | Status | Owner | Notes |
 |---|------|---------|--------|-------|-------|
-| 11.1 | AI Patient Risk Prediction (vitals + history) | §4.1 | ⬜ | | Thresholds configurable |
+| 11.1 | AI Patient Risk Prediction (vitals + history) | §4.1 | 🟦 | | **Working explainable scorer live** — `POST /api/ai/risk` (`AssessPatientRiskQuery`, auth) computes a deterministic NEWS2-aggregate early-warning score from vitals with per-parameter contributions + banded recommendation; band cut-offs config-driven (`Ai:Risk:*`). New **AI · Clinical Risk Prediction** screen (vitals form → score/band/flags). **Verified:** high case=16/High, normal=0/Low, 401 unauth, screen renders 0 errors. Seam (`AiController`) lets an Azure ML model replace the handler — that swap + history features pending |
 | 11.2 | AI Smart Scheduling (slot optimisation) | §4.2 | ⬜ | | |
 | 11.3 | AI Chatbot Support (24x7 appointments/reports/reminders/emergency) | §4.3 | ⬜ | | |
 | 11.4 | AI Inventory Forecasting (demand predict + auto-reorder) | §4.4 | ⬜ | | |
