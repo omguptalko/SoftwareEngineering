@@ -16,8 +16,13 @@ window.HIS = window.HIS || {};
     const role = p.isSuperAdmin ? 'Super Admin' : ((p.roles && p.roles[0]) || '—');
     $('#ctxUser').textContent = p.displayName || p.userName || '—';
     $('#ctxRole').textContent = role;
-    // Reveal the Platform Admin console link only for superadmins (L1.3.4).
-    if (p.isSuperAdmin) { const al = $('#adminLink'); if (al) al.hidden = false; }
+    // Reveal the admin console link: full "Platform Admin" for superadmins,
+    // a tenant-scoped "Manage Users" for tenant admins (role 'admin'), L1.3.4 / L1.7.4.
+    const isTenantAdmin = !p.isSuperAdmin && Array.isArray(p.roles) && p.roles.includes('admin');
+    if (p.isSuperAdmin || isTenantAdmin) {
+      const al = $('#adminLink');
+      if (al) { al.hidden = false; if (isTenantAdmin) al.innerHTML = '<i class="bi bi-people"></i> Manage Users'; }
+    }
     // Branch is assigned server-side (JWT claim / dev fallback); show the working branch label.
     const branchLabel = p.branchLabel || $('#sbBranch').textContent || '—';
     $('#ctxBranch').textContent = branchLabel;

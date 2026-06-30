@@ -42,6 +42,7 @@ INSERT security.Permission (Code, Description) VALUES
  ('billing.manage',    'Manage per-fiscal-year subscription and billing'),
  ('rbac.manage',       'Manage roles, permissions and assignments'),
  ('module.manage',     'Create modules/pages and assign them to roles/tenants'),
+ ('users.manage',      'Create and manage tenant login users'),
  ('audit.read',        'Read the control-plane audit trail');
 GO
 

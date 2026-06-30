@@ -19,7 +19,7 @@ public sealed record CreateTenantUserCommand(
     string TenantCode, string UserName, string Password, string DisplayName, string? Email, string RoleCode)
     : ICommand<CreateTenantUserResult>, IAuthorizable
 {
-    public string RequiredPermission => "tenant.manage";
+    public string RequiredPermission => "users.manage";
 }
 
 public sealed class CreateTenantUserValidator : AbstractValidator<CreateTenantUserCommand>
@@ -50,6 +50,7 @@ public sealed class CreateTenantUserHandler : MediatR.IRequestHandler<CreateTena
     {
         var tenantId = await _tenants.GetTenantIdByCodeAsync(c.TenantCode, ct)
             ?? throw new InvalidOperationException($"Unknown tenant '{c.TenantCode}'.");
+        TenantScope.Enforce(_ctx, tenantId);
 
         if (await _users.GetByUserNameAsync(c.UserName, ct) is not null)
             throw new InvalidOperationException($"User name '{c.UserName}' is already taken.");
@@ -93,7 +94,7 @@ public sealed record RoleDto(string Code, string Name);
 
 public sealed record GetRolesQuery : IQuery<IReadOnlyList<RoleDto>>, IAuthorizable
 {
-    public string RequiredPermission => "tenant.manage";
+    public string RequiredPermission => "users.manage";
 }
 
 public sealed class GetRolesHandler : MediatR.IRequestHandler<GetRolesQuery, IReadOnlyList<RoleDto>>
@@ -110,19 +111,21 @@ public sealed record TenantUserRow(string UserName, string DisplayName, string? 
 
 public sealed record GetTenantUsersQuery(string TenantCode) : IQuery<IReadOnlyList<TenantUserRow>>, IAuthorizable
 {
-    public string RequiredPermission => "tenant.manage";
+    public string RequiredPermission => "users.manage";
 }
 
 public sealed class GetTenantUsersHandler : MediatR.IRequestHandler<GetTenantUsersQuery, IReadOnlyList<TenantUserRow>>
 {
     private readonly IPlatformUserRepository _users;
     private readonly ITenantAdminRepository _tenants;
-    public GetTenantUsersHandler(IPlatformUserRepository users, ITenantAdminRepository tenants) { _users = users; _tenants = tenants; }
+    private readonly IBranchContext _ctx;
+    public GetTenantUsersHandler(IPlatformUserRepository users, ITenantAdminRepository tenants, IBranchContext ctx) { _users = users; _tenants = tenants; _ctx = ctx; }
 
     public async Task<IReadOnlyList<TenantUserRow>> Handle(GetTenantUsersQuery q, CancellationToken ct)
     {
         var tenantId = await _tenants.GetTenantIdByCodeAsync(q.TenantCode, ct)
             ?? throw new InvalidOperationException($"Unknown tenant '{q.TenantCode}'.");
+        TenantScope.Enforce(_ctx, tenantId);
         return (await _users.ListUsersByTenantAsync(tenantId, ct))
             .Select(u => new TenantUserRow(u.UserName, u.DisplayName, u.Email, u.IsActive, u.Roles)).ToList();
     }
@@ -144,10 +147,25 @@ internal static class TenantUserGuard
     }
 }
 
+/// <summary>
+/// Self-service scoping (L1.7.4): superadmin manages any tenant; a tenant admin may
+/// manage users only within its OWN tenant. Throws 403 otherwise. The caller's tenant
+/// comes from the JWT ('tenantId' claim), so it cannot be widened by a request param.
+/// </summary>
+internal static class TenantScope
+{
+    public static void Enforce(IBranchContext ctx, int targetTenantId)
+    {
+        if (ctx.IsSuperAdmin) return;
+        if (ctx.TenantId is int my && my == targetTenantId) return;
+        throw new UnauthorizedAccessException("You can manage users only within your own tenant.");
+    }
+}
+
 /// <summary>Edit a tenant user's display name / email.</summary>
 public sealed record UpdateTenantUserCommand(string UserName, string DisplayName, string? Email) : ICommand<bool>, IAuthorizable
 {
-    public string RequiredPermission => "tenant.manage";
+    public string RequiredPermission => "users.manage";
 }
 public sealed class UpdateTenantUserValidator : AbstractValidator<UpdateTenantUserCommand>
 {
@@ -165,6 +183,7 @@ public sealed class UpdateTenantUserHandler : MediatR.IRequestHandler<UpdateTena
     public async Task<bool> Handle(UpdateTenantUserCommand c, CancellationToken ct)
     {
         var u = await TenantUserGuard.RequireTenantUserAsync(_users, c.UserName, ct);
+        TenantScope.Enforce(_ctx, u.TenantId!.Value);
         await _users.UpdateUserProfileAsync(c.UserName, c.DisplayName, string.IsNullOrWhiteSpace(c.Email) ? null : c.Email, ct);
         await _users.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, u.TenantId, "UpdateTenantUser", "AppUser", c.UserName, true, null, ct);
         return true;
@@ -174,7 +193,7 @@ public sealed class UpdateTenantUserHandler : MediatR.IRequestHandler<UpdateTena
 /// <summary>Activate / deactivate a tenant user (a deactivated user can no longer log in).</summary>
 public sealed record SetTenantUserActiveCommand(string UserName, bool IsActive) : ICommand<bool>, IAuthorizable
 {
-    public string RequiredPermission => "tenant.manage";
+    public string RequiredPermission => "users.manage";
 }
 public sealed class SetTenantUserActiveHandler : MediatR.IRequestHandler<SetTenantUserActiveCommand, bool>
 {
@@ -183,6 +202,7 @@ public sealed class SetTenantUserActiveHandler : MediatR.IRequestHandler<SetTena
     public async Task<bool> Handle(SetTenantUserActiveCommand c, CancellationToken ct)
     {
         var u = await TenantUserGuard.RequireTenantUserAsync(_users, c.UserName, ct);
+        TenantScope.Enforce(_ctx, u.TenantId!.Value);
         await _users.SetUserActiveAsync(c.UserName, c.IsActive, ct);
         await _users.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, u.TenantId,
             c.IsActive ? "ActivateTenantUser" : "DeactivateTenantUser", "AppUser", c.UserName, true, null, ct);
@@ -193,7 +213,7 @@ public sealed class SetTenantUserActiveHandler : MediatR.IRequestHandler<SetTena
 /// <summary>Reset a tenant user's password (PBKDF2 re-hash).</summary>
 public sealed record ResetTenantUserPasswordCommand(string UserName, string NewPassword) : ICommand<bool>, IAuthorizable
 {
-    public string RequiredPermission => "tenant.manage";
+    public string RequiredPermission => "users.manage";
 }
 public sealed class ResetTenantUserPasswordValidator : AbstractValidator<ResetTenantUserPasswordCommand>
 {
@@ -211,6 +231,7 @@ public sealed class ResetTenantUserPasswordHandler : MediatR.IRequestHandler<Res
     public async Task<bool> Handle(ResetTenantUserPasswordCommand c, CancellationToken ct)
     {
         var u = await TenantUserGuard.RequireTenantUserAsync(_users, c.UserName, ct);
+        TenantScope.Enforce(_ctx, u.TenantId!.Value);
         var (hash, salt) = _hasher.Hash(c.NewPassword);
         await _users.SetUserPasswordAsync(c.UserName, hash, salt, ct);
         await _users.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, u.TenantId, "ResetTenantUserPassword", "AppUser", c.UserName, true, null, ct);
@@ -222,7 +243,7 @@ public sealed class ResetTenantUserPasswordHandler : MediatR.IRequestHandler<Res
 /// Takes effect on the user's next login (their current token keeps its old roles).</summary>
 public sealed record ChangeTenantUserRoleCommand(string UserName, string RoleCode) : ICommand<bool>, IAuthorizable
 {
-    public string RequiredPermission => "tenant.manage";
+    public string RequiredPermission => "users.manage";
 }
 public sealed class ChangeTenantUserRoleValidator : AbstractValidator<ChangeTenantUserRoleCommand>
 {
@@ -239,6 +260,7 @@ public sealed class ChangeTenantUserRoleHandler : MediatR.IRequestHandler<Change
     public async Task<bool> Handle(ChangeTenantUserRoleCommand c, CancellationToken ct)
     {
         var u = await TenantUserGuard.RequireTenantUserAsync(_users, c.UserName, ct);
+        TenantScope.Enforce(_ctx, u.TenantId!.Value);
         var roleId = await _users.GetRoleIdByCodeAsync(c.RoleCode, ct)
             ?? throw new InvalidOperationException($"Unknown role '{c.RoleCode}'.");
         await _users.ReplaceUserRoleAsync(u.UserId, roleId, ct);

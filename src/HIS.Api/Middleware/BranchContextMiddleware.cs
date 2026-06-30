@@ -26,6 +26,7 @@ public sealed class BranchContextMiddleware
             bc.BranchCode = user.FindFirst("branchCode")?.Value;
             bc.Roles = user.FindAll("role").Select(c => c.Value).ToArray();
             bc.IsSuperAdmin = user.FindFirst("superadmin")?.Value == "1";
+            bc.TenantId = int.TryParse(user.FindFirst("tenantId")?.Value, out var tid) ? tid : null;
         }
 
         // Dev/wireframe fallback — config-driven, so nothing is hardcoded.

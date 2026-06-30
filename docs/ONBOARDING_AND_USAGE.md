@@ -85,7 +85,8 @@ in the title bar opens the console (`/app/admin.html`).
 
 | What | How (today) | Status |
 |---|---|---|
-| **Create + manage the hospital's login users** (admin, doctors, nurses…) | Platform Admin → **Users**: create (tenant + id + password + display name + role), and per-user **Edit** (name/email), **Change role**, **Reset password**, **Deactivate/Activate**. Each user is bound to its tenant (`AppUser.TenantId`), PBKDF2-hashed, logs in **only** to that hospital; a deactivated user cannot log in; a role change takes effect on next login. Backed by `/api/platform/tenants/users[/update|/change-role|/set-active|/reset-password]` + `/roles` + `/tenants/{code}/users`, gated by `tenant.manage`. | ✅ live |
+| **Create + manage the hospital's login users** (admin, doctors, nurses…) | Platform Admin → **Users**: create (tenant + id + password + display name + role), and per-user **Edit** (name/email), **Change role**, **Reset password**, **Deactivate/Activate**. Each user is bound to its tenant (`AppUser.TenantId`), PBKDF2-hashed, logs in **only** to that hospital; a deactivated user cannot log in; a role change takes effect on next login. Backed by `/api/platform/tenants/users[/update|/change-role|/set-active|/reset-password]` + `/roles` + `/tenants/{code}/users`, gated by `users.manage`. | ✅ live |
+| **Tenant-admin self-service** | A hospital's own **admin** (role `admin`, which holds `users.manage`) sees a **"Manage Users"** link in the workspace → the same Users screen, **locked to its own tenant** (other tabs hidden, tenant code read-only). The scope is enforced **server-side** from the JWT `tenantId` claim — a tenant admin cannot touch another tenant's users (403), onboard, year-shift, or list all tenants. Superadmin keeps the full console. | ✅ live |
 | **Assign modules / pages to roles** (RBAC) | Platform Admin → **Modules & Roles** → assign module/page/action to a role. The sidebar + APIs scope to these grants. | ✅ live |
 | **Enable/disable a module per fiscal year** | Platform Admin → **Entitlements** → toggle a module for tenant × FY. The effective menu honours it. | ✅ live |
 | **Point the domain** | DNS: point `acme.hospital.in` (and/or the common subdomain) at the app. The platform resolves host → tenant automatically. | ops |
@@ -153,8 +154,8 @@ MFA + AES-at-rest, audit trail, the full clinical/financial module set, real-tim
 (queue/alerts/GPS), AI assists (risk/forecast/pre-scrub), FHIR R4 export.
 
 **Pending (needs work before a real hospital go-live):**
-- Tenant-admin *self-service* user management (a tenant admin managing only its own staff). Today the full user lifecycle — **create, edit, change-role, reset-password, deactivate/activate** — is **live** but superadmin-driven; platform users (superadmin/demo) are protected from edits.
 - A self-service **tenant decommission** flow (today it's manual SQL — §7).
+- Real external integrations and Azure-ML AI (scaffolded/mocked — see below).
 - Real external integrations (UIDAI/ABDM/NHCX/PM-JAY/ESIC/CGHS/ECHS/payment
   gateways) and real Azure-ML AI — these are scaffolded/mocked.
 - Production TLS termination + secret sourcing (Key Vault) and a DR/backup plan.

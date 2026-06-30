@@ -205,7 +205,9 @@
   if (!HIS.auth || !HIS.auth.requireSession('login.html')) { /* redirected */ }
   const profile = (HIS.auth && HIS.auth.get()) || {};
   $('#whoName').textContent = profile.displayName || profile.userName || '—';
-  if (!profile.isSuperAdmin) $('#notSuper').style.display = 'block';
+  // Mode: superadmin → full console; tenant admin (role 'admin') → Users-only, scoped to own tenant.
+  const isTenantAdmin = !profile.isSuperAdmin && Array.isArray(profile.roles) && profile.roles.includes('admin');
+  if (!profile.isSuperAdmin && !isTenantAdmin) $('#notSuper').style.display = 'block';
   $('#signout').addEventListener('click', () => { HIS.auth.clear(); location.href = 'login.html'; });
 
   // ---- API helpers (Bearer) ----
@@ -389,9 +391,31 @@
   }
   $('#loadUsersBtn').addEventListener('click', guard(loadUsers));
 
+  // Tenant-admin mode: hide superadmin-only nav/panels; lock the tenant code to
+  // the admin's own tenant (resolved realm). The server also enforces the scope.
+  async function applyTenantAdminMode() {
+    $$('.nav a[data-tab]').forEach(a => { if (a.dataset.tab !== 'users') a.style.display = 'none'; a.classList.remove('active'); });
+    const usersNav = $('.nav a[data-tab="users"]'); if (usersNav) usersNav.classList.add('active');
+    $$('.panel').forEach(p => p.classList.remove('active'));
+    $('#panel-users').classList.add('active');
+    const sub = document.querySelector('.brand small'); if (sub) sub.textContent = 'Finnid HIS · tenant admin';
+    try {
+      const realm = await api('GET', '/api/realm');
+      const code = realm && realm.tenantCode;
+      if (code) {
+        ['u_tenant', 'u_listcode'].forEach(id => { const el = $('#' + id); if (el) { el.value = code; el.readOnly = true; el.style.background = '#eef2f6'; } });
+        loadUsers();
+      }
+    } catch (e) {}
+  }
+
   // ---- Initial load ----
-  guard(loadTenants)();
-  guard(loadAudit)();
+  if (isTenantAdmin) {
+    guard(applyTenantAdminMode)();
+  } else {
+    guard(loadTenants)();
+    guard(loadAudit)();
+  }
   guard(fillRoles)();
 </script>
 </body>

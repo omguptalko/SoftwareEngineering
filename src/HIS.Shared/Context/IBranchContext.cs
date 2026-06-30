@@ -14,6 +14,8 @@ public interface IBranchContext
     bool IsAuthenticated { get; }
     /// <summary>Platform superadmin (Decision D6) — bypasses permission checks.</summary>
     bool IsSuperAdmin { get; }
+    /// <summary>The caller's bound tenant (JWT 'tenantId' claim); null for platform users.</summary>
+    int? TenantId { get; }
 }
 
 /// <summary>Mutable default implementation populated by the API/Web pipeline.</summary>
@@ -26,4 +28,5 @@ public sealed class BranchContext : IBranchContext
     public IReadOnlyCollection<string> Roles { get; set; } = Array.Empty<string>();
     public bool IsAuthenticated => UserId.HasValue;
     public bool IsSuperAdmin { get; set; }
+    public int? TenantId { get; set; }
 }
