@@ -1,9 +1,10 @@
 name: Deploy to Azure Container Apps
 
-# Build + test on every push/PR; build the image and deploy only from main (or manual run).
+# Build + test + functional smoke on every push to main/feature branches and PRs;
+# build the image and deploy only from main (the deploy job is guarded by ref).
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'feature/**' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
