@@ -387,10 +387,31 @@ window.HIS = window.HIS || {};
 
   HIS.openModule = openModule;
 
+  /* ===================== Real-time emergency alerts (task 0.9) ========= */
+  // Hospital-wide: any open screen pops a critical-arrival alert pushed by the
+  // server when a triage is registered. Reuses the @microsoft/signalr client.
+  function initAlertsHub() {
+    if (!window.signalR || HIS._alertsHub) return;
+    try {
+      const conn = new signalR.HubConnectionBuilder()
+        .withUrl((window.HIS_API_BASE || '') + '/hubs/alerts')
+        .withAutomaticReconnect()
+        .build();
+      conn.on('emergencyAlert', a => {
+        const who = a.patient ? ' · ' + a.patient : '';
+        const mlc = a.isMlc ? ' · MLC' : '';
+        toast(`🚨 EMERGENCY · ${a.category} triage${mlc}${who}`, 'bi-exclamation-octagon-fill');
+      });
+      conn.start().catch(() => {});
+      HIS._alertsHub = conn;
+    } catch (e) { /* alerts are best-effort */ }
+  }
+
   /* ===================== Boot ========================================= */
   (async function boot() {
     if (!initSession()) return;     // no/expired session → redirected to login; stop boot
     await HIS.bootstrap();          // load module registry + current patient from API
+    initAlertsHub();                // subscribe to hospital-wide emergency alerts
     renderTree();
     initModFilter();
     initMenus();
