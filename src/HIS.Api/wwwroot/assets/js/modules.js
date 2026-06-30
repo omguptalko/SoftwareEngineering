@@ -772,7 +772,7 @@ window.HIS = window.HIS || {};
   };
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, opd, ipd, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance };
+  HIS.screens = { dashboard, registration, appointments, opd, ipd, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -818,6 +818,50 @@ window.HIS = window.HIS || {};
     }
   }
 
+  /* ====================== AI — Clinical Risk (SRS §4.1) ========== */
+  function ai() {
+    return `<div class="screen">
+      ${head('bi-cpu', 'AI · Clinical Risk Prediction', 'Early-warning score from vitals (SRS §4.1) · explainable model')}
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-pulse"></i> Vitals</div><div class="panel__body">
+          <div class="form-grid" style="gap:8px">
+            <div class="f"><label>Respiratory rate (/min)</label><div class="field"><input class="ctl" id="aiRr" type="number" value="28"></div></div>
+            <div class="f"><label>SpO₂ (%)</label><div class="field"><input class="ctl" id="aiSpo2" type="number" value="90"></div></div>
+            <div class="f"><label>Temperature (°C)</label><div class="field"><input class="ctl" id="aiTemp" type="number" step="0.1" value="39.5"></div></div>
+            <div class="f"><label>Systolic BP (mmHg)</label><div class="field"><input class="ctl" id="aiSbp" type="number" value="88"></div></div>
+            <div class="f"><label>Heart rate (bpm)</label><div class="field"><input class="ctl" id="aiHr" type="number" value="125"></div></div>
+            <div class="f"><label>Consciousness</label><div class="field"><select class="ctl" id="aiCon"><option>Alert</option><option>Confused</option><option>Voice</option><option>Pain</option><option>Unresponsive</option></select></div></div>
+          </div>
+          <button class="btn btn--primary mt12" id="aiCompute" style="width:100%"><i class="bi bi-cpu"></i> Compute Risk Score</button>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-activity"></i> Assessment</div><div class="panel__body">
+          <div id="aiResult"><div class="muted" style="padding:12px">Enter vitals and compute.</div></div>
+        </div></div>
+      </div>
+    </div>`;
+  }
+  function initAi(doc) {
+    const btn = doc.querySelector('#aiCompute');
+    if (btn) btn.addEventListener('click', () => computeRisk(doc));
+  }
+  async function computeRisk(doc) {
+    const num = id => { const v = doc.querySelector('#' + id).value; return v === '' ? null : Number(v); };
+    const vitals = { respiratoryRate: num('aiRr'), spO2: num('aiSpo2'), temperatureC: num('aiTemp'), systolicBp: num('aiSbp'), heartRate: num('aiHr'), consciousness: doc.querySelector('#aiCon').value };
+    const host = doc.querySelector('#aiResult');
+    host.innerHTML = '<div class="muted" style="padding:12px">Scoring…</div>';
+    try {
+      const r = await HIS.api.aiRisk(vitals);
+      const band = { 'High': 'pill--danger', 'Medium': 'pill--warn', 'Low-Medium': 'pill--info', 'Low': 'pill--ok' }[r.band] || 'pill--muted';
+      host.innerHTML =
+        `<div class="kpis"><div class="kpi"><div class="v tnum">${r.score}</div><div class="l">Aggregate score</div></div>
+           <div class="kpi"><div class="v"><span class="pill ${band}" style="font-size:14px">${r.band}</span></div><div class="l">Risk band</div></div></div>
+         <div class="mt12" style="padding:8px 2px"><b>Recommendation:</b> ${r.recommendation}</div>
+         <div class="grid-wrap mt8" style="border:0"><table class="grid"><thead><tr><th>Parameter</th><th class="num">Points</th><th>Value</th></tr></thead>
+         <tbody>${r.flags.length ? r.flags.map(f => `<tr><td>${f.parameter}</td><td class="num">${f.points}</td><td>${f.note}</td></tr>`).join('') : emptyRow(3, 'All parameters in normal range')}</tbody></table></div>
+         <div class="muted mt8" style="font-size:11px">Model: ${r.model}</div>`;
+    } catch (e) { host.innerHTML = '<div class="muted" style="padding:12px">Risk API error: ' + e.message + '</div>'; }
+  }
+
   /* ============================ afterRender ========================= */
   HIS.afterRender = function (id, doc) {
     const map = { rxBody: TPL.rxBody, chargeBody: TPL.chargeBody, dispBody: TPL.dispBody, labResultsBody: TPL.labResultBody };
@@ -845,6 +889,7 @@ window.HIS = window.HIS || {};
     if (id === 'queue') { initQueue(doc); }
     if (id === 'feedback') { initFeedback(doc); HIS.saveHandlers.feedback = () => doSubmitSurvey(doc); }
     if (id === 'compliance') loadCompliance(doc);
+    if (id === 'ai') initAi(doc);
   };
 
   /* ---- Phase 10: ambulance ------------------------------------------- */
