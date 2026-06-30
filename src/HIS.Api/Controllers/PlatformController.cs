@@ -71,4 +71,16 @@ public sealed class PlatformController : ControllerBase
     /// <summary>Create a hospital (tenant) login user with a role (gated by 'tenant.manage').</summary>
     [HttpPost("tenants/users")]
     public Task<CreateTenantUserResult> CreateTenantUser([FromBody] CreateTenantUserCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Edit a tenant user's display name / email (gated by 'tenant.manage').</summary>
+    [HttpPost("tenants/users/update")]
+    public Task<bool> UpdateTenantUser([FromBody] UpdateTenantUserCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Activate / deactivate a tenant user (gated by 'tenant.manage').</summary>
+    [HttpPost("tenants/users/set-active")]
+    public Task<bool> SetTenantUserActive([FromBody] SetTenantUserActiveCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Reset a tenant user's password (gated by 'tenant.manage').</summary>
+    [HttpPost("tenants/users/reset-password")]
+    public Task<bool> ResetTenantUserPassword([FromBody] ResetTenantUserPasswordCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }

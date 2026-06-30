@@ -109,6 +109,31 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
             new { tenantId }, cancellationToken: ct))).ToList();
     }
 
+    public async Task<bool> UpdateUserProfileAsync(string userName, string displayName, string? email, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.ExecuteAsync(new CommandDefinition(
+            @"UPDATE security.AppUser SET DisplayName = @displayName, Email = @email
+              WHERE UserName = @userName AND TenantId IS NOT NULL",
+            new { userName, displayName, email }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task<bool> SetUserActiveAsync(string userName, bool isActive, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE security.AppUser SET IsActive = @isActive WHERE UserName = @userName AND TenantId IS NOT NULL",
+            new { userName, isActive }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task<bool> SetUserPasswordAsync(string userName, string hash, string salt, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        return await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE security.AppUser SET PasswordHash = @hash, PasswordSalt = @salt WHERE UserName = @userName AND TenantId IS NOT NULL",
+            new { userName, hash, salt }, cancellationToken: ct)) > 0;
+    }
+
     public async Task<bool> HasPrivilegedRoleAsync(long userId, CancellationToken ct = default)
     {
         using var c = await _f.CreateOpenConnectionAsync(ct);

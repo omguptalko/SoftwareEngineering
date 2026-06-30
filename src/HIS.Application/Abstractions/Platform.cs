@@ -60,6 +60,11 @@ public interface IPlatformUserRepository
     Task<IReadOnlyList<(string Code, string Name)>> ListRolesAsync(CancellationToken ct = default);
     /// <summary>Users belonging to a tenant, with their comma-joined role codes.</summary>
     Task<IReadOnlyList<(string UserName, string DisplayName, string? Email, bool IsActive, string Roles)>> ListUsersByTenantAsync(int tenantId, CancellationToken ct = default);
+    // Tenant-user lifecycle. These touch ONLY tenant-bound users (TenantId IS NOT NULL),
+    // so platform users (superadmin/demo) cannot be modified via the tenant-user admin.
+    Task<bool> UpdateUserProfileAsync(string userName, string displayName, string? email, CancellationToken ct = default);
+    Task<bool> SetUserActiveAsync(string userName, bool isActive, CancellationToken ct = default);
+    Task<bool> SetUserPasswordAsync(string userName, string hash, string salt, CancellationToken ct = default);
     /// <summary>True if any of the user's roles is flagged IsPrivileged (MFA policy, L1.2.5).</summary>
     Task<bool> HasPrivilegedRoleAsync(long userId, CancellationToken ct = default);
     /// <summary>Store the user's TOTP secret and enable MFA.</summary>

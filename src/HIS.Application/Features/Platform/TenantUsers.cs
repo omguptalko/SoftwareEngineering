@@ -127,3 +127,93 @@ public sealed class GetTenantUsersHandler : MediatR.IRequestHandler<GetTenantUse
             .Select(u => new TenantUserRow(u.UserName, u.DisplayName, u.Email, u.IsActive, u.Roles)).ToList();
     }
 }
+
+// ============================ Tenant-user lifecycle (tenant.manage) ============================
+// All three resolve the user first to confirm it is a TENANT user (TenantId set) — platform
+// users (superadmin/demo) are never editable here — and audit the action.
+
+internal static class TenantUserGuard
+{
+    public static async Task<HIS.Domain.Entities.PlatformUser> RequireTenantUserAsync(
+        IPlatformUserRepository users, string userName, CancellationToken ct)
+    {
+        var u = await users.GetByUserNameAsync(userName, ct);
+        if (u is null || u.TenantId is null)
+            throw new InvalidOperationException($"'{userName}' is not a tenant user.");
+        return u;
+    }
+}
+
+/// <summary>Edit a tenant user's display name / email.</summary>
+public sealed record UpdateTenantUserCommand(string UserName, string DisplayName, string? Email) : ICommand<bool>, IAuthorizable
+{
+    public string RequiredPermission => "tenant.manage";
+}
+public sealed class UpdateTenantUserValidator : AbstractValidator<UpdateTenantUserCommand>
+{
+    public UpdateTenantUserValidator()
+    {
+        RuleFor(x => x.UserName).NotEmpty();
+        RuleFor(x => x.DisplayName).NotEmpty().MaximumLength(160);
+        RuleFor(x => x.Email).MaximumLength(190).EmailAddress().When(x => !string.IsNullOrWhiteSpace(x.Email));
+    }
+}
+public sealed class UpdateTenantUserHandler : MediatR.IRequestHandler<UpdateTenantUserCommand, bool>
+{
+    private readonly IPlatformUserRepository _users; private readonly IBranchContext _ctx;
+    public UpdateTenantUserHandler(IPlatformUserRepository users, IBranchContext ctx) { _users = users; _ctx = ctx; }
+    public async Task<bool> Handle(UpdateTenantUserCommand c, CancellationToken ct)
+    {
+        var u = await TenantUserGuard.RequireTenantUserAsync(_users, c.UserName, ct);
+        await _users.UpdateUserProfileAsync(c.UserName, c.DisplayName, string.IsNullOrWhiteSpace(c.Email) ? null : c.Email, ct);
+        await _users.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, u.TenantId, "UpdateTenantUser", "AppUser", c.UserName, true, null, ct);
+        return true;
+    }
+}
+
+/// <summary>Activate / deactivate a tenant user (a deactivated user can no longer log in).</summary>
+public sealed record SetTenantUserActiveCommand(string UserName, bool IsActive) : ICommand<bool>, IAuthorizable
+{
+    public string RequiredPermission => "tenant.manage";
+}
+public sealed class SetTenantUserActiveHandler : MediatR.IRequestHandler<SetTenantUserActiveCommand, bool>
+{
+    private readonly IPlatformUserRepository _users; private readonly IBranchContext _ctx;
+    public SetTenantUserActiveHandler(IPlatformUserRepository users, IBranchContext ctx) { _users = users; _ctx = ctx; }
+    public async Task<bool> Handle(SetTenantUserActiveCommand c, CancellationToken ct)
+    {
+        var u = await TenantUserGuard.RequireTenantUserAsync(_users, c.UserName, ct);
+        await _users.SetUserActiveAsync(c.UserName, c.IsActive, ct);
+        await _users.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, u.TenantId,
+            c.IsActive ? "ActivateTenantUser" : "DeactivateTenantUser", "AppUser", c.UserName, true, null, ct);
+        return true;
+    }
+}
+
+/// <summary>Reset a tenant user's password (PBKDF2 re-hash).</summary>
+public sealed record ResetTenantUserPasswordCommand(string UserName, string NewPassword) : ICommand<bool>, IAuthorizable
+{
+    public string RequiredPermission => "tenant.manage";
+}
+public sealed class ResetTenantUserPasswordValidator : AbstractValidator<ResetTenantUserPasswordCommand>
+{
+    public ResetTenantUserPasswordValidator()
+    {
+        RuleFor(x => x.UserName).NotEmpty();
+        RuleFor(x => x.NewPassword).NotEmpty().MinimumLength(8).WithMessage("Password must be at least 8 characters.");
+    }
+}
+public sealed class ResetTenantUserPasswordHandler : MediatR.IRequestHandler<ResetTenantUserPasswordCommand, bool>
+{
+    private readonly IPlatformUserRepository _users; private readonly IPasswordHasher _hasher; private readonly IBranchContext _ctx;
+    public ResetTenantUserPasswordHandler(IPlatformUserRepository users, IPasswordHasher hasher, IBranchContext ctx)
+    { _users = users; _hasher = hasher; _ctx = ctx; }
+    public async Task<bool> Handle(ResetTenantUserPasswordCommand c, CancellationToken ct)
+    {
+        var u = await TenantUserGuard.RequireTenantUserAsync(_users, c.UserName, ct);
+        var (hash, salt) = _hasher.Hash(c.NewPassword);
+        await _users.SetUserPasswordAsync(c.UserName, hash, salt, ct);
+        await _users.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, u.TenantId, "ResetTenantUserPassword", "AppUser", c.UserName, true, null, ct);
+        return true;
+    }
+}

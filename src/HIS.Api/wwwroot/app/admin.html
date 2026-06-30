@@ -178,8 +178,8 @@
           <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
             <input id="u_listcode" placeholder="tenant code" style="width:140px">
             <button class="btn ghost sm" id="loadUsersBtn"><i class="bi bi-search"></i> Load</button></span></h2>
-        <div class="tablewrap"><table><thead><tr><th>User ID</th><th>Display name</th><th>Roles</th><th>Email</th><th>Active</th></tr></thead>
-          <tbody id="usersBody"><tr><td colspan="5" class="muted">Enter a tenant code and Load.</td></tr></tbody></table></div>
+        <div class="tablewrap"><table><thead><tr><th>User ID</th><th>Display name</th><th>Roles</th><th>Email</th><th>Active</th><th>Actions</th></tr></thead>
+          <tbody id="usersBody"><tr><td colspan="6" class="muted">Enter a tenant code and Load.</td></tr></tbody></table></div>
       </div>
     </section>
 
@@ -335,12 +335,46 @@
       $('#u_listcode').value = r.tenantCode; loadUsers();
     } finally { btn.disabled = false; }
   }));
+  function esc(s) { return (s == null ? '' : String(s)).replace(/"/g, '&quot;'); }
   async function loadUsers() {
     const code = $('#u_listcode').value.trim(); if (!code) return;
     const rows = await api('GET', `/api/platform/tenants/${encodeURIComponent(code)}/users`);
     $('#usersBody').innerHTML = rows.length
-      ? rows.map(u => `<tr><td><b>${u.userName}</b></td><td>${u.displayName}</td><td>${u.roles || '—'}</td><td>${u.email || '—'}</td><td>${u.isActive ? '<span class="pill ok">yes</span>' : '<span class="pill no">no</span>'}</td></tr>`).join('')
-      : '<tr><td colspan="5" class="muted">No users for this tenant.</td></tr>';
+      ? rows.map(u => {
+          const un = esc(u.userName);
+          const toggle = u.isActive
+            ? `<button class="btn ghost sm" data-active="${un}" data-to="false"><i class="bi bi-pause-circle"></i> Deactivate</button>`
+            : `<button class="btn ghost sm" data-active="${un}" data-to="true"><i class="bi bi-play-circle"></i> Activate</button>`;
+          return `<tr><td><b>${u.userName}</b></td><td data-dn>${u.displayName}</td><td>${u.roles || '—'}</td><td data-em>${u.email || '—'}</td>` +
+                 `<td>${u.isActive ? '<span class="pill ok">yes</span>' : '<span class="pill no">no</span>'}</td>` +
+                 `<td style="white-space:nowrap;display:flex;gap:6px">` +
+                 `<button class="btn ghost sm" data-edit="${un}" data-dn="${esc(u.displayName)}" data-em="${esc(u.email || '')}"><i class="bi bi-pencil"></i> Edit</button>` +
+                 `<button class="btn ghost sm" data-reset="${un}"><i class="bi bi-key"></i> Reset pw</button>${toggle}</td></tr>`;
+        }).join('')
+      : '<tr><td colspan="6" class="muted">No users for this tenant.</td></tr>';
+
+    // wire row actions
+    $$('#usersBody [data-edit]').forEach(btn => btn.addEventListener('click', guard(async () => {
+      const userName = btn.dataset.edit;
+      const displayName = prompt(`Display name for ${userName}:`, btn.dataset.dn);
+      if (displayName === null || !displayName.trim()) return;
+      const email = prompt(`Email for ${userName} (blank = none):`, btn.dataset.em) ?? '';
+      await api('POST', '/api/platform/tenants/users/update', { userName, displayName: displayName.trim(), email: email.trim() || null });
+      toast(`Updated ${userName}`); loadUsers();
+    })));
+    $$('#usersBody [data-reset]').forEach(btn => btn.addEventListener('click', guard(async () => {
+      const userName = btn.dataset.reset;
+      const newPassword = prompt(`New password for ${userName} (min 8 chars):`, '');
+      if (newPassword === null || newPassword.length < 8) { if (newPassword !== null) toast('Password must be at least 8 characters', true); return; }
+      await api('POST', '/api/platform/tenants/users/reset-password', { userName, newPassword });
+      toast(`Password reset for ${userName}`);
+    })));
+    $$('#usersBody [data-active]').forEach(btn => btn.addEventListener('click', guard(async () => {
+      const userName = btn.dataset.active, isActive = btn.dataset.to === 'true';
+      if (!isActive && !confirm(`Deactivate ${userName}? They will be unable to log in.`)) return;
+      await api('POST', '/api/platform/tenants/users/set-active', { userName, isActive });
+      toast(`${userName} ${isActive ? 'activated' : 'deactivated'}`); loadUsers();
+    })));
   }
   $('#loadUsersBtn').addEventListener('click', guard(loadUsers));
 
