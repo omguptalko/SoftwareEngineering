@@ -15,6 +15,7 @@ public static class DependencyInjection
         // L1.8.5: the single-DB SqlConnectionFactory is retired — all data access now flows
         // through ITenantConnectionFactory (per-tenant master / current-FY DB).
         services.AddScoped<IAuditWriter, AuditWriter>();
+        services.AddScoped<IAuditQueryRepository, AuditQueryRepository>();
 
         // L1 control plane (HIS_Platform): identity + auth.
         services.AddSingleton<IPlatformConnectionFactory, PlatformConnectionFactory>();

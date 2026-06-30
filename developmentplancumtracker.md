@@ -235,7 +235,7 @@ Remaining: SignalR hubs (0.9), FHIR R4 adapters (0.10), AI modules (Phase 11), A
 | # | Module / Task | SRS Ref | Status | Owner | Notes |
 |---|------|---------|--------|-------|-------|
 | 12.1 | Admin Dashboard & Analytics (patient counts, emergency stats, revenue, inventory alerts, OT cost) | §3.20 | 🟩 | | Live KPIs (OPD/IPD/emergency/revenue/claims/bed) + branch-activity table (incl. OT) from `/api/dashboard`; **live Alerts feed** `/api/dashboard/alerts` (`GetDashboardAlertsQuery`) aggregates low blood stock, below-reorder inventory, pending claims & maintenance-due/AMC-expiring assets from the existing repos — replaces the hardcoded placeholder. Verified end-to-end (3 real alerts rendered, 0 console errors) |
-| 12.2 | Compliance & Audit (NABH reporting, audit logs all actions, govt reporting automation, data-security compliance) | §3.22 | ⬜ | | |
+| 12.2 | Compliance & Audit (NABH reporting, audit logs all actions, govt reporting automation, data-security compliance) | §3.22 | 🟦 | | **Audit-trail viewer done** — `GET /api/audit` (`GetAuditTrailQuery`, auth-required) reads the resolved tenant's immutable `audit.AuditEntry` (newest-first); new **Compliance & Audit** screen shows summary KPIs (entries/ok/failed/distinct-users) + the trail (time/user/action/entity/ref/result). **Verified:** 401 without token, real entries rendered (queue/patient/bill), 0 console errors. Remaining: NABH/govt report automation |
 | 12.3 | Regulatory & Compliance Framework mapping (Clinical Establishments Act, NABH/NABL, BMWM 2016, D&C/NDPS, PC-PNDT, Factories Act 1948, ESI Act 1948, PM-JAY/NHA, IRDAI, DPDP/IT Act, ABDM/EHR 2016) | §10 | ⬜ | | |
 
 ### Phase 13 — Non-Functional Hardening & Release

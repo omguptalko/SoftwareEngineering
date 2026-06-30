@@ -18,6 +18,13 @@ public interface IAuditWriter
     Task WriteAsync(AuditEntry entry, CancellationToken ct = default);
 }
 
+/// <summary>Reads the resolved tenant's immutable audit trail (SRS §3.22, Phase 12.2).</summary>
+public interface IAuditQueryRepository
+{
+    Task<IReadOnlyList<(DateTime OccurredAtUtc, string? UserName, string Action, string Entity, string? EntityId, bool Succeeded)>>
+        GetRecentAsync(int take, CancellationToken ct = default);
+}
+
 // ---- Read/write repositories (Dapper-backed, parameterized only) ----
 
 public interface IModuleRegistryRepository
