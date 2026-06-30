@@ -121,6 +121,7 @@ HIS.api = (function () {
     ambDispatches:   () => get('/api/ambulance/dispatches'),
     ambDispatch:     (cmd) => post('/api/ambulance/dispatch', cmd),
     ambArrive:       (id) => post(`/api/ambulance/dispatches/${id}/arrive`, {}),
+    ambLocation:     (id, body) => post(`/api/ambulance/${id}/location`, body),
     bmwm:            () => get('/api/bmwm'),
     bmwmBag:         (cmd) => post('/api/bmwm/bags', cmd),
     bmwmHandover:    (id) => post(`/api/bmwm/bags/${id}/handover`, {}),

@@ -664,6 +664,19 @@ window.HIS = window.HIS || {};
             <tbody id="ambDispatches">${emptyRow(6, 'No dispatches')}</tbody>
           </table></div></div></div>
       </div>
+      <div class="panel mt12"><div class="panel__head"><i class="bi bi-geo"></i> Live GPS Tracking
+        <span id="gpsLive" class="pill pill--warn" style="margin-left:auto"><i class="bi bi-broadcast"></i> Connecting…</span>
+        <button class="btn btn--sm" id="gpsSim" style="margin-left:8px"><i class="bi bi-play-fill"></i> Simulate</button></div>
+        <div class="panel__body">
+          <div id="gpsMap" style="position:relative;height:240px;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+               background:repeating-linear-gradient(0deg,transparent,transparent 23px,var(--line-2) 24px),repeating-linear-gradient(90deg,transparent,transparent 23px,var(--line-2) 24px),var(--bg-2)">
+            <div class="muted" id="gpsHint" style="position:absolute;inset:0;display:grid;place-items:center">Awaiting GPS pings — press Simulate</div>
+          </div>
+          <div class="grid-wrap mt8" style="border:0"><table class="grid">
+            <thead><tr><th>Vehicle</th><th class="num">Lat</th><th class="num">Lng</th><th class="num">Speed</th><th>Updated</th></tr></thead>
+            <tbody id="gpsTable">${emptyRow(5, 'Awaiting GPS pings…')}</tbody>
+          </table></div>
+        </div></div>
     </div>`;
   }
 
@@ -960,8 +973,65 @@ window.HIS = window.HIS || {};
 
   /* ---- Phase 10: ambulance ------------------------------------------- */
   function initAmbulance(doc) {
-    loadFleet(doc); loadDispatches(doc);
+    loadFleet(doc); loadDispatches(doc); initGps(doc);
     const b = doc.querySelector('#btnDispatch'); if (b) b.addEventListener('click', () => doDispatch(doc));
+  }
+
+  /* ---- Ambulance live GPS tracking over SignalR (task 0.9) ---- */
+  let gpsHubDoc = null, gpsFleet = {}, gpsConn = null;
+  function setGpsLive(doc, on) {
+    const el = doc.querySelector('#gpsLive'); if (!el) return;
+    el.className = 'pill ' + (on ? 'pill--ok' : 'pill--warn');
+    el.innerHTML = `<i class="bi bi-broadcast"></i> ${on ? 'Live' : 'Reconnecting…'}`;
+  }
+  async function initGps(doc) {
+    gpsHubDoc = doc;
+    try { const fleet = await HIS.api.ambulances(); gpsFleet = {}; fleet.forEach(a => gpsFleet[a.ambulanceId] = a.vehicleNo); } catch (e) {}
+    if (window.signalR && !gpsConn) {
+      try {
+        gpsConn = new signalR.HubConnectionBuilder()
+          .withUrl((window.HIS_API_BASE || '') + '/hubs/gps').withAutomaticReconnect().build();
+        gpsConn.on('ambulanceMoved', d => { if (gpsHubDoc && document.body.contains(gpsHubDoc)) plotGps(gpsHubDoc, d); });
+        gpsConn.onreconnecting(() => gpsHubDoc && setGpsLive(gpsHubDoc, false));
+        gpsConn.onreconnected(() => gpsHubDoc && setGpsLive(gpsHubDoc, true));
+        gpsConn.start().then(() => gpsHubDoc && setGpsLive(gpsHubDoc, true)).catch(() => {});
+      } catch (e) {}
+    } else if (gpsConn && gpsConn.state === 'Connected') { setGpsLive(doc, true); }
+    const sim = doc.querySelector('#gpsSim'); if (sim) sim.addEventListener('click', () => simulateGps(doc));
+  }
+  function plotGps(doc, d) {
+    const map = doc.querySelector('#gpsMap'); if (!map) return;
+    const hint = doc.querySelector('#gpsHint'); if (hint) hint.style.display = 'none';
+    const label = gpsFleet[d.ambulanceId] || ('Amb #' + d.ambulanceId);
+    let dot = map.querySelector(`[data-amb="${d.ambulanceId}"]`);
+    if (!dot) {
+      dot = document.createElement('div'); dot.dataset.amb = d.ambulanceId;
+      dot.style.cssText = 'position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 4px rgba(220,53,69,.25);transition:left .8s linear,top .8s linear;z-index:2';
+      const tag = document.createElement('span');
+      tag.style.cssText = 'position:absolute;left:13px;top:-4px;white-space:nowrap;font-size:10px;font-weight:700;color:var(--ink)';
+      tag.textContent = label; dot.appendChild(tag); map.appendChild(dot);
+    }
+    dot.style.left = d.x + '%'; dot.style.top = (100 - d.y) + '%';
+    const tb = doc.querySelector('#gpsTable'); if (!tb) return;
+    if (tb.querySelector('td[colspan]')) tb.innerHTML = '';
+    let row = tb.querySelector(`tr[data-amb="${d.ambulanceId}"]`);
+    if (!row) { row = document.createElement('tr'); row.dataset.amb = d.ambulanceId; tb.appendChild(row); }
+    const t = new Date(d.ts); const hhmmss = isNaN(t) ? '' : t.toISOString().slice(11, 19);
+    row.innerHTML = `<td>${label}</td><td class="num">${Number(d.lat).toFixed(4)}</td><td class="num">${Number(d.lng).toFixed(4)}</td><td class="num">${d.speedKmph != null ? d.speedKmph + ' km/h' : '—'}</td><td class="tnum">${hhmmss}</td>`;
+  }
+  async function simulateGps(doc) {
+    const ids = Object.keys(gpsFleet).map(Number).slice(0, 3);
+    if (!ids.length) { HIS.toast('No ambulances to track'); return; }
+    HIS.toast('Simulating GPS movement…', 'bi-broadcast');
+    const pos = {}; ids.forEach(id => { pos[id] = { lat: 26.70 + Math.random() * 0.25, lng: 80.85 + Math.random() * 0.25 }; });
+    for (let step = 0; step < 8; step++) {
+      await Promise.all(ids.map(id => {
+        pos[id].lat = Math.min(26.95, Math.max(26.70, pos[id].lat + (Math.random() - 0.5) * 0.03));
+        pos[id].lng = Math.min(81.10, Math.max(80.85, pos[id].lng + (Math.random() - 0.5) * 0.03));
+        return HIS.api.ambLocation(id, { lat: +pos[id].lat.toFixed(5), lng: +pos[id].lng.toFixed(5), speedKmph: Math.round(20 + Math.random() * 40) }).catch(() => {});
+      }));
+      await new Promise(r => setTimeout(r, 900));
+    }
   }
   async function loadFleet(doc) {
     const tb = doc.querySelector('#ambFleet'); if (!tb) return;
