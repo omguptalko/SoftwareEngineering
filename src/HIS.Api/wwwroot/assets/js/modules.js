@@ -196,11 +196,23 @@ window.HIS = window.HIS || {};
         </div>
         <div class="panel"><div class="panel__head"><i class="bi bi-list-ol"></i> Today's Queue</div>
           <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
-            <thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Status</th></tr></thead>
-            <tbody id="apptQueue">${emptyRow(4, 'Loading…')}</tbody>
+            <thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Status</th><th></th></tr></thead>
+            <tbody id="apptQueue">${emptyRow(5, 'Loading…')}</tbody>
           </table></div></div>
         </div>
       </div>
+      <div class="panel" id="vitalsStation" hidden><div class="panel__head"><i class="bi bi-heart-pulse"></i> Vitals Station <span class="ph-right muted" id="vsWho"></span></div>
+        <div class="panel__body">
+          <div class="form-grid three">
+            <div class="f"><label>Temp</label><div class="field with-unit"><input class="ctl" id="vsTemp"><span class="unit">°F</span></div></div>
+            <div class="f"><label>Pulse</label><div class="field with-unit"><input class="ctl" id="vsPulse"><span class="unit">/min</span></div></div>
+            <div class="f"><label>BP</label><div class="field with-unit"><input class="ctl" id="vsBp" placeholder="120/80"><span class="unit">mmHg</span></div></div>
+            <div class="f"><label>SpO₂</label><div class="field with-unit"><input class="ctl" id="vsSpo2"><span class="unit">%</span></div></div>
+            <div class="f"><label>Resp. Rate</label><div class="field with-unit"><input class="ctl" id="vsResp"><span class="unit">/min</span></div></div>
+            <div class="f"><label>Weight</label><div class="field with-unit"><input class="ctl" id="vsWeight"><span class="unit">kg</span></div></div>
+          </div>
+          <div class="flex gap6 mt8"><button class="btn btn--primary" id="vsSave"><i class="bi bi-check2-circle"></i> Save Vitals &amp; Send to Doctor</button><button class="btn" id="vsCancel">Cancel</button></div>
+        </div></div>
     </div>`;
   }
 
@@ -208,8 +220,14 @@ window.HIS = window.HIS || {};
   function opd() {
     const p = HIS.mock.currentPatient;
     return `<div class="screen">
-      ${head('bi-clipboard2-pulse', 'OPD Consultation', 'Consultation &amp; prescription')}
-      ${banner(p)}
+      ${head('bi-clipboard2-pulse', 'OPD Consultation', 'Doctor waiting lobby · consultation &amp; prescription')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-people"></i> Waiting Lobby — vitals done
+        <span class="ph-right"><input class="ctl" id="opdLobbyDoctor" data-lookup="doctor" placeholder="F3 your doctor code…" style="width:170px;display:inline-block"><button class="lk" data-lookup="doctor">F3</button></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Token</th><th>Patient</th><th>UHID</th><th>Status</th><th></th></tr></thead>
+          <tbody id="opdLobby">${emptyRow(5, 'Enter your doctor code to load your queue')}</tbody>
+        </table></div></div></div>
+      <div id="opdBanner">${banner(p)}</div>
       <div>
         <div class="itabs">
           <div class="itab active" data-tab="vit">Vitals</div>
@@ -953,7 +971,7 @@ window.HIS = window.HIS || {};
     if (id === 'registration') { initRegistration(doc); HIS.saveHandlers.registration = () => doRegister(doc); }
     if (id === 'ipd') { loadBedBoard(doc); HIS.saveHandlers.ipd = () => doAdmit(doc); }
     if (id === 'appointments') { initAppointments(doc); HIS.saveHandlers.appointments = () => doBookAppointment(doc); }
-    if (id === 'opd') { HIS.saveHandlers.opd = () => doSaveConsultation(doc); }
+    if (id === 'opd') { initOpd(doc); HIS.saveHandlers.opd = () => doSaveConsultation(doc); }
     if (id === 'lab') { initLab(doc); HIS.saveHandlers.lab = () => doEnterResults(doc); }
     if (id === 'pharmacy') { initPharmacy(doc); HIS.saveHandlers.pharmacy = () => doDispense(doc); }
     if (id === 'cashless') { initCashless(doc); HIS.saveHandlers.cashless = () => doSubmitPreAuth(doc); }
@@ -1574,15 +1592,45 @@ window.HIS = window.HIS || {};
       const el = doc.querySelector('#' + id);
       if (el) { el.addEventListener('change', reload); el.addEventListener('blur', reload); }
     });
+    const vs = doc.querySelector('#vsSave'); if (vs) vs.addEventListener('click', () => doSaveVitals(doc));
+    const vc = doc.querySelector('#vsCancel'); if (vc) vc.addEventListener('click', () => { doc.querySelector('#vitalsStation').hidden = true; });
   }
   async function loadQueue(doc) {
     const tb = doc.querySelector('#apptQueue'); if (!tb) return;
     try {
       const rows = await HIS.api.apptQueue(val(doc, 'apptDoctor') || null);
-      tb.innerHTML = rows.length ? rows.map(r =>
-        `<tr><td><b>${r.token}</b></td><td>${r.patient}</td><td>${r.doctor}</td><td><span class="pill pill--muted">${r.status}</span></td></tr>`
-      ).join('') : emptyRow(4, 'No appointments today');
-    } catch (e) { tb.innerHTML = emptyRow(4, 'Queue API unavailable'); }
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const cls = r.status === 'VitalsDone' ? 'pill--ok' : r.status === 'Completed' ? 'pill--muted' : '';
+        const canVitals = r.status === 'Booked' || r.status === 'VitalsDone';
+        const act = canVitals
+          ? `<button class="btn btn--sm" data-vitals="${r.appointmentId}" data-token="${r.token}" data-patient="${r.patient}"><i class="bi bi-heart-pulse"></i> ${r.hasVitals ? 'Edit Vitals' : 'Take Vitals'}</button>`
+          : '';
+        return `<tr><td><b>${r.token}</b></td><td>${r.patient}</td><td>${r.doctor}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${act}</td></tr>`;
+      }).join('') : emptyRow(5, 'No appointments today');
+      tb.querySelectorAll('[data-vitals]').forEach(b => b.addEventListener('click', () => openVitalsStation(doc, b.dataset)));
+    } catch (e) { tb.innerHTML = emptyRow(5, 'Queue API unavailable'); }
+  }
+  function openVitalsStation(doc, ds) {
+    doc.dataset.vitalsAppt = ds.vitals;
+    const who = doc.querySelector('#vsWho'); if (who) who.textContent = `Token ${ds.token} · ${ds.patient}`;
+    const panel = doc.querySelector('#vitalsStation'); if (panel) { panel.hidden = false; panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
+  async function doSaveVitals(doc) {
+    const apptId = doc.dataset.vitalsAppt; if (!apptId) { HIS.toast('Pick a patient from the queue first'); return; }
+    const bp = (val(doc, 'vsBp') || '').split('/');
+    const vitals = {
+      tempF: numOrNull(val(doc, 'vsTemp')), pulse: intOrNull(val(doc, 'vsPulse')),
+      bpSystolic: intOrNull(bp[0]), bpDiastolic: intOrNull(bp[1]),
+      spo2: intOrNull(val(doc, 'vsSpo2')), respRate: intOrNull(val(doc, 'vsResp')),
+      weightKg: numOrNull(val(doc, 'vsWeight')), heightCm: null, grbs: null
+    };
+    try {
+      await HIS.api.recordVitals(apptId, vitals);
+      HIS.toast('Vitals recorded — patient sent to the doctor lobby', 'bi-heart-pulse');
+      doc.querySelector('#vitalsStation').hidden = true;
+      ['vsTemp', 'vsPulse', 'vsBp', 'vsSpo2', 'vsResp', 'vsWeight'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      loadQueue(doc);
+    } catch (e) { HIS.toast('Save vitals failed: ' + e.message); }
   }
   async function loadSlots(doc) {
     const host = doc.querySelector('#apptSlots'); if (!host) return;
@@ -1622,12 +1670,49 @@ window.HIS = window.HIS || {};
     } catch (e) { HIS.toast('Booking failed: ' + e.message); }
   }
 
+  /* ---- OPD doctor lobby: patients whose vitals are done, waiting for this doctor ---- */
+  function initOpd(doc) {
+    const el = doc.querySelector('#opdLobbyDoctor');
+    if (el) { el.addEventListener('change', () => loadOpdLobby(doc)); el.addEventListener('blur', () => loadOpdLobby(doc)); }
+    loadOpdLobby(doc);
+  }
+  async function loadOpdLobby(doc) {
+    const tb = doc.querySelector('#opdLobby'); if (!tb) return;
+    const docCode = val(doc, 'opdLobbyDoctor');
+    try {
+      const rows = await HIS.api.apptQueue(docCode || null, 'VitalsDone');
+      tb.innerHTML = rows.length ? rows.map(r =>
+        `<tr><td><b>${r.token}</b></td><td>${r.patient}</td><td>${r.uhid}</td><td><span class="pill pill--ok">${r.status}</span></td>
+         <td><button class="btn btn--sm btn--primary" data-consult="${r.appointmentId}" data-uhid="${r.uhid}" data-patient="${r.patient}" data-token="${r.token}" data-doctor="${docCode || ''}"><i class="bi bi-play-fill"></i> Start Consult</button></td></tr>`
+      ).join('') : emptyRow(5, docCode ? 'No patients waiting (vitals done)' : 'Enter your doctor code above');
+      tb.querySelectorAll('[data-consult]').forEach(b => b.addEventListener('click', () => selectOpdPatient(doc, b.dataset)));
+    } catch (e) { tb.innerHTML = emptyRow(5, 'Lobby API unavailable'); }
+  }
+  async function selectOpdPatient(doc, ds) {
+    doc.dataset.opdAppt = ds.consult;
+    doc.dataset.opdUhid = ds.uhid;
+    const b = doc.querySelector('#opdBanner');
+    if (b) b.innerHTML = `<div class="banner"><div class="meta"><span>Consulting <b>${ds.patient}</b></span><span>UHID <b>${ds.uhid}</b></span><span>Token <b>${ds.token || ''}</b></span></div></div>`;
+    const dc = doc.querySelector('#opdDoctor'); if (dc && ds.doctor) dc.value = ds.doctor;
+    try {
+      const v = await HIS.api.apptVitals(ds.consult);
+      if (v) {
+        const set = (id, x) => { const el = doc.querySelector('#' + id); if (el) el.value = (x == null ? '' : x); };
+        set('opdTemp', v.tempF); set('opdPulse', v.pulse);
+        set('opdBp', (v.bpSystolic == null ? '' : v.bpSystolic) + (v.bpDiastolic == null ? '' : '/' + v.bpDiastolic));
+        set('opdSpo2', v.spo2); set('opdResp', v.respRate); set('opdWeight', v.weightKg);
+      }
+    } catch (e) {}
+    HIS.toast('Loaded ' + ds.patient + ' — vitals preloaded, proceed to diagnosis', 'bi-person-check');
+  }
+
   /* ---- Phase 2: save OPD consultation (POST /api/encounters/consultation) */
   async function doSaveConsultation(doc) {
-    const p = HIS.mock.currentPatient;
-    if (!p || !p.uhid) { HIS.toast('No patient loaded — F3 to select'); return; }
+    const uhid = doc.dataset.opdUhid || (HIS.mock.currentPatient && HIS.mock.currentPatient.uhid);
+    if (!uhid) { HIS.toast('Select a patient from the waiting lobby'); return; }
     const docCode = val(doc, 'opdDoctor');
     if (!docCode) { HIS.toast('Select a consultant'); return; }
+    const apptId = doc.dataset.opdAppt ? parseInt(doc.dataset.opdAppt, 10) : null;
 
     const bp = val(doc, 'opdBp').split('/');
     const rx = Array.from(doc.querySelectorAll('#rxBody tr')).map(tr => {
@@ -1643,9 +1728,11 @@ window.HIS = window.HIS || {};
     }).filter(l => l.drugCode);
 
     const cmd = {
-      patientUhid: p.uhid,
+      patientUhid: uhid,
       doctorCode: docCode,
-      vitals: {
+      // Vitals taken at the station are already linked via appointmentId — don't resend.
+      // A walk-in (no appointment) may still capture vitals here.
+      vitals: apptId ? null : {
         tempF: numOrNull(val(doc, 'opdTemp')), pulse: intOrNull(val(doc, 'opdPulse')),
         bpSystolic: intOrNull(bp[0]), bpDiastolic: intOrNull(bp[1]),
         spo2: intOrNull(val(doc, 'opdSpo2')), respRate: intOrNull(val(doc, 'opdResp')),
@@ -1656,11 +1743,13 @@ window.HIS = window.HIS || {};
       advice: val(doc, 'opdAdvice') || null,
       followUpDate: val(doc, 'opdFollowup') || null,
       diagnosisCodes: [val(doc, 'opdDx1'), val(doc, 'opdDx2')].filter(Boolean),
-      prescription: rx
+      prescription: rx,
+      appointmentId: apptId
     };
     try {
       const r = await HIS.api.saveConsultation(cmd);
-      HIS.toast('Consultation saved · Encounter #' + r.encounterId, 'bi-check-circle-fill');
+      HIS.toast('Consultation saved · Encounter #' + r.encounterId + (apptId ? ' · token closed' : ''), 'bi-check-circle-fill');
+      if (apptId) { delete doc.dataset.opdAppt; delete doc.dataset.opdUhid; loadOpdLobby(doc); }
     } catch (e) { HIS.toast('Save failed: ' + e.message); }
   }
 

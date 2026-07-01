@@ -68,9 +68,11 @@ HIS.api = (function () {
     aiPreScrub:      (input) => post('/api/ai/claim-prescrub', input),
     health:          () => get('/api/health'),
     // Phase 2 — Appointments & OPD
-    apptQueue:       (doctorCode) => get(`/api/appointments/queue${doctorCode ? `?doctorCode=${encodeURIComponent(doctorCode)}` : ''}`),
+    apptQueue:       (doctorCode, status) => { const q = new URLSearchParams(); if (doctorCode) q.set('doctorCode', doctorCode); if (status) q.set('status', status); const s = q.toString(); return get('/api/appointments/queue' + (s ? '?' + s : '')); },
     apptSlots:       (doctorCode, date) => get(`/api/appointments/slots?doctorCode=${encodeURIComponent(doctorCode)}&date=${encodeURIComponent(date)}`),
     bookAppointment: (cmd) => post('/api/appointments', cmd),
+    recordVitals:    (apptId, vitals) => post(`/api/appointments/${apptId}/vitals`, vitals),
+    apptVitals:      (apptId) => get(`/api/appointments/${apptId}/vitals`),
     saveConsultation:(cmd) => post('/api/encounters/consultation', cmd),
     // Phase 2.3 — IPD
     bedBoard:        () => get('/api/ipd/bedboard'),
