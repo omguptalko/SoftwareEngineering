@@ -113,10 +113,20 @@ const SKIP = (sec, id, name, why) => rec(sec, id, name, 'SKIP', why);
   // Admit/nursing/diet/discharge need a free bed. If the ward is at capacity
   // (e.g. repeated runs against the same tenant), these are SKIPped, not FAILed.
   await T('IPD', 'TC-IPD-bed', 'bed board', async () => { const r = await GET('/api/ipd/bedboard'); ctx.beds = r.json; return { pass: ok(r.status), detail: `HTTP ${r.status}, ${(r.json || []).length} beds` }; });
-  const freeBed = Array.isArray(ctx.beds) && ctx.beds.find(b => b.status === 'free');
-  if (freeBed) {
+  // Admit needs a 'free' bed. If none are free but some are 'clean' (post-discharge),
+  // recycle one via the housekeeping transition (clean -> free) so repeated runs don't stall.
+  let admitBed = Array.isArray(ctx.beds) && ctx.beds.find(b => b.status === 'free');
+  if (!admitBed) {
+    const cleanBed = Array.isArray(ctx.beds) && ctx.beds.find(b => b.status === 'clean');
+    if (cleanBed) {
+      const r = await POST(`/api/ipd/beds/${encodeURIComponent(cleanBed.bedNo)}/ready`, {});
+      if (ok(r.status)) admitBed = cleanBed;
+    }
+  }
+  if (admitBed) {
+    ctx.ipdBedNo = admitBed.bedNo;
     await T('IPD', 'TC-IPD-01', 'admit patient -> bed occupied', async () => {
-      const r = await POST('/api/ipd/admit', { patientUhid: ctx.uhid, bedLabel: freeBed.bedNo, consultantCode: ctx.doctor, admissionType: 'Planned', paymentClass: 'Cash' });
+      const r = await POST('/api/ipd/admit', { patientUhid: ctx.uhid, bedLabel: admitBed.bedNo, consultantCode: ctx.doctor, admissionType: 'Planned', paymentClass: 'Cash' });
       ctx.admissionId = r.json && r.json.admissionId; return { pass: ok(r.status) && !!ctx.admissionId, detail: `Adm ${r.json && r.json.admissionNo} (HTTP ${r.status})` };
     });
     await T('Nursing', 'TC-NUR-01', 'nursing note', async () => {
@@ -130,9 +140,9 @@ const SKIP = (sec, id, name, why) => rec(sec, id, name, 'SKIP', why);
       return { pass: ok(r.status), detail: `HTTP ${r.status}` };
     });
   } else {
-    SKIP('IPD', 'TC-IPD-01', 'admit patient -> bed occupied', 'ward at capacity (no free bed)');
-    SKIP('Nursing', 'TC-NUR-01', 'nursing note', 'no free bed to admit into');
-    SKIP('Diet', 'TC-DIET-01', 'diet order', 'no free bed to admit into');
+    SKIP('IPD', 'TC-IPD-01', 'admit patient -> bed occupied', 'no free or recyclable bed (all occupied/blocked)');
+    SKIP('Nursing', 'TC-NUR-01', 'nursing note', 'no bed to admit into');
+    SKIP('Diet', 'TC-DIET-01', 'diet order', 'no bed to admit into');
   }
 
   // ---------- 2.6 EMERGENCY ----------
@@ -357,8 +367,14 @@ const SKIP = (sec, id, name, why) => rec(sec, id, name, 'SKIP', why);
       const r = await POST('/api/ipd/discharge', { admissionId: ctx.admissionId, dischargeSummary: 'recovered' });
       return { pass: ok(r.status), detail: `HTTP ${r.status}` };
     });
+    // Housekeeping: the just-discharged bed is now 'clean' — recycle it back to 'free'.
+    await T('Housekeeping', 'TC-HK-01', 'mark bed ready (clean -> free)', async () => {
+      const r = await POST(`/api/ipd/beds/${encodeURIComponent(ctx.ipdBedNo)}/ready`, {});
+      return { pass: ok(r.status) && r.json === true, detail: `bed ${ctx.ipdBedNo} -> free (HTTP ${r.status})` };
+    });
   } else {
     SKIP('IPD', 'TC-IPD-02', 'discharge (frees bed)', 'nothing admitted this run');
+    SKIP('Housekeeping', 'TC-HK-01', 'mark bed ready (clean -> free)', 'nothing admitted this run');
   }
 
   // ---------- External / not testable without services+credentials ----------

@@ -275,6 +275,8 @@ table.grid input.gi:focus, table.grid select.gi:focus { border-color: var(--acce
 .bed.clean { background: var(--warn-bg); border-color: #ecd4a3; }
 .bed.block { background: var(--bg-2); color: var(--muted-2); }
 .bed .tag { font-size: 8px; font-weight: 800; padding: 1px 5px; border-radius: 6px; }
+.bed-ready { margin-top: 5px; width: 100%; font-size: 9px; font-weight: 800; padding: 2px 6px; border: 1px solid #ecd4a3; border-radius: 6px; background: #fff; cursor: pointer; }
+.bed-ready:hover { background: var(--ok-bg); border-color: #bfe3cc; }
 .bed.occ .tag { background: var(--danger); color: #fff; }
 .bed.free .tag { background: var(--ok); color: #fff; }
 .bed.clean .tag { background: var(--warn); color: #fff; }

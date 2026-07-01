@@ -23,4 +23,9 @@ public sealed class AdmissionsController : ControllerBase
 
     [HttpPost("discharge")]
     public Task<bool> Discharge([FromBody] DischargePatientCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Housekeeping: return a cleaned bed to the available pool (clean -> free),
+    /// so beds recycle after discharge (SRS §3.4).</summary>
+    [HttpPost("beds/{bedNo}/ready")]
+    public Task<bool> MarkBedReady(string bedNo, CancellationToken ct) => _mediator.Send(new MarkBedReadyCommand(bedNo), ct);
 }

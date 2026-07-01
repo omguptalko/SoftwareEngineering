@@ -137,6 +137,44 @@ public sealed class DischargePatientHandler : MediatR.IRequestHandler<DischargeP
     }
 }
 
+// ======================= Housekeeping: mark bed ready =======================
+/// <summary>Housekeeping: return a cleaned bed to the available pool (clean -> free).
+/// Closes the bed lifecycle so beds recycle after discharge (SRS §3.4). Without this,
+/// a bed stuck in 'clean' can never be admitted into again.</summary>
+public sealed record MarkBedReadyCommand(string BedLabel) : ICommand<bool>, IAuditable
+{
+    public string AuditEntity => "Bed";
+    public string? AuditEntityId => BedLabel;
+}
+
+public sealed class MarkBedReadyValidator : AbstractValidator<MarkBedReadyCommand>
+{
+    public MarkBedReadyValidator() => RuleFor(x => x.BedLabel).NotEmpty();
+}
+
+public sealed class MarkBedReadyHandler : MediatR.IRequestHandler<MarkBedReadyCommand, bool>
+{
+    private readonly IAdmissionRepository _adm;
+    private readonly IBranchContext _ctx;
+    public MarkBedReadyHandler(IAdmissionRepository adm, IBranchContext ctx) { _adm = adm; _ctx = ctx; }
+
+    public async Task<bool> Handle(MarkBedReadyCommand c, CancellationToken ct)
+    {
+        var branchId = _ctx.BranchId ?? throw new InvalidOperationException("Branch context required.");
+        var bedNo = LookupCode.ParseTail(c.BedLabel);
+        var bed = await _adm.GetBedByNoAsync(branchId, bedNo, ct)
+            ?? throw new InvalidOperationException($"Unknown bed '{bedNo}'.");
+
+        if (string.Equals(bed.Status, "free", StringComparison.OrdinalIgnoreCase))
+            return false; // already available — idempotent no-op
+        if (!string.Equals(bed.Status, "clean", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Bed '{bedNo}' cannot be marked ready (status: {bed.Status}).");
+
+        await _adm.SetBedStatusAsync(bed.BedId, "free", ct);
+        return true;
+    }
+}
+
 // ============================ Bed board ============================
 public sealed record BedDto(string Ward, string BedNo, string Status, string? Occupant);
 public sealed record GetBedBoardQuery : IQuery<IReadOnlyList<BedDto>>;

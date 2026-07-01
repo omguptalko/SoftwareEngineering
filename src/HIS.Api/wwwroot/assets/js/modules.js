@@ -1743,8 +1743,15 @@ window.HIS = window.HIS || {};
         const who = b.occupant || (cls === 'free' ? 'Available' : cls === 'clean' ? 'Cleaning' : cls === 'block' ? 'Blocked' : '—');
         return `<div class="bed ${cls}" data-bed="${b.bedNo}" tabindex="0" data-focusable>
           <div class="bn">${b.bedNo} <span class="tag">${map[cls] || ''}</span></div>
-          <div class="bp">${who}</div></div>`;
+          <div class="bp">${who}</div>
+          ${cls === 'clean' ? `<button class="bed-ready" data-ready="${b.bedNo}" title="Housekeeping: return this cleaned bed to the available pool">Mark ready</button>` : ''}</div>`;
       }).join('') || '<div class="muted">No beds configured</div>';
+      host.querySelectorAll('.bed-ready').forEach(btn => btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const bedNo = btn.getAttribute('data-ready');
+        try { await HIS.api.markBedReady(bedNo); HIS.toast('Bed ' + bedNo + ' ready for admission', 'bi-hospital'); loadBedBoard(doc); }
+        catch (err) { HIS.toast('Mark ready failed: ' + err.message); }
+      }));
       if (HIS.wireScreenFragment) HIS.wireScreenFragment(host);
     } catch (e) {
       host.innerHTML = '<div class="muted">Bed board API unavailable</div>';

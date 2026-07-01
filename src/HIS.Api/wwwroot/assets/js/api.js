@@ -74,6 +74,7 @@ HIS.api = (function () {
     admitPatient:    (cmd) => post('/api/ipd/admit', cmd),
     transferBed:     (cmd) => post('/api/ipd/transfer', cmd),
     dischargePatient:(cmd) => post('/api/ipd/discharge', cmd),
+    markBedReady:    (bedNo) => post(`/api/ipd/beds/${encodeURIComponent(bedNo)}/ready`, {}),
     // Phase 3 — Diagnostics
     labWorklist:     () => get('/api/lab/worklist'),
     createLabOrder:  (cmd) => post('/api/lab/orders', cmd),
