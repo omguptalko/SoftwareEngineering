@@ -241,6 +241,9 @@ public sealed class ResetTenantUserPasswordHandler : MediatR.IRequestHandler<Res
 
 /// <summary>Change a tenant user's role (replaces all role grants with the given role).
 /// Takes effect on the user's next login (their current token keeps its old roles).</summary>
+/// <summary>Set a tenant user's role(s). <c>RoleCode</c> may be a single code ("doctor") or a
+/// comma-separated list ("doctor,billing,admin"); the user's RBAC becomes the union of all the
+/// listed roles' module/page grants.</summary>
 public sealed record ChangeTenantUserRoleCommand(string UserName, string RoleCode) : ICommand<bool>, IAuthorizable
 {
     public string RequiredPermission => "users.manage";
@@ -250,7 +253,7 @@ public sealed class ChangeTenantUserRoleValidator : AbstractValidator<ChangeTena
     public ChangeTenantUserRoleValidator()
     {
         RuleFor(x => x.UserName).NotEmpty();
-        RuleFor(x => x.RoleCode).NotEmpty().MaximumLength(40);
+        RuleFor(x => x.RoleCode).NotEmpty().MaximumLength(400);   // holds several comma-separated codes
     }
 }
 public sealed class ChangeTenantUserRoleHandler : MediatR.IRequestHandler<ChangeTenantUserRoleCommand, bool>
@@ -261,11 +264,31 @@ public sealed class ChangeTenantUserRoleHandler : MediatR.IRequestHandler<Change
     {
         var u = await TenantUserGuard.RequireTenantUserAsync(_users, c.UserName, ct);
         TenantScope.Enforce(_ctx, u.TenantId!.Value);
-        var roleId = await _users.GetRoleIdByCodeAsync(c.RoleCode, ct)
-            ?? throw new InvalidOperationException($"Unknown role '{c.RoleCode}'.");
-        await _users.ReplaceUserRoleAsync(u.UserId, roleId, ct);
+
+        // 1) Parse: split the comma-separated codes, trim, drop blanks, de-dup (case-insensitive).
+        var requested = (c.RoleCode ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (requested.Count == 0)
+            throw new InvalidOperationException("At least one role is required.");
+
+        // 2) Validate EVERY requested role exists before touching the DB — report all bad ones at once.
+        var matched = await _users.GetRoleIdsByCodesAsync(requested, ct);
+        var matchedCodes = matched.Select(m => m.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var invalid = requested.Where(r => !matchedCodes.Contains(r)).ToList();
+        if (invalid.Count > 0)
+        {
+            var valid = string.Join(", ", (await _users.ListRolesAsync(ct)).Select(r => r.Code));
+            throw new InvalidOperationException(
+                $"Unknown role(s): {string.Join(", ", invalid)}. Valid roles are: {valid}.");
+        }
+
+        // 3) Replace the user's entire role set atomically → RBAC = union of these roles' grants.
+        await _users.ReplaceUserRolesAsync(u.UserId, matched.Select(m => m.RoleId).ToList(), ct);
         await _users.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, u.TenantId,
-            "ChangeTenantUserRole", "AppUser", $"{c.UserName} -> {c.RoleCode}", true, null, ct);
+            "ChangeTenantUserRole", "AppUser",
+            $"{c.UserName} -> {string.Join(",", matched.Select(m => m.Code))}", true, null, ct);
         return true;
     }
 }

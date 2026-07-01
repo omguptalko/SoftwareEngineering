@@ -389,11 +389,14 @@
     $$('#usersBody [data-role]').forEach(btn => btn.addEventListener('click', guard(async () => {
       const userName = btn.dataset.role;
       const codes = ROLES.map(r => r.code);
-      const roleCode = prompt(`New role for ${userName} (current: ${btn.dataset.cur || '—'})\nValid roles:\n${codes.join(', ')}`, btn.dataset.cur);
-      if (roleCode === null) return;
-      if (!codes.includes(roleCode.trim())) { toast(`Unknown role '${roleCode}'`, true); return; }
-      await api('POST', '/api/platform/tenants/users/change-role', { userName, roleCode: roleCode.trim() });
-      toast(`${userName} → ${roleCode.trim()} (effective next login)`); loadUsers();
+      const input = prompt(`Role(s) for ${userName} (current: ${btn.dataset.cur || '—'})\nOne or more, comma-separated (e.g. doctor,billing).\nValid roles:\n${codes.join(', ')}`, btn.dataset.cur);
+      if (input === null) return;
+      const picked = input.split(',').map(s => s.trim()).filter(Boolean);
+      if (!picked.length) { toast('Enter at least one role', true); return; }
+      const bad = picked.filter(p => !codes.includes(p));
+      if (bad.length) { toast(`Unknown role(s): ${bad.join(', ')}`, true); return; }
+      await api('POST', '/api/platform/tenants/users/change-role', { userName, roleCode: picked.join(',') });
+      toast(`${userName} → ${picked.join(', ')} (effective next login)`); loadUsers();
     })));
     $$('#usersBody [data-reset]').forEach(btn => btn.addEventListener('click', guard(async () => {
       const userName = btn.dataset.reset;

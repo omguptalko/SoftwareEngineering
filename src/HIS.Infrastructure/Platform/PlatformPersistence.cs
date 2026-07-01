@@ -143,6 +143,32 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
             new { userId, roleId }, cancellationToken: ct));
     }
 
+    public async Task<IReadOnlyList<(string Code, int RoleId)>> GetRoleIdsByCodesAsync(IEnumerable<string> codes, CancellationToken ct = default)
+    {
+        var list = codes.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (list.Length == 0) return System.Array.Empty<(string, int)>();
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        // SQL Server's default collation is case-insensitive, so 'Doctor' matches 'doctor'.
+        return (await c.QueryAsync<(string Code, int RoleId)>(new CommandDefinition(
+            "SELECT Code, RoleId FROM security.Role WHERE Code IN @codes",
+            new { codes = list }, cancellationToken: ct))).ToList();
+    }
+
+    public async Task ReplaceUserRolesAsync(long userId, IReadOnlyCollection<int> roleIds, CancellationToken ct = default)
+    {
+        using var c = await _f.CreateOpenConnectionAsync(ct);
+        using var tx = c.BeginTransaction();
+        await c.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM security.UserRole WHERE UserId = @userId;",
+            new { userId }, transaction: tx, cancellationToken: ct));
+        if (roleIds.Count > 0)
+            // Dapper runs the parameterised INSERT once per RoleId (multi-exec), all inside the txn.
+            await c.ExecuteAsync(new CommandDefinition(
+                "INSERT security.UserRole (UserId, RoleId) VALUES (@userId, @roleId);",
+                roleIds.Distinct().Select(roleId => new { userId, roleId }), transaction: tx, cancellationToken: ct));
+        tx.Commit();
+    }
+
     public async Task<bool> HasPrivilegedRoleAsync(long userId, CancellationToken ct = default)
     {
         using var c = await _f.CreateOpenConnectionAsync(ct);

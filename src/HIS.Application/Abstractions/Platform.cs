@@ -67,6 +67,12 @@ public interface IPlatformUserRepository
     Task<bool> SetUserPasswordAsync(string userName, string hash, string salt, CancellationToken ct = default);
     /// <summary>Replace all of a user's roles with the single given role.</summary>
     Task ReplaceUserRoleAsync(long userId, int roleId, CancellationToken ct = default);
+    /// <summary>Resolve a set of role codes to (Code, RoleId) pairs — only codes that actually
+    /// exist are returned, so the caller can detect invalid codes. Case-insensitive.</summary>
+    Task<IReadOnlyList<(string Code, int RoleId)>> GetRoleIdsByCodesAsync(IEnumerable<string> codes, CancellationToken ct = default);
+    /// <summary>Replace ALL of a user's roles with the given set atomically (RBAC becomes the
+    /// union of these roles' module/page grants).</summary>
+    Task ReplaceUserRolesAsync(long userId, IReadOnlyCollection<int> roleIds, CancellationToken ct = default);
     /// <summary>True if any of the user's roles is flagged IsPrivileged (MFA policy, L1.2.5).</summary>
     Task<bool> HasPrivilegedRoleAsync(long userId, CancellationToken ct = default);
     /// <summary>Store the user's TOTP secret and enable MFA.</summary>
