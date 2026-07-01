@@ -4,10 +4,12 @@ using Microsoft.Extensions.Configuration;
 
 namespace HIS.Application.Features.Appointments;
 
-// ---- Today's queue (SRS §3.2) ----
-public sealed record QueueItemDto(string Token, string Patient, string Doctor, string Status);
+// ---- Today's queue (SRS §3.2) — carries AppointmentId/UHID/vitals so the OPD
+//      doctor lobby can select a booked patient and consult (no more static UHID).
+//      Optional Status filter drives the lobby (e.g. Status='VitalsDone'). ----
+public sealed record QueueItemDto(long AppointmentId, string Token, string Uhid, string Patient, string Doctor, string Status, bool HasVitals);
 
-public sealed record GetTodayQueueQuery(string? DoctorCode) : IQuery<IReadOnlyList<QueueItemDto>>;
+public sealed record GetTodayQueueQuery(string? DoctorCode, string? Status = null) : IQuery<IReadOnlyList<QueueItemDto>>;
 
 public sealed class GetTodayQueueHandler : MediatR.IRequestHandler<GetTodayQueueQuery, IReadOnlyList<QueueItemDto>>
 {
@@ -23,8 +25,8 @@ public sealed class GetTodayQueueHandler : MediatR.IRequestHandler<GetTodayQueue
         if (!string.IsNullOrWhiteSpace(q.DoctorCode))
             doctorId = await _appts.GetDoctorIdByCodeAsync(LookupCode.Parse(q.DoctorCode!), ct);
 
-        var rows = await _appts.GetTodayQueueAsync(branchId, doctorId, DateTime.Now.Date, ct);
-        return rows.Select(r => new QueueItemDto(r.TokenNo, r.PatientName, r.DoctorName, r.Status)).ToList();
+        var rows = await _appts.GetTodayQueueAsync(branchId, doctorId, DateTime.Now.Date, q.Status, ct);
+        return rows.Select(r => new QueueItemDto(r.AppointmentId, r.TokenNo, r.Uhid, r.PatientName, r.DoctorName, r.Status, r.HasVitals)).ToList();
     }
 }
 

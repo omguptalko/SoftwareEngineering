@@ -17,7 +17,8 @@ public sealed record RxLineDto(string DrugCode, string? Dose, string? Frequency,
 public sealed record SaveConsultationCommand(
     string PatientUhid, string DoctorCode,
     VitalsDto? Vitals, string? Complaints, string? History, string? Advice, DateTime? FollowUpDate,
-    IReadOnlyList<string>? DiagnosisCodes, IReadOnlyList<RxLineDto>? Prescription)
+    IReadOnlyList<string>? DiagnosisCodes, IReadOnlyList<RxLineDto>? Prescription,
+    long? AppointmentId = null)   // when consulting a queued patient: links vitals + closes the token
     : ICommand<SaveConsultationResult>, IAuditable
 {
     public string AuditEntity => "Encounter";
@@ -39,11 +40,12 @@ public sealed class SaveConsultationHandler : MediatR.IRequestHandler<SaveConsul
 {
     private readonly IEncounterRepository _enc;
     private readonly IPatientRepository _patients;
+    private readonly IAppointmentRepository _appts;
     private readonly IBranchContext _ctx;
 
-    public SaveConsultationHandler(IEncounterRepository enc, IPatientRepository patients, IBranchContext ctx)
+    public SaveConsultationHandler(IEncounterRepository enc, IPatientRepository patients, IAppointmentRepository appts, IBranchContext ctx)
     {
-        _enc = enc; _patients = patients; _ctx = ctx;
+        _enc = enc; _patients = patients; _appts = appts; _ctx = ctx;
     }
 
     public async Task<SaveConsultationResult> Handle(SaveConsultationCommand c, CancellationToken ct)
@@ -77,6 +79,13 @@ public sealed class SaveConsultationHandler : MediatR.IRequestHandler<SaveConsul
                 TempF = v.TempF, Pulse = v.Pulse, BpSystolic = v.BpSystolic, BpDiastolic = v.BpDiastolic,
                 Spo2 = v.Spo2, RespRate = v.RespRate, WeightKg = v.WeightKg, HeightCm = v.HeightCm, Grbs = v.Grbs
             }, ct);
+        }
+
+        // OPD lobby flow: attach the station-recorded vitals to this encounter and close the token.
+        if (c.AppointmentId is long apptId)
+        {
+            await _enc.LinkApptVitalsAsync(apptId, encounterId, ct);
+            await _appts.SetStatusAsync(apptId, "Completed", ct);
         }
 
         if (c.DiagnosisCodes is { Count: > 0 })

@@ -36,7 +36,8 @@ public sealed class Encounter
 public sealed class Vitals
 {
     public long VitalsId { get; set; }
-    public long EncounterId { get; set; }
+    public long? EncounterId { get; set; }      // null while taken at the vitals station (pre-encounter)
+    public long? AppointmentId { get; set; }     // set when recorded against a booked appointment
     public DateTime RecordedUtc { get; set; }
     public decimal? TempF { get; set; }
     public int? Pulse { get; set; }

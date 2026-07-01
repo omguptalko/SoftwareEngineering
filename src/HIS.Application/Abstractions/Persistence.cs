@@ -68,7 +68,11 @@ public interface IAppointmentRepository
     Task<IReadOnlyList<DateTime>> GetBookedSlotStartsAsync(int doctorId, DateTime date, CancellationToken ct = default);
     Task<string> NextTokenAsync(int branchId, int doctorId, DateTime date, CancellationToken ct = default);
     Task<long> InsertAsync(Appointment appt, CancellationToken ct = default);
-    Task<IReadOnlyList<(string TokenNo, string PatientName, string DoctorName, string Status)>> GetTodayQueueAsync(int branchId, int? doctorId, DateTime date, CancellationToken ct = default);
+    Task<IReadOnlyList<(long AppointmentId, string TokenNo, string Uhid, string PatientName, string DoctorName, string Status, bool HasVitals)>> GetTodayQueueAsync(int branchId, int? doctorId, DateTime date, string? status, CancellationToken ct = default);
+    /// <summary>Appointment header for the OPD flow (patient/doctor/branch/status), or null.</summary>
+    Task<(long? PatientId, int DoctorId, int BranchId, string Status)?> GetAppointmentAsync(long appointmentId, CancellationToken ct = default);
+    /// <summary>Advance the appointment through its lifecycle: Booked -> VitalsDone -> InConsultation -> Completed.</summary>
+    Task SetStatusAsync(long appointmentId, string status, CancellationToken ct = default);
 }
 
 public interface IEncounterRepository
@@ -77,6 +81,12 @@ public interface IEncounterRepository
     Task<int?> GetDrugIdByCodeAsync(string code, CancellationToken ct = default);
     Task<long> CreateEncounterAsync(Encounter e, CancellationToken ct = default);
     Task SaveVitalsAsync(Vitals v, CancellationToken ct = default);
+    /// <summary>Vitals recorded at the station against an appointment (before any encounter).</summary>
+    Task SaveApptVitalsAsync(long appointmentId, Vitals v, CancellationToken ct = default);
+    /// <summary>The station-recorded vitals for an appointment (for the doctor's read-only preload), or null.</summary>
+    Task<Vitals?> GetApptVitalsAsync(long appointmentId, CancellationToken ct = default);
+    /// <summary>Attach station-recorded vitals to the encounter created at consultation time.</summary>
+    Task LinkApptVitalsAsync(long appointmentId, long encounterId, CancellationToken ct = default);
     Task AddDiagnosisAsync(long encounterId, string icd10, bool provisional, CancellationToken ct = default);
     Task<long> CreatePrescriptionAsync(long encounterId, CancellationToken ct = default);
     Task AddPrescriptionLineAsync(PrescriptionLine line, CancellationToken ct = default);
