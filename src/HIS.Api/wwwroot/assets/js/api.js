@@ -15,6 +15,9 @@ HIS.api = (function () {
     const h = Object.assign({ 'Accept': 'application/json' }, extra || {});
     const tok = window.HIS && HIS.auth && HIS.auth.token();
     if (tok) h['Authorization'] = 'Bearer ' + tok;
+    // Dev-only realm override (login-page tenant selector): forces every request into the
+    // chosen tenant realm on localhost, where the host doesn't map to a hospital domain.
+    try { const dt = sessionStorage.getItem('HIS_devTenant'); if (dt) h['X-Tenant'] = dt; } catch (e) {}
     return h;
   }
 
