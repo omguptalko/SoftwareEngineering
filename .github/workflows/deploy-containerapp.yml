@@ -25,8 +25,8 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '9.0.x'
       - run: dotnet restore HIS.sln
@@ -57,8 +57,8 @@ jobs:
       ConnectionStrings__His: "Server=localhost,1433;Database=master;User Id=sa;Password=Ci_Str0ng!Passw0rd;TrustServerCertificate=True;Encrypt=False"
       Provisioning__BaseConnection: "Server=localhost,1433;Database=master;User Id=sa;Password=Ci_Str0ng!Passw0rd;TrustServerCertificate=True;Encrypt=False"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '9.0.x'
       - uses: actions/setup-node@v5
@@ -117,7 +117,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
