@@ -61,9 +61,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
       - run: dotnet build HIS.sln -c Release
 
       - name: Install sqlcmd (mssql-tools18)
