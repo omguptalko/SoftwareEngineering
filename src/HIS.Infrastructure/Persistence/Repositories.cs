@@ -90,7 +90,8 @@ public sealed class LookupRepository : ILookupRepository
         var rows = await c.QueryAsync<(string, string, string)>(new CommandDefinition(
             @"SELECT w.Name AS Ward, b.BedNo AS Bed, b.Status
               FROM master.Bed b INNER JOIN master.Ward w ON w.WardId = b.WardId
-              WHERE w.BranchId = @branchId AND (@q = '%%' OR w.Name LIKE @q OR b.BedNo LIKE @q)
+              WHERE w.BranchId = @branchId AND b.Status = 'free'
+                    AND (@q = '%%' OR w.Name LIKE @q OR b.BedNo LIKE @q)
               ORDER BY w.Name, b.BedNo", new { branchId, q = Like(q) }, cancellationToken: ct));
         return rows.ToList();
     }

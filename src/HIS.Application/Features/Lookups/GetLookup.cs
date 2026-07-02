@@ -57,7 +57,7 @@ public sealed class GetLookupHandler : MediatR.IRequestHandler<GetLookupQuery, L
 
             case "ward":
                 var beds = await _lk.GetWardBedsAsync(branchId, q, ct);
-                return new LookupResultDto("Ward / Bed Lookup", new[] { "Ward", "Bed", "Status" },
+                return new LookupResultDto("Ward / Bed Lookup — available beds", new[] { "Ward", "Bed", "Status" },
                     beds.Select(b => (IReadOnlyList<string>)new[] { b.Ward, b.Bed, b.Status }).ToList());
 
             case "tariff":
