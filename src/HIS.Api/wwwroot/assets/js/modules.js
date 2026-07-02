@@ -246,7 +246,6 @@ window.HIS = window.HIS || {};
 
   /* ============================ OPD =================================== */
   function opd() {
-    const p = HIS.mock.currentPatient;
     return `<div class="screen">
       ${head('bi-clipboard2-pulse', 'OPD Consultation', 'Doctor waiting lobby · consultation &amp; prescription')}
       <div class="panel"><div class="panel__head"><i class="bi bi-people"></i> Waiting Lobby — vitals done
@@ -261,7 +260,9 @@ window.HIS = window.HIS || {};
           <thead><tr><th>Time</th><th>Token</th><th>Patient</th><th>UHID</th><th>Status</th><th>Vitals</th></tr></thead>
           <tbody id="opdSchedule">${emptyRow(6, 'Enter your doctor code to load your schedule')}</tbody>
         </table></div></div></div>
-      <div id="opdBanner">${banner(p)}</div>
+      <div id="opdBanner"><div class="pbanner selectable"><div class="av">—</div>
+        <div><div class="nm">No patient selected</div>
+        <div class="meta"><span>Click <b>Call In</b> on a patient in the Waiting Lobby to start their consultation</span></div></div></div></div>
       <div>
         <div class="itabs">
           <div class="itab active" data-tab="vit">Vitals</div>
@@ -1990,8 +1991,8 @@ window.HIS = window.HIS || {};
 
   /* ---- Phase 2: save OPD consultation (POST /api/encounters/consultation) */
   async function doSaveConsultation(doc) {
-    const uhid = doc.dataset.opdUhid || (HIS.mock.currentPatient && HIS.mock.currentPatient.uhid);
-    if (!uhid) { HIS.toast('Select a patient from the waiting lobby'); return; }
+    const uhid = doc.dataset.opdUhid;
+    if (!uhid) { HIS.toast('Call In a patient from the waiting lobby first — no patient is selected'); return; }
     const docCode = val(doc, 'opdDoctor');
     if (!docCode) { HIS.toast('Select a consultant'); return; }
     const apptId = doc.dataset.opdAppt ? parseInt(doc.dataset.opdAppt, 10) : null;
