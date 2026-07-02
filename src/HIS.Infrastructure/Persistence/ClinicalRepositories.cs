@@ -83,6 +83,14 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
             "UPDATE clinical.Appointment SET Status = @status WHERE AppointmentId = @appointmentId",
             new { appointmentId, status }, cancellationToken: ct));
     }
+
+    public async Task MarkCalledAsync(long appointmentId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE clinical.Appointment SET Status = 'InConsultation', CalledUtc = SYSUTCDATETIME() WHERE AppointmentId = @appointmentId",
+            new { appointmentId }, cancellationToken: ct));
+    }
 }
 
 public sealed class EncounterRepository : IEncounterRepository

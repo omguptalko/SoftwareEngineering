@@ -1103,6 +1103,7 @@ window.HIS = window.HIS || {};
 
   /* ---- Phase 10: Queue — live board over SignalR (task 0.9) ----------- */
   let queueLiveDoc = null;          // the currently-open queue screen
+  let opdLiveDoc = null;            // the currently-open OPD lobby screen
   function ensureQueueHub() {
     if (HIS._queueHub || !window.signalR) return;
     const conn = new signalR.HubConnectionBuilder()
@@ -1115,6 +1116,10 @@ window.HIS = window.HIS || {};
         loadBoard(queueLiveDoc);
         setQueueLive(queueLiveDoc, true);
       }
+    });
+    // OPD vitals-done / called / completed → refresh the doctor lobby live.
+    conn.on('opdChanged', () => {
+      if (opdLiveDoc && document.body.contains(opdLiveDoc)) loadOpdLobby(opdLiveDoc);
     });
     conn.onreconnecting(() => queueLiveDoc && setQueueLive(queueLiveDoc, false));
     conn.onreconnected(() => queueLiveDoc && setQueueLive(queueLiveDoc, true));
@@ -1674,19 +1679,34 @@ window.HIS = window.HIS || {};
   function initOpd(doc) {
     const el = doc.querySelector('#opdLobbyDoctor');
     if (el) { el.addEventListener('change', () => loadOpdLobby(doc)); el.addEventListener('blur', () => loadOpdLobby(doc)); }
+    opdLiveDoc = doc; ensureQueueHub();   // live refresh when vitals recorded / patient called / consult done
     loadOpdLobby(doc);
   }
   async function loadOpdLobby(doc) {
     const tb = doc.querySelector('#opdLobby'); if (!tb) return;
     const docCode = val(doc, 'opdLobbyDoctor');
     try {
-      const rows = await HIS.api.apptQueue(docCode || null, 'VitalsDone');
-      tb.innerHTML = rows.length ? rows.map(r =>
-        `<tr><td><b>${r.token}</b></td><td>${r.patient}</td><td>${r.uhid}</td><td><span class="pill pill--ok">${r.status}</span></td>
-         <td><button class="btn btn--sm btn--primary" data-consult="${r.appointmentId}" data-uhid="${r.uhid}" data-patient="${r.patient}" data-token="${r.token}" data-doctor="${docCode || ''}"><i class="bi bi-play-fill"></i> Start Consult</button></td></tr>`
-      ).join('') : emptyRow(5, docCode ? 'No patients waiting (vitals done)' : 'Enter your doctor code above');
+      const all = await HIS.api.apptQueue(docCode || null);
+      const rows = all.filter(r => r.status === 'VitalsDone' || r.status === 'InConsultation');
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const inRoom = r.status === 'InConsultation';
+        const attrs = `data-uhid="${r.uhid}" data-patient="${r.patient}" data-token="${r.token}" data-doctor="${docCode || ''}"`;
+        const act = inRoom
+          ? `<button class="btn btn--sm" data-consult="${r.appointmentId}" ${attrs}><i class="bi bi-arrow-return-right"></i> Resume</button>`
+          : `<button class="btn btn--sm btn--primary" data-call="${r.appointmentId}" ${attrs}><i class="bi bi-megaphone"></i> Call In</button>`;
+        return `<tr><td><b>${r.token}</b></td><td>${r.patient}</td><td>${r.uhid}</td><td><span class="pill ${inRoom ? 'pill--warn' : 'pill--ok'}">${inRoom ? 'In consultation' : 'Waiting'}</span></td><td>${act}</td></tr>`;
+      }).join('') : emptyRow(5, docCode ? 'No patients waiting' : 'Enter your doctor code above');
+      tb.querySelectorAll('[data-call]').forEach(b => b.addEventListener('click', () => doCallIn(doc, b.dataset)));
       tb.querySelectorAll('[data-consult]').forEach(b => b.addEventListener('click', () => selectOpdPatient(doc, b.dataset)));
     } catch (e) { tb.innerHTML = emptyRow(5, 'Lobby API unavailable'); }
+  }
+  async function doCallIn(doc, ds) {
+    try {
+      await HIS.api.callNext(ds.call);
+      HIS.toast('Calling ' + ds.patient + ' · token ' + (ds.token || ''), 'bi-megaphone');
+      await selectOpdPatient(doc, { consult: ds.call, uhid: ds.uhid, patient: ds.patient, token: ds.token, doctor: ds.doctor });
+      loadOpdLobby(doc);
+    } catch (e) { HIS.toast('Call failed: ' + e.message); }
   }
   async function selectOpdPatient(doc, ds) {
     doc.dataset.opdAppt = ds.consult;

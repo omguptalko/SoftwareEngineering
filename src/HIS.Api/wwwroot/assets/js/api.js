@@ -72,6 +72,7 @@ HIS.api = (function () {
     apptSlots:       (doctorCode, date) => get(`/api/appointments/slots?doctorCode=${encodeURIComponent(doctorCode)}&date=${encodeURIComponent(date)}`),
     bookAppointment: (cmd) => post('/api/appointments', cmd),
     recordVitals:    (apptId, vitals) => post(`/api/appointments/${apptId}/vitals`, vitals),
+    callNext:        (apptId) => post(`/api/appointments/${apptId}/call`, {}),
     apptVitals:      (apptId) => get(`/api/appointments/${apptId}/vitals`),
     saveConsultation:(cmd) => post('/api/encounters/consultation', cmd),
     // Phase 2.3 — IPD

@@ -50,6 +50,32 @@ public sealed class RecordVitalsHandler : MediatR.IRequestHandler<RecordVitalsCo
     }
 }
 
+/// <summary>Call a waiting (VitalsDone) patient into the consult room. Advances the appointment
+/// to 'InConsultation' and stamps CalledUtc — used by the waiting-room "now calling" display.</summary>
+public sealed record CallNextCommand(long AppointmentId) : ICommand<bool>, IAuditable
+{
+    public string AuditEntity => "Appointment";
+    public string? AuditEntityId => AppointmentId.ToString();
+}
+
+public sealed class CallNextHandler : MediatR.IRequestHandler<CallNextCommand, bool>
+{
+    private readonly IAppointmentRepository _appts;
+    public CallNextHandler(IAppointmentRepository appts) { _appts = appts; }
+    public async Task<bool> Handle(CallNextCommand c, CancellationToken ct)
+    {
+        var appt = await _appts.GetAppointmentAsync(c.AppointmentId, ct)
+            ?? throw new InvalidOperationException($"Appointment {c.AppointmentId} not found.");
+        if (string.Equals(appt.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("This appointment is already completed.");
+        if (!string.Equals(appt.Status, "VitalsDone", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(appt.Status, "InConsultation", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Vitals must be recorded before the patient can be called in.");
+        await _appts.MarkCalledAsync(c.AppointmentId, ct);
+        return true;
+    }
+}
+
 /// <summary>The station-recorded vitals for an appointment, for the doctor's read-only preload.</summary>
 public sealed record GetApptVitalsQuery(long AppointmentId) : IQuery<VitalsDto?>;
 

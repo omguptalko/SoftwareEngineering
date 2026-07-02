@@ -1,6 +1,9 @@
+using HIS.Api.RealTime;
 using HIS.Application.Features.Opd;
+using HIS.Shared.Context;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace HIS.Api.Controllers;
 
@@ -9,13 +12,19 @@ namespace HIS.Api.Controllers;
 public sealed class EncountersController : ControllerBase
 {
     private readonly IMediator _mediator;
-    public EncountersController(IMediator mediator) => _mediator = mediator;
+    private readonly IHubContext<QueueHub> _hub;
+    private readonly ITenantContext _tenant;
+    public EncountersController(IMediator mediator, IHubContext<QueueHub> hub, ITenantContext tenant)
+    { _mediator = mediator; _hub = hub; _tenant = tenant; }
 
-    /// <summary>Save an OPD consultation (encounter + vitals + diagnoses + prescription).</summary>
+    /// <summary>Save an OPD consultation (encounter + vitals + diagnoses + prescription).
+    /// When it closes a queued appointment, pushes a live OPD-board update.</summary>
     [HttpPost("consultation")]
     public async Task<ActionResult<SaveConsultationResult>> Save([FromBody] SaveConsultationCommand cmd, CancellationToken ct)
     {
         var result = await _mediator.Send(cmd, ct);
+        if (cmd.AppointmentId is long apptId)
+            await _hub.Clients.Group(TenantGroups.Name(_tenant)).SendAsync("opdChanged", new { action = "completed", appointmentId = apptId }, ct);
         return Ok(result);
     }
 }

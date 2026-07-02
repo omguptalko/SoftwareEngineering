@@ -73,6 +73,8 @@ public interface IAppointmentRepository
     Task<(long? PatientId, int DoctorId, int BranchId, string Status)?> GetAppointmentAsync(long appointmentId, CancellationToken ct = default);
     /// <summary>Advance the appointment through its lifecycle: Booked -> VitalsDone -> InConsultation -> Completed.</summary>
     Task SetStatusAsync(long appointmentId, string status, CancellationToken ct = default);
+    /// <summary>Call a waiting (VitalsDone) patient into the room: status -> InConsultation + stamp CalledUtc.</summary>
+    Task MarkCalledAsync(long appointmentId, CancellationToken ct = default);
 }
 
 public interface IEncounterRepository
