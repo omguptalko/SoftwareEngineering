@@ -249,7 +249,7 @@ window.HIS = window.HIS || {};
     return `<div class="screen">
       ${head('bi-clipboard2-pulse', 'OPD Consultation', 'Doctor waiting lobby · consultation &amp; prescription')}
       <div class="panel"><div class="panel__head"><i class="bi bi-people"></i> Waiting Lobby — vitals done
-        <span class="ph-right"><input class="ctl" id="opdLobbyDoctor" data-lookup="doctor" placeholder="F3 your doctor code…" style="width:170px;display:inline-block"><button class="lk" data-lookup="doctor">F3</button></span></div>
+        <span class="ph-right"><select class="ctl" id="opdLobbyDoctor" style="width:220px;display:inline-block"><option value="">— select your doctor —</option></select></span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>Token</th><th>Patient</th><th>UHID</th><th>Status</th><th></th></tr></thead>
           <tbody id="opdLobby">${emptyRow(5, 'Enter your doctor code to load your queue')}</tbody>
@@ -1931,6 +1931,7 @@ window.HIS = window.HIS || {};
     // Specialty/Department -> filtered consultant + department-specific template (admin-configured).
     Promise.all([loadDoctorDirectory(), loadDeptTemplates()]).then(() => {
       const dept = doc.querySelector('#opdDept'), docSel = doc.querySelector('#opdDoctor');
+      const lob = doc.querySelector('#opdLobbyDoctor'); if (lob) fillDoctorSelect(lob, '');
       if (dept) fillDeptSelect(dept);
       if (docSel) fillDoctorSelect(docSel, '');
       if (dept && docSel) dept.addEventListener('change', () => { fillDoctorSelect(docSel, dept.value); renderDeptTemplate(doc, dept.value); });
