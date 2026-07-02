@@ -84,6 +84,7 @@ HIS.api = (function () {
     saveConsultation:(cmd) => post('/api/encounters/consultation', cmd),
     // Phase 2.3 — IPD
     bedBoard:        () => get('/api/ipd/bedboard'),
+    admittedPatients:() => get('/api/ipd/admissions'),
     admitPatient:    (cmd) => post('/api/ipd/admit', cmd),
     transferBed:     (cmd) => post('/api/ipd/transfer', cmd),
     dischargePatient:(cmd) => post('/api/ipd/discharge', cmd),

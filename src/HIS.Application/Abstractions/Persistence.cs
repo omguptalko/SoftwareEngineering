@@ -122,6 +122,8 @@ public interface IAdmissionRepository
     Task InsertTransferAsync(BedTransfer t, CancellationToken ct = default);
     Task DischargeAsync(long admissionId, string? summary, DateTime dischargedUtc, CancellationToken ct = default);
     Task<IReadOnlyList<(string Ward, string BedNo, string Status, string? Occupant)>> GetBedBoardAsync(int branchId, CancellationToken ct = default);
+    /// <summary>Currently-admitted patients with their ward/bed/consultant (SRS §3.4).</summary>
+    Task<IReadOnlyList<(long AdmissionId, string AdmissionNo, string Patient, string Uhid, string Ward, string BedNo, string? Consultant, DateTime AdmittedUtc)>> GetAdmittedPatientsAsync(int branchId, CancellationToken ct = default);
 }
 
 public interface IEmergencyRepository

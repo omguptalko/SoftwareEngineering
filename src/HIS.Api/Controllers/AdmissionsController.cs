@@ -15,6 +15,10 @@ public sealed class AdmissionsController : ControllerBase
     [HttpGet("bedboard")]
     public Task<IReadOnlyList<BedDto>> BedBoard(CancellationToken ct) => _mediator.Send(new GetBedBoardQuery(), ct);
 
+    /// <summary>Currently-admitted patients — who is in which ward/bed (SRS §3.4).</summary>
+    [HttpGet("admissions")]
+    public Task<IReadOnlyList<AdmittedPatientDto>> Admissions(CancellationToken ct) => _mediator.Send(new GetAdmittedPatientsQuery(), ct);
+
     [HttpPost("admit")]
     public Task<AdmitPatientResult> Admit([FromBody] AdmitPatientCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 

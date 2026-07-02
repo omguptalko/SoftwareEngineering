@@ -367,6 +367,7 @@ window.HIS = window.HIS || {};
         <div class="panel"><div class="panel__head"><i class="bi bi-clipboard-plus"></i> Admission</div><div class="panel__body">
           <div class="form-grid one">
             <div class="f"><label>Admission No.</label><div class="field"><input class="ctl code ro" id="ipdAdmNo" value="(auto on admit)" readonly tabindex="-1"></div></div>
+            <div class="f"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="ipdPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
             <div class="f"><label>Ward / Bed <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="ipdBed" data-lookup="ward" placeholder="F3 bed…"><button class="lk" data-lookup="ward">F3</button></div></div>
             <div class="f"><label>Consultant <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="ipdConsultant" data-lookup="doctor" placeholder="F3 consultant…"><button class="lk" data-lookup="doctor">F3</button></div></div>
             <div class="f"><label>Provisional Dx</label><div class="field with-btn"><input class="ctl" id="ipdDx" data-lookup="icd10" placeholder="F3 ICD-10…"><button class="lk" data-lookup="icd10">F3</button></div></div>
@@ -376,6 +377,12 @@ window.HIS = window.HIS || {};
           <button class="btn btn--primary mt8" style="width:100%" data-act="save"><i class="bi bi-hospital"></i> Confirm Admission <span class="fk">F9</span></button>
         </div></div>
       </div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-heart"></i> Admitted Patients — who is in which bed
+        <span class="ph-right muted" id="ipdAdmCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Admission No.</th><th>Patient</th><th>UHID</th><th>Ward / Room</th><th>Bed</th><th>Consultant</th><th>Admitted</th></tr></thead>
+          <tbody id="ipdAdmitted">${emptyRow(7, 'Loading…')}</tbody>
+        </table></div></div></div>
     </div>`;
   }
 
@@ -1008,7 +1015,7 @@ window.HIS = window.HIS || {};
       const cp = doc.querySelector('#btnCollectPay'); if (cp) cp.addEventListener('click', () => doCollectPayment(doc)); }
     if (id === 'dashboard') loadDashboard(doc);
     if (id === 'registration') { initRegistration(doc); HIS.saveHandlers.registration = () => doRegister(doc); }
-    if (id === 'ipd') { loadBedBoard(doc); HIS.saveHandlers.ipd = () => doAdmit(doc); }
+    if (id === 'ipd') { loadBedBoard(doc); loadAdmissions(doc); HIS.saveHandlers.ipd = () => doAdmit(doc); }
     if (id === 'appointments') { initAppointments(doc); HIS.saveHandlers.appointments = () => doBookAppointment(doc); }
     if (id === 'opd') { initOpd(doc); HIS.saveHandlers.opd = () => doSaveConsultation(doc); }
     if (id === 'lab') { initLab(doc); HIS.saveHandlers.lab = () => doEnterResults(doc); }
@@ -1536,12 +1543,14 @@ window.HIS = window.HIS || {};
 
   /* ---- Phase 2.3: admit patient (POST /api/ipd/admit) ----------------- */
   async function doAdmit(doc) {
-    const p = HIS.mock.currentPatient;
-    if (!p || !p.uhid) { HIS.toast('No patient loaded — F3 to select'); return; }
+    // Prefer the explicitly-picked patient (F3); fall back to the banner patient.
+    const picked = val(doc, 'ipdPatient');
+    const uhid = picked || (HIS.mock.currentPatient && HIS.mock.currentPatient.uhid);
+    if (!uhid) { HIS.toast('Select a patient (F3) to admit'); return; }
     const bed = val(doc, 'ipdBed');
     if (!bed) { HIS.toast('Select a ward/bed (F3)'); return; }
     const cmd = {
-      patientUhid: p.uhid,
+      patientUhid: uhid,
       bedLabel: bed,
       consultantCode: val(doc, 'ipdConsultant') || null,
       provisionalIcd10: val(doc, 'ipdDx') || null,
@@ -1552,9 +1561,24 @@ window.HIS = window.HIS || {};
     try {
       const r = await HIS.api.admitPatient(cmd);
       const el = doc.querySelector('#ipdAdmNo'); if (el) el.value = r.admissionNo;
-      HIS.toast('Admitted · ' + r.admissionNo + ' · Bed ' + r.bedNo, 'bi-hospital');
-      loadBedBoard(doc);
+      HIS.toast('Admitted · ' + r.admissionNo + ' · Bed ' + r.bedNo + ' — added to the list', 'bi-hospital');
+      const pf = doc.querySelector('#ipdPatient'); if (pf) pf.value = '';
+      const bf = doc.querySelector('#ipdBed'); if (bf) bf.value = '';
+      loadBedBoard(doc); loadAdmissions(doc);
     } catch (e) { HIS.toast('Admit failed: ' + e.message); }
+  }
+  // Who is admitted in which bed/room — tenant/branch-scoped.
+  async function loadAdmissions(doc) {
+    const tb = doc.querySelector('#ipdAdmitted'); if (!tb) return;
+    try {
+      const rows = await HIS.api.admittedPatients();
+      const cnt = doc.querySelector('#ipdAdmCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' admitted' : '';
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const when = (r.admittedUtc || '').replace('T', ' ').slice(0, 16);
+        return `<tr><td><b>${r.admissionNo}</b></td><td>${r.patient}</td><td>${r.uhid}</td><td>${r.ward || ''}</td>`
+          + `<td><span class="pill pill--warn">${r.bedNo || ''}</span></td><td>${r.consultant || '—'}</td><td>${when}</td></tr>`;
+      }).join('') : emptyRow(7, 'No patients currently admitted');
+    } catch (e) { tb.innerHTML = emptyRow(7, 'Admissions API unavailable'); }
   }
 
   /* ---- Phase 3: LIS worklist + create order + enter results ----------- */

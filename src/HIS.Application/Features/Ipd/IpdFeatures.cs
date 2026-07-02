@@ -191,3 +191,20 @@ public sealed class GetBedBoardHandler : MediatR.IRequestHandler<GetBedBoardQuer
         return rows.Select(r => new BedDto(r.Ward, r.BedNo, r.Status, r.Occupant)).ToList();
     }
 }
+
+// ==================== Admitted patients (who is in which bed) ====================
+public sealed record AdmittedPatientDto(long AdmissionId, string AdmissionNo, string Patient, string Uhid, string Ward, string BedNo, string? Consultant, DateTime AdmittedUtc);
+public sealed record GetAdmittedPatientsQuery : IQuery<IReadOnlyList<AdmittedPatientDto>>;
+
+public sealed class GetAdmittedPatientsHandler : MediatR.IRequestHandler<GetAdmittedPatientsQuery, IReadOnlyList<AdmittedPatientDto>>
+{
+    private readonly IAdmissionRepository _adm;
+    private readonly IBranchContext _ctx;
+    public GetAdmittedPatientsHandler(IAdmissionRepository adm, IBranchContext ctx) { _adm = adm; _ctx = ctx; }
+
+    public async Task<IReadOnlyList<AdmittedPatientDto>> Handle(GetAdmittedPatientsQuery q, CancellationToken ct)
+    {
+        var rows = await _adm.GetAdmittedPatientsAsync(_ctx.BranchId ?? 0, ct);
+        return rows.Select(r => new AdmittedPatientDto(r.AdmissionId, r.AdmissionNo, r.Patient, r.Uhid, r.Ward, r.BedNo, r.Consultant, r.AdmittedUtc)).ToList();
+    }
+}

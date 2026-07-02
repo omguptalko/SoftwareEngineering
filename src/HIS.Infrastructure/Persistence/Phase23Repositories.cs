@@ -104,6 +104,28 @@ VALUES (@AdmissionId, @FromBedId, @ToBedId, @TransferUtc, @Reason);";
               ORDER BY w.Name, b.BedNo", new { branchId }, cancellationToken: ct));
         return rows.ToList();
     }
+
+    public async Task<IReadOnlyList<(long, string, string, string, string, string, string?, DateTime)>> GetAdmittedPatientsAsync(int branchId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        var rows = await c.QueryAsync<(long, string, string, string, string, string, string?, DateTime)>(new CommandDefinition(
+            @"SELECT a.AdmissionId,
+                     a.AdmissionNo,
+                     ISNULL(p.FullName,'') AS Patient,
+                     ISNULL(p.Uhid,'')     AS Uhid,
+                     ISNULL(w.Name,'')     AS Ward,
+                     ISNULL(b.BedNo,'')    AS BedNo,
+                     d.Name                AS Consultant,
+                     a.AdmittedUtc
+              FROM clinical.Admission a
+              INNER JOIN patient.Patient p ON p.PatientId = a.PatientId
+              LEFT JOIN master.Bed b ON b.BedId = a.BedId
+              LEFT JOIN master.Ward w ON w.WardId = b.WardId
+              LEFT JOIN master.Doctor d ON d.DoctorId = a.ConsultantId
+              WHERE a.BranchId = @branchId AND a.Status = 'Admitted'
+              ORDER BY a.AdmittedUtc DESC", new { branchId }, cancellationToken: ct));
+        return rows.ToList();
+    }
 }
 
 /// <summary>Shared helper: resolve patient names from the master DB for a set of ids (D8 two-step).</summary>
