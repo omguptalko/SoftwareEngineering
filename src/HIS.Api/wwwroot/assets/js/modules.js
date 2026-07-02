@@ -1784,7 +1784,15 @@ window.HIS = window.HIS || {};
     const fields = (HIS._deptTemplates || {})[dept] || [];
     if (!fields.length) { panel.hidden = true; host.innerHTML = ''; return; }
     if (title) title.textContent = dept + ' template';
-    host.innerHTML = fields.map((label, i) => `<div class="f"><label>${label}</label><div class="field"><input class="ctl" id="tplf${i}"></div></div>`).join('');
+    host.innerHTML = fields.map((f, i) => {
+      const id = 'tplf' + i, t = f.fieldType || 'text';
+      let ctrl;
+      if (t === 'number') ctrl = `<input class="ctl" type="number" id="${id}">`;
+      else if (t === 'checkbox') ctrl = `<label style="display:flex;align-items:center;gap:6px;height:34px"><input type="checkbox" id="${id}"> Yes</label>`;
+      else if (t === 'select') ctrl = `<select class="ctl" id="${id}"><option value=""></option>${(f.options || []).map(o => `<option>${o}</option>`).join('')}</select>`;
+      else ctrl = `<input class="ctl" id="${id}">`;
+      return `<div class="f"><label>${f.label}</label><div class="field">${ctrl}</div></div>`;
+    }).join('');
     panel.hidden = false;
   }
   function initOpd(doc) {
@@ -1890,11 +1898,14 @@ window.HIS = window.HIS || {};
         .map(cb => (cb.closest('label') ? cb.closest('label').textContent.trim() : '')).filter(Boolean),
       appointmentId: apptId
     };
-    // Fold the department-specific template fields into the clinical history.
-    const tplInputs = Array.from(doc.querySelectorAll('#deptTplFields input')).filter(i => i.value.trim());
-    if (tplInputs.length) {
-      const note = tplInputs.map(i => { const l = i.closest('.f'); return (l ? l.querySelector('label').textContent : i.id) + ': ' + i.value.trim(); }).join('; ');
-      cmd.history = (cmd.history ? cmd.history + ' | ' : '') + '[' + (val(doc, 'opdDept') || 'Dept') + '] ' + note;
+    // Fold the department-specific template fields into the clinical history (all field types).
+    const tplParts = Array.from(doc.querySelectorAll('#deptTplFields input, #deptTplFields select')).map(el => {
+      const l = el.closest('.f'); const lbl = l ? l.querySelector('label').textContent.trim() : el.id;
+      const v = el.type === 'checkbox' ? (el.checked ? 'Yes' : '') : (el.value || '').trim();
+      return v ? (lbl + ': ' + v) : '';
+    }).filter(Boolean);
+    if (tplParts.length) {
+      cmd.history = (cmd.history ? cmd.history + ' | ' : '') + '[' + (val(doc, 'opdDept') || 'Dept') + '] ' + tplParts.join('; ');
     }
     try {
       const r = await HIS.api.saveConsultation(cmd);

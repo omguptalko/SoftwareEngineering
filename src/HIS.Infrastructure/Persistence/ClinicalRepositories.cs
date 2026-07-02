@@ -159,26 +159,32 @@ VALUES (@appointmentId, NULL, @RecordedUtc, @TempF, @Pulse, @BpSystolic, @BpDias
             new { appointmentId, encounterId }, cancellationToken: ct));
     }
 
-    public async Task<IReadOnlyList<(string Department, string Label, int SortOrder)>> ListDeptTemplatesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<(string Department, string Label, string FieldType, string? Options, int SortOrder)>> ListDeptTemplatesAsync(CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);
-        return (await c.QueryAsync<(string Department, string Label, int SortOrder)>(new CommandDefinition(
-            "SELECT Department, Label, SortOrder FROM master.DeptTemplateField ORDER BY Department, SortOrder, Id",
+        return (await c.QueryAsync<(string Department, string Label, string FieldType, string? Options, int SortOrder)>(new CommandDefinition(
+            "SELECT Department, Label, FieldType, Options, SortOrder FROM master.DeptTemplateField ORDER BY Department, SortOrder, Id",
             cancellationToken: ct))).ToList();
     }
 
-    public async Task ReplaceDeptTemplateAsync(string department, IReadOnlyList<string> labels, CancellationToken ct = default)
+    public async Task ReplaceDeptTemplateAsync(string department, IReadOnlyList<(string Label, string FieldType, string? Options)> fields, CancellationToken ct = default)
     {
+        var allowed = new[] { "text", "number", "checkbox", "select" };
         using var c = await _f.OpenMasterAsync(ct);
         using var tx = c.BeginTransaction();
         await c.ExecuteAsync(new CommandDefinition(
             "DELETE FROM master.DeptTemplateField WHERE Department = @department",
             new { department }, transaction: tx, cancellationToken: ct));
-        var clean = labels.Select(l => (l ?? "").Trim()).Where(l => l.Length > 0).ToList();
+        var clean = fields.Where(f => !string.IsNullOrWhiteSpace(f.Label)).ToList();
         for (var i = 0; i < clean.Count; i++)
+        {
+            var f = clean[i];
+            var type = allowed.Contains((f.FieldType ?? "text").ToLowerInvariant()) ? f.FieldType!.ToLowerInvariant() : "text";
             await c.ExecuteAsync(new CommandDefinition(
-                "INSERT master.DeptTemplateField (Department, Label, SortOrder) VALUES (@department, @label, @sort)",
-                new { department, label = clean[i], sort = i + 1 }, transaction: tx, cancellationToken: ct));
+                "INSERT master.DeptTemplateField (Department, Label, FieldType, Options, SortOrder) VALUES (@department, @label, @type, @options, @sort)",
+                new { department, label = f.Label.Trim(), type, options = string.IsNullOrWhiteSpace(f.Options) ? null : f.Options.Trim(), sort = i + 1 },
+                transaction: tx, cancellationToken: ct));
+        }
         tx.Commit();
     }
 

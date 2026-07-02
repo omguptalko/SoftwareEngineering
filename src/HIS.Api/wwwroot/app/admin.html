@@ -210,9 +210,11 @@
         <div class="grid2">
           <label>Department <select id="tplDept"></select></label>
         </div>
-        <label style="margin-top:12px;display:block">Fields <span class="muted">(one per line)</span>
-          <textarea id="tplFields" rows="9" style="width:100%;font-family:inherit;margin-top:6px" placeholder="Procedure planned&#10;ASA grade&#10;Consent taken"></textarea></label>
-        <div class="actions"><button class="btn" id="tplSaveBtn"><i class="bi bi-check2-circle"></i> Save template</button></div>
+        <table style="margin-top:12px">
+          <thead><tr><th style="width:38%">Field label</th><th style="width:18%">Type</th><th>Options <span class="muted">(dropdown, comma-separated)</span></th><th></th></tr></thead>
+          <tbody id="tplRows"></tbody>
+        </table>
+        <div class="actions"><button class="btn ghost" id="tplAddRow"><i class="bi bi-plus-lg"></i> Add field</button><button class="btn" id="tplSaveBtn"><i class="bi bi-check2-circle"></i> Save template</button></div>
       </div>
     </section>
   </main>
@@ -448,23 +450,37 @@
 
   // ---- OPD department templates (admin-configurable, per hospital) ----
   const COMMON_DEPTS = ['General Medicine', 'Cardiology', 'Orthopaedics', 'Surgery', 'Pulmonology', 'Dermatology', 'Emergency Medicine', 'Radiology', 'Occupational Health'];
+  const esc = s => (s || '').replace(/"/g, '&quot;');
+  function tplRowHtml(f) {
+    f = f || { label: '', fieldType: 'text', options: [] };
+    const opt = t => `<option value="${t}"${(f.fieldType || 'text') === t ? ' selected' : ''}>${t}</option>`;
+    return `<tr>
+      <td><input class="tlbl" value="${esc(f.label)}" style="width:100%"></td>
+      <td><select class="ttype">${['text', 'number', 'checkbox', 'select'].map(opt).join('')}</select></td>
+      <td><input class="topts" value="${esc((f.options || []).join(', '))}" placeholder="e.g. Mild, Moderate, Severe" style="width:100%"></td>
+      <td><button class="btn ghost sm trm" title="Remove">✕</button></td></tr>`;
+  }
+  function renderTplRows(fields) {
+    $('#tplRows').innerHTML = (fields && fields.length ? fields : [null]).map(tplRowHtml).join('');
+  }
   async function loadOpdTemplates() {
-    const tpls = await api('GET', '/api/opd/templates');           // [{department, fields:[]}]
+    const tpls = await api('GET', '/api/opd/templates');   // [{department, fields:[{label,fieldType,options}]}]
     window._opdTpls = {};
     (tpls || []).forEach(t => { window._opdTpls[t.department] = t.fields || []; });
     COMMON_DEPTS.forEach(d => { if (!(d in window._opdTpls)) window._opdTpls[d] = []; });
-    const all = Object.keys(window._opdTpls).sort();
-    $('#tplDept').innerHTML = all.map(d => `<option>${d}</option>`).join('');
-    showTplFields();
+    $('#tplDept').innerHTML = Object.keys(window._opdTpls).sort().map(d => `<option>${d}</option>`).join('');
+    renderTplRows(window._opdTpls[$('#tplDept').value] || []);
   }
-  function showTplFields() {
-    const d = $('#tplDept').value;
-    $('#tplFields').value = (window._opdTpls[d] || []).join('\n');
-  }
-  $('#tplDept').addEventListener('change', showTplFields);
+  $('#tplDept').addEventListener('change', () => renderTplRows(window._opdTpls[$('#tplDept').value] || []));
+  $('#tplAddRow').addEventListener('click', () => $('#tplRows').insertAdjacentHTML('beforeend', tplRowHtml()));
+  $('#tplRows').addEventListener('click', e => { if (e.target.closest('.trm')) { e.preventDefault(); e.target.closest('tr').remove(); } });
   $('#tplSaveBtn').addEventListener('click', guard(async () => {
     const d = $('#tplDept').value;
-    const fields = $('#tplFields').value.split('\n').map(s => s.trim()).filter(Boolean);
+    const fields = $$('#tplRows tr').map(tr => ({
+      label: tr.querySelector('.tlbl').value.trim(),
+      fieldType: tr.querySelector('.ttype').value,
+      options: tr.querySelector('.topts').value.split(',').map(s => s.trim()).filter(Boolean)
+    })).filter(f => f.label);
     await api('POST', '/api/opd/templates', { department: d, fields });
     window._opdTpls[d] = fields;
     toast(`Saved ${d} template — ${fields.length} field(s)`);
