@@ -260,9 +260,17 @@ window.HIS = window.HIS || {};
           <thead><tr><th>Time</th><th>Token</th><th>Patient</th><th>UHID</th><th>Status</th><th>Vitals</th></tr></thead>
           <tbody id="opdSchedule">${emptyRow(6, 'Enter your doctor code to load your schedule')}</tbody>
         </table></div></div></div>
+      <div class="panel"><div class="panel__body" style="padding:10px 12px">
+        <div class="flex gap6" style="align-items:center;flex-wrap:wrap">
+          <span class="muted"><i class="bi bi-person-walking"></i> Walk-in (no appointment):</span>
+          <div class="field with-btn" style="max-width:300px;margin:0"><input class="ctl" id="opdWalkin" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div>
+          <button class="btn btn--sm" id="opdWalkinBtn"><i class="bi bi-person-plus"></i> Start walk-in consult</button>
+          <span class="muted" style="font-size:12px">— or Call In a patient from the waiting lobby above.</span>
+        </div>
+      </div></div>
       <div id="opdBanner"><div class="pbanner selectable"><div class="av">—</div>
         <div><div class="nm">No patient selected</div>
-        <div class="meta"><span>Click <b>Call In</b> on a patient in the Waiting Lobby to start their consultation</span></div></div></div></div>
+        <div class="meta"><span>Click <b>Call In</b> on a lobby patient, or pick a <b>walk-in</b> above to start their consultation</span></div></div></div></div>
       <div>
         <div class="itabs">
           <div class="itab active" data-tab="vit">Vitals</div>
@@ -1928,6 +1936,24 @@ window.HIS = window.HIS || {};
       if (dept && docSel) dept.addEventListener('change', () => { fillDoctorSelect(docSel, dept.value); renderDeptTemplate(doc, dept.value); });
       if (docSel) docSel.addEventListener('change', () => { const d = deptOfDoctor(docSel.value); if (dept) dept.value = d; renderDeptTemplate(doc, d); });
     });
+    const wb = doc.querySelector('#opdWalkinBtn'); if (wb) wb.addEventListener('click', () => startWalkIn(doc));
+  }
+  // Walk-in: consult a patient who has no appointment/token. Vitals are captured on
+  // this form (no appointmentId), and the consultation saves against the picked patient.
+  async function startWalkIn(doc) {
+    const raw = val(doc, 'opdWalkin');
+    if (!raw) { HIS.toast('Pick a walk-in patient (F3) first'); return; }
+    // Lookups fill "UHID — Name"; split only on the em-dash (UHIDs contain hyphens).
+    let i = raw.indexOf('—'); if (i < 0) i = raw.indexOf(' - ');
+    const uhid = (i > 0 ? raw.slice(0, i) : raw).trim();
+    try {
+      const p = await HIS.api.patientByUhid(uhid);
+      if (!p) { HIS.toast('Patient not found: ' + uhid); return; }
+      doc.dataset.opdUhid = p.uhid;
+      delete doc.dataset.opdAppt;   // walk-in: no queued appointment/token to close
+      const b = doc.querySelector('#opdBanner'); if (b) b.innerHTML = banner(p);
+      HIS.toast('Walk-in consult started for ' + p.name + ' — select consultant, then Save', 'bi-person-plus');
+    } catch (e) { HIS.toast('Could not load patient: ' + e.message); }
   }
   async function loadOpdLobby(doc) {
     const tb = doc.querySelector('#opdLobby'); if (!tb) return;
