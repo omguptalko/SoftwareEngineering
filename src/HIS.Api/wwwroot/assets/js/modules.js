@@ -356,13 +356,14 @@ window.HIS = window.HIS || {};
 
   /* ============================ IPD =================================== */
   function ipd() {
-    const p = HIS.mock.currentPatient;
     return `<div class="screen">
       ${head('bi-hospital', 'IPD Admission &amp; Bed Board', 'Ward management · transfers · discharge',
         `<button class="btn btn--ghost btn--sm" id="ipdTransferBtn"><i class="bi bi-arrow-left-right"></i> Transfer</button>
          <button class="btn btn--ghost btn--sm" id="ipdDischargeBtn"><i class="bi bi-box-arrow-right"></i> Discharge</button>
          <button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-save"></i> Admit <span class="fk">F9</span></button>`)}
-      ${banner(p)}
+      <div id="ipdBanner"><div class="pbanner selectable"><div class="av">—</div>
+        <div><div class="nm">No patient selected</div>
+        <div class="meta"><span>Pick a <b>Patient (F3)</b> in the Admission form below to admit</span></div></div></div></div>
       <div class="cols-side">
         <div class="panel"><div class="panel__head"><i class="bi bi-grid-3x3"></i> Bed Board — live
           <span class="ph-right legend-row">
@@ -1034,6 +1035,9 @@ window.HIS = window.HIS || {};
       });
       const tbtn = doc.querySelector('#ipdTransferBtn');
       if (tbtn) tbtn.addEventListener('click', () => HIS.toast('Transfer: admit flow handles bed moves — discharge & re-admit, or use the bed board'));
+      // Show who is about to be admitted as soon as a patient is picked (F3).
+      const pf = doc.querySelector('#ipdPatient');
+      if (pf) { pf.addEventListener('change', () => showIpdPatient(doc)); pf.addEventListener('blur', () => showIpdPatient(doc)); }
     }
     if (id === 'appointments') { initAppointments(doc); HIS.saveHandlers.appointments = () => doBookAppointment(doc); }
     if (id === 'opd') { initOpd(doc); HIS.saveHandlers.opd = () => doSaveConsultation(doc); }
@@ -1561,11 +1565,19 @@ window.HIS = window.HIS || {};
   }
 
   /* ---- Phase 2.3: admit patient (POST /api/ipd/admit) ----------------- */
+  // Resolve the F3-picked patient and show them in the IPD banner.
+  async function showIpdPatient(doc) {
+    const raw = val(doc, 'ipdPatient'); const b = doc.querySelector('#ipdBanner'); if (!b) return;
+    if (!raw) { b.innerHTML = banner(null); return; }
+    let i = raw.indexOf('—'); if (i < 0) i = raw.indexOf(' - ');
+    const uhid = (i > 0 ? raw.slice(0, i) : raw).trim();
+    try { const p = await HIS.api.patientByUhid(uhid); b.innerHTML = banner(p); }
+    catch (e) { /* leave as-is */ }
+  }
   async function doAdmit(doc) {
-    // Prefer the explicitly-picked patient (F3); fall back to the banner patient.
-    const picked = val(doc, 'ipdPatient');
-    const uhid = picked || (HIS.mock.currentPatient && HIS.mock.currentPatient.uhid);
-    if (!uhid) { HIS.toast('Select a patient (F3) to admit'); return; }
+    // Require an explicitly-picked patient (no silent default) so nobody is admitted by accident.
+    const uhid = val(doc, 'ipdPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3) to admit — none is selected'); return; }
     const bed = val(doc, 'ipdBed');
     if (!bed) { HIS.toast('Select a ward/bed (F3)'); return; }
     const cmd = {
@@ -1583,6 +1595,7 @@ window.HIS = window.HIS || {};
       HIS.toast('Admitted · ' + r.admissionNo + ' · Bed ' + r.bedNo + ' — added to the list', 'bi-hospital');
       const pf = doc.querySelector('#ipdPatient'); if (pf) pf.value = '';
       const bf = doc.querySelector('#ipdBed'); if (bf) bf.value = '';
+      const bn = doc.querySelector('#ipdBanner'); if (bn) bn.innerHTML = banner(null);
       loadBedBoard(doc); loadAdmissions(doc);
     } catch (e) { HIS.toast('Admit failed: ' + e.message); }
   }
