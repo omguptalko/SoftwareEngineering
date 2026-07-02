@@ -45,17 +45,18 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return await c.QuerySingleAsync<long>(new CommandDefinition(sql, a, cancellationToken: ct));
     }
 
-    public async Task<IReadOnlyList<(long, string, string, string, string, string, bool)>> GetTodayQueueAsync(int branchId, int? doctorId, DateTime date, string? status, CancellationToken ct = default)
+    public async Task<IReadOnlyList<(long, string, string, string, string, string, bool, DateTime)>> GetTodayQueueAsync(int branchId, int? doctorId, DateTime date, string? status, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);
-        var rows = await c.QueryAsync<(long, string, string, string, string, string, bool)>(new CommandDefinition(
+        var rows = await c.QueryAsync<(long, string, string, string, string, string, bool, DateTime)>(new CommandDefinition(
             @"SELECT a.AppointmentId,
                      ISNULL(a.TokenNo,'') AS TokenNo,
                      ISNULL(p.Uhid,'') AS Uhid,
                      ISNULL(p.FullName,'(walk-in)') AS PatientName,
                      ISNULL(d.Name,'') AS DoctorName,
                      a.Status,
-                     CAST(CASE WHEN EXISTS (SELECT 1 FROM clinical.Vitals v WHERE v.AppointmentId = a.AppointmentId) THEN 1 ELSE 0 END AS BIT) AS HasVitals
+                     CAST(CASE WHEN EXISTS (SELECT 1 FROM clinical.Vitals v WHERE v.AppointmentId = a.AppointmentId) THEN 1 ELSE 0 END AS BIT) AS HasVitals,
+                     a.SlotStart
               FROM clinical.Appointment a
               LEFT JOIN patient.Patient p ON p.PatientId = a.PatientId
               LEFT JOIN master.Doctor  d ON d.DoctorId  = a.DoctorId
