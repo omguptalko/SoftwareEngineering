@@ -1764,6 +1764,8 @@ window.HIS = window.HIS || {};
       followUpDate: val(doc, 'opdFollowup') || null,
       diagnosisCodes: [val(doc, 'opdDx1'), val(doc, 'opdDx2')].filter(Boolean),
       prescription: rx,
+      labTests: Array.from(doc.querySelectorAll('[data-pane="ord"] input[type="checkbox"]:checked'))
+        .map(cb => (cb.closest('label') ? cb.closest('label').textContent.trim() : '')).filter(Boolean),
       appointmentId: apptId
     };
     try {

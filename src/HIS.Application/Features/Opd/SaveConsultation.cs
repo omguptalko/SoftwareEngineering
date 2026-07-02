@@ -18,6 +18,7 @@ public sealed record SaveConsultationCommand(
     string PatientUhid, string DoctorCode,
     VitalsDto? Vitals, string? Complaints, string? History, string? Advice, DateTime? FollowUpDate,
     IReadOnlyList<string>? DiagnosisCodes, IReadOnlyList<RxLineDto>? Prescription,
+    IReadOnlyList<string>? LabTests = null,   // investigations ordered -> raised in the Lab worklist
     long? AppointmentId = null)   // when consulting a queued patient: links vitals + closes the token
     : ICommand<SaveConsultationResult>, IAuditable, IAuthorizable
 {
@@ -42,11 +43,12 @@ public sealed class SaveConsultationHandler : MediatR.IRequestHandler<SaveConsul
     private readonly IEncounterRepository _enc;
     private readonly IPatientRepository _patients;
     private readonly IAppointmentRepository _appts;
+    private readonly MediatR.ISender _sender;
     private readonly IBranchContext _ctx;
 
-    public SaveConsultationHandler(IEncounterRepository enc, IPatientRepository patients, IAppointmentRepository appts, IBranchContext ctx)
+    public SaveConsultationHandler(IEncounterRepository enc, IPatientRepository patients, IAppointmentRepository appts, MediatR.ISender sender, IBranchContext ctx)
     {
-        _enc = enc; _patients = patients; _appts = appts; _ctx = ctx;
+        _enc = enc; _patients = patients; _appts = appts; _sender = sender; _ctx = ctx;
     }
 
     public async Task<SaveConsultationResult> Handle(SaveConsultationCommand c, CancellationToken ct)
@@ -92,6 +94,11 @@ public sealed class SaveConsultationHandler : MediatR.IRequestHandler<SaveConsul
         if (c.DiagnosisCodes is { Count: > 0 })
             foreach (var dx in c.DiagnosisCodes.Where(d => !string.IsNullOrWhiteSpace(d)))
                 await _enc.AddDiagnosisAsync(encounterId, LookupCode.Parse(dx), true, ct);
+
+        // Downstream: raise ordered investigations in the Lab worklist (reuses the LIS feature).
+        if (c.LabTests is { Count: > 0 })
+            foreach (var test in c.LabTests.Where(t => !string.IsNullOrWhiteSpace(t)))
+                await _sender.Send(new HIS.Application.Features.Diagnostics.CreateLabOrderCommand(c.PatientUhid, test), ct);
 
         long? prescriptionId = null;
         var lines = (c.Prescription ?? Array.Empty<RxLineDto>()).Where(l => !string.IsNullOrWhiteSpace(l.DrugCode)).ToList();
