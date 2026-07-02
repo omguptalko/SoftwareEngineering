@@ -10,10 +10,11 @@ namespace HIS.Application.Features.Opd;
 /// appointment to 'VitalsDone', which places the patient in the doctor's OPD waiting lobby.
 /// This separates the attendant's task from the doctor's, and drives the queue.
 /// </summary>
-public sealed record RecordVitalsCommand(long AppointmentId, VitalsDto Vitals) : ICommand<bool>, IAuditable
+public sealed record RecordVitalsCommand(long AppointmentId, VitalsDto Vitals) : ICommand<bool>, IAuditable, IAuthorizable
 {
     public string AuditEntity => "Appointment";
     public string? AuditEntityId => AppointmentId.ToString();
+    public string RequiredPermission => "opd.vitals";     // attendant/nurse/reception/doctor
 }
 
 public sealed class RecordVitalsValidator : AbstractValidator<RecordVitalsCommand>
@@ -52,10 +53,11 @@ public sealed class RecordVitalsHandler : MediatR.IRequestHandler<RecordVitalsCo
 
 /// <summary>Call a waiting (VitalsDone) patient into the consult room. Advances the appointment
 /// to 'InConsultation' and stamps CalledUtc — used by the waiting-room "now calling" display.</summary>
-public sealed record CallNextCommand(long AppointmentId) : ICommand<bool>, IAuditable
+public sealed record CallNextCommand(long AppointmentId) : ICommand<bool>, IAuditable, IAuthorizable
 {
     public string AuditEntity => "Appointment";
     public string? AuditEntityId => AppointmentId.ToString();
+    public string RequiredPermission => "opd.consult";    // doctor/admin only
 }
 
 public sealed class CallNextHandler : MediatR.IRequestHandler<CallNextCommand, bool>

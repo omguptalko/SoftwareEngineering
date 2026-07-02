@@ -19,10 +19,11 @@ public sealed record SaveConsultationCommand(
     VitalsDto? Vitals, string? Complaints, string? History, string? Advice, DateTime? FollowUpDate,
     IReadOnlyList<string>? DiagnosisCodes, IReadOnlyList<RxLineDto>? Prescription,
     long? AppointmentId = null)   // when consulting a queued patient: links vitals + closes the token
-    : ICommand<SaveConsultationResult>, IAuditable
+    : ICommand<SaveConsultationResult>, IAuditable, IAuthorizable
 {
     public string AuditEntity => "Encounter";
     public string? AuditEntityId => PatientUhid;
+    public string RequiredPermission => "opd.consult";    // doctor/admin only
 }
 
 public sealed record SaveConsultationResult(long EncounterId, long? PrescriptionId);
