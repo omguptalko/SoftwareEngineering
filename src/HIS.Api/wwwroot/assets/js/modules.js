@@ -192,8 +192,8 @@ window.HIS = window.HIS || {};
          <button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-ticket-detailed"></i> Book &amp; Token <span class="fk">F9</span></button>`)}
       <div class="panel"><div class="panel__body">
         <div class="form-grid three">
-          <div class="f"><label>Department</label><div class="field"><select class="ctl" id="apptDept"><option value="">—</option><option>General Medicine</option><option>Cardiology</option><option>Orthopaedics</option><option>Pulmonology</option></select></div></div>
-          <div class="f"><label>Doctor <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="apptDoctor" data-lookup="doctor" placeholder="F3 doctor…"><button class="lk" data-lookup="doctor">F3</button></div></div>
+          <div class="f"><label>Specialty / Department</label><div class="field"><select class="ctl" id="apptDept"><option value="">All departments</option></select></div></div>
+          <div class="f"><label>Doctor <span class="req">*</span></label><div class="field"><select class="ctl" id="apptDoctor"><option value="">— select doctor —</option></select></div></div>
           <div class="f"><label>Date</label><div class="field"><input class="ctl" id="apptDate" type="date"></div></div>
           <div class="f"><label>Patient</label><div class="field with-btn"><input class="ctl" id="apptPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
           <div class="f"><label>Visit Type</label><div class="field"><select class="ctl" id="apptVisit"><option>New</option><option>Follow-up</option><option>Review</option></select></div></div>
@@ -250,7 +250,8 @@ window.HIS = window.HIS || {};
         <div data-pane="vit">
           <div class="panel"><div class="panel__head"><i class="bi bi-heart-pulse"></i> Vitals</div><div class="panel__body">
             <div class="form-grid three">
-              <div class="f"><label>Consultant <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="opdDoctor" data-lookup="doctor" placeholder="F3 doctor…"><button class="lk" data-lookup="doctor">F3</button></div></div>
+              <div class="f"><label>Specialty / Department</label><div class="field"><select class="ctl" id="opdDept"><option value="">All departments</option></select></div></div>
+              <div class="f"><label>Consultant <span class="req">*</span></label><div class="field"><select class="ctl" id="opdDoctor"><option value="">— select doctor —</option></select></div></div>
               <div class="f"><label>Temp</label><div class="field with-unit"><input class="ctl" id="opdTemp"><span class="unit">°F</span></div></div>
               <div class="f"><label>Pulse</label><div class="field with-unit"><input class="ctl" id="opdPulse"><span class="unit">/min</span></div></div>
               <div class="f"><label>BP</label><div class="field with-unit"><input class="ctl" id="opdBp" placeholder="120/80"><span class="unit">mmHg</span></div></div>
@@ -258,6 +259,8 @@ window.HIS = window.HIS || {};
               <div class="f"><label>Resp. Rate</label><div class="field with-unit"><input class="ctl" id="opdResp"><span class="unit">/min</span></div></div>
               <div class="f"><label>Weight</label><div class="field with-unit"><input class="ctl" id="opdWeight"><span class="unit">kg</span></div></div>
             </div></div></div>
+          <div class="panel" id="deptTplPanel" hidden><div class="panel__head"><i class="bi bi-clipboard2-pulse"></i> <span id="deptTplTitle">Department template</span></div>
+            <div class="panel__body"><div class="form-grid three" id="deptTplFields"></div></div></div>
         </div>
 
         <div data-pane="dx" hidden>
@@ -1648,10 +1651,51 @@ window.HIS = window.HIS || {};
     catch (e) { HIS.toast('Deactivate failed: ' + e.message); }
   }
 
+  /* ---- Doctor directory + department → doctor filtering --------------- */
+  // Cached list of {code, name, dept}; drives the Specialty/Department dropdowns.
+  async function loadDoctorDirectory() {
+    if (HIS._doctors) return HIS._doctors;
+    try {
+      const r = await HIS.api.lookup('doctor');
+      HIS._doctors = (r.rows || []).map(row => ({ code: row[0], name: row[1], dept: row[2] || '' }));
+    } catch (e) { HIS._doctors = []; }
+    return HIS._doctors;
+  }
+  function departmentsOf(docs) { return [...new Set(docs.map(d => d.dept).filter(Boolean))].sort(); }
+  function deptOfDoctor(code) { const d = (HIS._doctors || []).find(x => x.code === code); return d ? d.dept : ''; }
+  // Fill a <select> with doctors, optionally filtered to one department.
+  function fillDoctorSelect(sel, dept, keep) {
+    const docs = (HIS._doctors || []).filter(d => !dept || d.dept === dept);
+    sel.innerHTML = '<option value="">— select doctor —</option>' +
+      docs.map(d => `<option value="${d.code}"${d.code === keep ? ' selected' : ''}>${d.name} · ${d.dept}</option>`).join('');
+  }
+  function fillDeptSelect(sel, keep) {
+    sel.innerHTML = '<option value="">All departments</option>' +
+      departmentsOf(HIS._doctors || []).map(x => `<option${x === keep ? ' selected' : ''}>${x}</option>`).join('');
+  }
+
+  // Department-specific clinical templates (config-driven). Extra fields shown in the
+  // consult for that specialty; on save they are folded into the clinical history.
+  const DEPT_TEMPLATES = {
+    'Surgery': [{ id: 'tplProc', label: 'Procedure planned' }, { id: 'tplAsa', label: 'ASA grade' }, { id: 'tplConsent', label: 'Consent taken' }],
+    'Orthopaedics': [{ id: 'tplJoint', label: 'Affected joint / limb' }, { id: 'tplRom', label: 'Range of motion' }, { id: 'tplXray', label: 'X-ray done' }],
+    'Cardiology': [{ id: 'tplEcg', label: 'ECG findings' }, { id: 'tplChest', label: 'Chest pain (Y/N)' }, { id: 'tplNyha', label: 'NYHA class' }],
+    'Pulmonology': [{ id: 'tplSpiro', label: 'Spirometry' }, { id: 'tplSputum', label: 'Sputum / cough' }],
+    'Dermatology': [{ id: 'tplLesion', label: 'Lesion type' }, { id: 'tplDist', label: 'Distribution' }, { id: 'tplItch', label: 'Pruritus (Y/N)' }],
+    'General Medicine': [{ id: 'tplSystemic', label: 'Systemic review' }]
+  };
+
   /* ---- Phase 2: appointments queue + slots + booking ------------------ */
   function initAppointments(doc) {
     const d = doc.querySelector('#apptDate'); if (d) d.value = new Date().toISOString().slice(0, 10);
     loadQueue(doc);
+    // Specialty/Department -> filtered doctor dropdown (select a dept to narrow the doctors).
+    loadDoctorDirectory().then(() => {
+      const dept = doc.querySelector('#apptDept'), docSel = doc.querySelector('#apptDoctor');
+      if (dept) fillDeptSelect(dept);
+      if (docSel) fillDoctorSelect(docSel, '');
+      if (dept && docSel) dept.addEventListener('change', () => { fillDoctorSelect(docSel, dept.value); loadSlots(doc); });
+    });
     const reload = () => loadSlots(doc);
     ['apptDoctor', 'apptDate'].forEach(id => {
       const el = doc.querySelector('#' + id);
@@ -1736,11 +1780,28 @@ window.HIS = window.HIS || {};
   }
 
   /* ---- OPD doctor lobby: patients whose vitals are done, waiting for this doctor ---- */
+  function renderDeptTemplate(doc, dept) {
+    const panel = doc.querySelector('#deptTplPanel'), host = doc.querySelector('#deptTplFields'), title = doc.querySelector('#deptTplTitle');
+    if (!panel || !host) return;
+    const tpl = DEPT_TEMPLATES[dept];
+    if (!tpl || !tpl.length) { panel.hidden = true; host.innerHTML = ''; return; }
+    if (title) title.textContent = dept + ' template';
+    host.innerHTML = tpl.map(f => `<div class="f"><label>${f.label}</label><div class="field"><input class="ctl" id="${f.id}"></div></div>`).join('');
+    panel.hidden = false;
+  }
   function initOpd(doc) {
     const el = doc.querySelector('#opdLobbyDoctor');
     if (el) { el.addEventListener('change', () => loadOpdLobby(doc)); el.addEventListener('blur', () => loadOpdLobby(doc)); }
     opdLiveDoc = doc; ensureQueueHub();   // live refresh when vitals recorded / patient called / consult done
     loadOpdLobby(doc);
+    // Specialty/Department -> filtered consultant + department-specific template.
+    loadDoctorDirectory().then(() => {
+      const dept = doc.querySelector('#opdDept'), docSel = doc.querySelector('#opdDoctor');
+      if (dept) fillDeptSelect(dept);
+      if (docSel) fillDoctorSelect(docSel, '');
+      if (dept && docSel) dept.addEventListener('change', () => { fillDoctorSelect(docSel, dept.value); renderDeptTemplate(doc, dept.value); });
+      if (docSel) docSel.addEventListener('change', () => { const d = deptOfDoctor(docSel.value); if (dept) dept.value = d; renderDeptTemplate(doc, d); });
+    });
   }
   async function loadOpdLobby(doc) {
     const tb = doc.querySelector('#opdLobby'); if (!tb) return;
@@ -1773,7 +1834,10 @@ window.HIS = window.HIS || {};
     doc.dataset.opdUhid = ds.uhid;
     const b = doc.querySelector('#opdBanner');
     if (b) b.innerHTML = `<div class="banner"><div class="meta"><span>Consulting <b>${ds.patient}</b></span><span>UHID <b>${ds.uhid}</b></span><span>Token <b>${ds.token || ''}</b></span></div></div>`;
+    await loadDoctorDirectory();
     const dc = doc.querySelector('#opdDoctor'); if (dc && ds.doctor) dc.value = ds.doctor;
+    const dept = deptOfDoctor(ds.doctor); const dptSel = doc.querySelector('#opdDept'); if (dptSel) dptSel.value = dept;
+    renderDeptTemplate(doc, dept);
     try {
       const v = await HIS.api.apptVitals(ds.consult);
       if (v) {
@@ -1828,6 +1892,12 @@ window.HIS = window.HIS || {};
         .map(cb => (cb.closest('label') ? cb.closest('label').textContent.trim() : '')).filter(Boolean),
       appointmentId: apptId
     };
+    // Fold the department-specific template fields into the clinical history.
+    const tplInputs = Array.from(doc.querySelectorAll('#deptTplFields input')).filter(i => i.value.trim());
+    if (tplInputs.length) {
+      const note = tplInputs.map(i => { const l = i.closest('.f'); return (l ? l.querySelector('label').textContent : i.id) + ': ' + i.value.trim(); }).join('; ');
+      cmd.history = (cmd.history ? cmd.history + ' | ' : '') + '[' + (val(doc, 'opdDept') || 'Dept') + '] ' + note;
+    }
     try {
       const r = await HIS.api.saveConsultation(cmd);
       HIS.toast('Consultation saved · Encounter #' + r.encounterId + (apptId ? ' · token closed' : ''), 'bi-check-circle-fill');
