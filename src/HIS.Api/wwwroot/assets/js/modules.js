@@ -355,7 +355,7 @@ window.HIS = window.HIS || {};
         <span class="ph-right muted" id="opdHistWho"></span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>Date</th><th>Doctor</th><th>Department</th><th>Complaints</th><th>Diagnosis</th></tr></thead>
-          <tbody id="opdHistory">${emptyRow(5, 'Select a patient (Call In / Resume / walk-in) to see their history')}</tbody>
+          <tbody id="opdHistBody">${emptyRow(5, 'Select a patient (Call In / Resume / walk-in) to see their history')}</tbody>
         </table></div></div></div>
     </div>`;
   }
@@ -2051,7 +2051,7 @@ window.HIS = window.HIS || {};
   }
   // Selected patient's past consultations — shown below the OPD form; refreshed after each save.
   async function loadOpdHistory(doc, uhid, name) {
-    const tb = doc.querySelector('#opdHistory'); if (!tb) return;
+    const tb = doc.querySelector('#opdHistBody'); if (!tb) return;
     const who = doc.querySelector('#opdHistWho'); if (who) who.textContent = name ? (name + ' · ' + uhid) : (uhid || '');
     if (!uhid) { tb.innerHTML = emptyRow(5, 'Select a patient to see their history'); return; }
     tb.innerHTML = emptyRow(5, 'Loading…');
