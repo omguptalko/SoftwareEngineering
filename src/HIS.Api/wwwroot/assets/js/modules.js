@@ -317,6 +317,8 @@ window.HIS = window.HIS || {};
               <div class="f"><label>Referral</label><div class="field with-btn"><input class="ctl" data-lookup="doctor" placeholder="F3 refer to…"><button class="lk" data-lookup="doctor">F3</button></div></div>
               <div class="f wide"><label>Advice</label><div class="field"><textarea class="ctl" id="opdAdvice"></textarea></div></div>
             </div>
+            <div class="muted" style="font-size:12px;margin-top:6px"><i class="bi bi-ticket-detailed"></i> Pick a date to auto-issue a follow-up appointment token on save.</div>
+            <div id="opdFollowupResult" class="pill" style="display:none;margin-top:8px;background:#e7f6ec;color:#137333;font-weight:600"></div>
             <div class="flex gap6 mt8"><button class="btn btn--primary" data-act="save"><i class="bi bi-save"></i> Save Consultation <span class="fk">F9</span></button><button class="btn"><i class="bi bi-printer"></i> Print Prescription</button></div>
           </div></div>
         </div>
@@ -1940,6 +1942,13 @@ window.HIS = window.HIS || {};
     try {
       const r = await HIS.api.saveConsultation(cmd);
       HIS.toast('Consultation saved · Encounter #' + r.encounterId + (apptId ? ' · token closed' : ''), 'bi-check-circle-fill');
+      // Follow-up appointment issued right after the consultation (SRS 3.2).
+      const fuBadge = doc.querySelector('#opdFollowupResult');
+      if (r.followUpToken) {
+        const when = (r.followUpDate || cmd.followUpDate || '').slice(0, 10);
+        HIS.toast('Follow-up booked · Token ' + r.followUpToken + (when ? ' · ' + when : ''), 'bi-ticket-detailed');
+        if (fuBadge) { fuBadge.innerHTML = '<i class="bi bi-ticket-detailed"></i> Follow-up token <b>' + r.followUpToken + '</b>' + (when ? ' for ' + when : ''); fuBadge.style.display = 'inline-block'; }
+      } else if (fuBadge) { fuBadge.style.display = 'none'; }
       if (apptId) { delete doc.dataset.opdAppt; delete doc.dataset.opdUhid; loadOpdLobby(doc); }
     } catch (e) { HIS.toast('Save failed: ' + e.message); }
   }

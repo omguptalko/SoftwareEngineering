@@ -25,6 +25,8 @@ public sealed class EncountersController : ControllerBase
         var result = await _mediator.Send(cmd, ct);
         if (cmd.AppointmentId is long apptId)
             await _hub.Clients.Group(TenantGroups.Name(_tenant)).SendAsync("opdChanged", new { action = "completed", appointmentId = apptId }, ct);
+        if (result.FollowUpAppointmentId is long followUpId)
+            await _hub.Clients.Group(TenantGroups.Name(_tenant)).SendAsync("opdChanged", new { action = "booked", appointmentId = followUpId }, ct);
         return Ok(result);
     }
 

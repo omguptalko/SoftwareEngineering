@@ -32,7 +32,9 @@ public sealed record SaveConsultationCommand(
     public string RequiredPermission => "opd.consult";    // doctor/admin only
 }
 
-public sealed record SaveConsultationResult(long EncounterId, long? PrescriptionId);
+public sealed record SaveConsultationResult(
+    long EncounterId, long? PrescriptionId,
+    long? FollowUpAppointmentId = null, string? FollowUpToken = null, DateTime? FollowUpDate = null);
 
 public sealed class SaveConsultationValidator : AbstractValidator<SaveConsultationCommand>
 {
@@ -127,7 +129,29 @@ public sealed class SaveConsultationHandler : MediatR.IRequestHandler<SaveConsul
             }
         }
 
-        return new SaveConsultationResult(encounterId, prescriptionId);
+        // Follow-up scheduling: if the doctor picked a next-visit date, issue a Follow-up
+        // appointment + token straight away (same token scheme as normal booking). SRS 3.2.
+        long? followUpApptId = null; string? followUpToken = null; DateTime? followUpOn = null;
+        if (c.FollowUpDate is { } fu && fu.Date >= DateTime.UtcNow.Date && doctorId is int fuDoctorId)
+        {
+            followUpOn = fu.Date;
+            followUpToken = await _appts.NextTokenAsync(branchId, fuDoctorId, fu.Date, ct);
+            followUpApptId = await _appts.InsertAsync(new Appointment
+            {
+                BranchId = branchId,
+                PatientId = patient.PatientId,
+                DoctorId = fuDoctorId,
+                Department = c.Department,
+                SlotStart = fu.Date.AddHours(9),   // default morning OPD slot
+                VisitType = "Follow-up",
+                Mode = "Walk-in",
+                TokenNo = followUpToken,
+                Status = "Booked",
+                CreatedUtc = DateTime.UtcNow
+            }, ct);
+        }
+
+        return new SaveConsultationResult(encounterId, prescriptionId, followUpApptId, followUpToken, followUpOn);
     }
 
     private static bool HasAnyVital(VitalsDto v) =>
