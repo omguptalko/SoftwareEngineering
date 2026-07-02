@@ -351,6 +351,12 @@ window.HIS = window.HIS || {};
           </div></div>
         </div>
       </div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-clock-history"></i> Consultation History
+        <span class="ph-right muted" id="opdHistWho"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Date</th><th>Doctor</th><th>Department</th><th>Complaints</th><th>Diagnosis</th></tr></thead>
+          <tbody id="opdHistory">${emptyRow(5, 'Select a patient (Call In / Resume / walk-in) to see their history')}</tbody>
+        </table></div></div></div>
     </div>`;
   }
 
@@ -1966,6 +1972,7 @@ window.HIS = window.HIS || {};
       doc.dataset.opdUhid = p.uhid;
       delete doc.dataset.opdAppt;   // walk-in: no queued appointment/token to close
       const b = doc.querySelector('#opdBanner'); if (b) b.innerHTML = banner(p);
+      loadOpdHistory(doc, p.uhid, p.name);
       HIS.toast('Walk-in consult started for ' + p.name + ' — select consultant, then Save', 'bi-person-plus');
     } catch (e) { HIS.toast('Could not load patient: ' + e.message); }
   }
@@ -2026,7 +2033,22 @@ window.HIS = window.HIS || {};
         set('opdSpo2', v.spo2); set('opdResp', v.respRate); set('opdWeight', v.weightKg);
       }
     } catch (e) {}
+    loadOpdHistory(doc, ds.uhid, ds.patient);
     HIS.toast('Loaded ' + ds.patient + ' — vitals preloaded, proceed to diagnosis', 'bi-person-check');
+  }
+  // Selected patient's past consultations — shown below the OPD form; refreshed after each save.
+  async function loadOpdHistory(doc, uhid, name) {
+    const tb = doc.querySelector('#opdHistory'); if (!tb) return;
+    const who = doc.querySelector('#opdHistWho'); if (who) who.textContent = name ? (name + ' · ' + uhid) : (uhid || '');
+    if (!uhid) { tb.innerHTML = emptyRow(5, 'Select a patient to see their history'); return; }
+    tb.innerHTML = emptyRow(5, 'Loading…');
+    try {
+      const encs = await HIS.api.patientEncounters(uhid);
+      tb.innerHTML = encs.length ? encs.map(e => {
+        const dt = (e.dateUtc || '').replace('T', ' ').slice(0, 16);
+        return `<tr><td>${dt}</td><td>${e.doctor || ''}</td><td>${e.department || ''}</td><td>${e.complaints || ''}</td><td>${e.diagnosis || '—'}</td></tr>`;
+      }).join('') : emptyRow(5, 'No consultations recorded yet');
+    } catch (e) { tb.innerHTML = emptyRow(5, 'History API unavailable'); }
   }
 
   /* ---- Phase 2: save OPD consultation (POST /api/encounters/consultation) */
@@ -2090,6 +2112,7 @@ window.HIS = window.HIS || {};
         HIS.toast('Follow-up booked · Token ' + r.followUpToken + (when ? ' · ' + when : ''), 'bi-ticket-detailed');
         if (fuBadge) { fuBadge.innerHTML = '<i class="bi bi-ticket-detailed"></i> Follow-up token <b>' + r.followUpToken + '</b>' + (when ? ' for ' + when : ''); fuBadge.style.display = 'inline-block'; }
       } else if (fuBadge) { fuBadge.style.display = 'none'; }
+      loadOpdHistory(doc, uhid);   // show the just-saved consultation in the history table
       if (apptId) { delete doc.dataset.opdAppt; delete doc.dataset.opdUhid; loadOpdLobby(doc); }
     } catch (e) { HIS.toast('Save failed: ' + e.message); }
   }
