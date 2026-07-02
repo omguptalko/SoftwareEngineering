@@ -1674,16 +1674,14 @@ window.HIS = window.HIS || {};
       departmentsOf(HIS._doctors || []).map(x => `<option${x === keep ? ' selected' : ''}>${x}</option>`).join('');
   }
 
-  // Department-specific clinical templates (config-driven). Extra fields shown in the
-  // consult for that specialty; on save they are folded into the clinical history.
-  const DEPT_TEMPLATES = {
-    'Surgery': [{ id: 'tplProc', label: 'Procedure planned' }, { id: 'tplAsa', label: 'ASA grade' }, { id: 'tplConsent', label: 'Consent taken' }],
-    'Orthopaedics': [{ id: 'tplJoint', label: 'Affected joint / limb' }, { id: 'tplRom', label: 'Range of motion' }, { id: 'tplXray', label: 'X-ray done' }],
-    'Cardiology': [{ id: 'tplEcg', label: 'ECG findings' }, { id: 'tplChest', label: 'Chest pain (Y/N)' }, { id: 'tplNyha', label: 'NYHA class' }],
-    'Pulmonology': [{ id: 'tplSpiro', label: 'Spirometry' }, { id: 'tplSputum', label: 'Sputum / cough' }],
-    'Dermatology': [{ id: 'tplLesion', label: 'Lesion type' }, { id: 'tplDist', label: 'Distribution' }, { id: 'tplItch', label: 'Pruritus (Y/N)' }],
-    'General Medicine': [{ id: 'tplSystemic', label: 'Systemic review' }]
-  };
+  // Department-specific clinical templates — admin-configurable per hospital, loaded from
+  // the API (GET /api/opd/templates). Cached as { department: [label, …] }.
+  async function loadDeptTemplates(force) {
+    if (HIS._deptTemplates && !force) return HIS._deptTemplates;
+    const map = {};
+    try { (await HIS.api.opdTemplates()).forEach(t => { map[t.department] = t.fields || []; }); } catch (e) {}
+    HIS._deptTemplates = map; return map;
+  }
 
   /* ---- Phase 2: appointments queue + slots + booking ------------------ */
   function initAppointments(doc) {
@@ -1783,10 +1781,10 @@ window.HIS = window.HIS || {};
   function renderDeptTemplate(doc, dept) {
     const panel = doc.querySelector('#deptTplPanel'), host = doc.querySelector('#deptTplFields'), title = doc.querySelector('#deptTplTitle');
     if (!panel || !host) return;
-    const tpl = DEPT_TEMPLATES[dept];
-    if (!tpl || !tpl.length) { panel.hidden = true; host.innerHTML = ''; return; }
+    const fields = (HIS._deptTemplates || {})[dept] || [];
+    if (!fields.length) { panel.hidden = true; host.innerHTML = ''; return; }
     if (title) title.textContent = dept + ' template';
-    host.innerHTML = tpl.map(f => `<div class="f"><label>${f.label}</label><div class="field"><input class="ctl" id="${f.id}"></div></div>`).join('');
+    host.innerHTML = fields.map((label, i) => `<div class="f"><label>${label}</label><div class="field"><input class="ctl" id="tplf${i}"></div></div>`).join('');
     panel.hidden = false;
   }
   function initOpd(doc) {
@@ -1794,8 +1792,8 @@ window.HIS = window.HIS || {};
     if (el) { el.addEventListener('change', () => loadOpdLobby(doc)); el.addEventListener('blur', () => loadOpdLobby(doc)); }
     opdLiveDoc = doc; ensureQueueHub();   // live refresh when vitals recorded / patient called / consult done
     loadOpdLobby(doc);
-    // Specialty/Department -> filtered consultant + department-specific template.
-    loadDoctorDirectory().then(() => {
+    // Specialty/Department -> filtered consultant + department-specific template (admin-configured).
+    Promise.all([loadDoctorDirectory(), loadDeptTemplates()]).then(() => {
       const dept = doc.querySelector('#opdDept'), docSel = doc.querySelector('#opdDoctor');
       if (dept) fillDeptSelect(dept);
       if (docSel) fillDoctorSelect(docSel, '');
@@ -1834,7 +1832,7 @@ window.HIS = window.HIS || {};
     doc.dataset.opdUhid = ds.uhid;
     const b = doc.querySelector('#opdBanner');
     if (b) b.innerHTML = `<div class="banner"><div class="meta"><span>Consulting <b>${ds.patient}</b></span><span>UHID <b>${ds.uhid}</b></span><span>Token <b>${ds.token || ''}</b></span></div></div>`;
-    await loadDoctorDirectory();
+    await loadDoctorDirectory(); await loadDeptTemplates();
     const dc = doc.querySelector('#opdDoctor'); if (dc && ds.doctor) dc.value = ds.doctor;
     const dept = deptOfDoctor(ds.doctor); const dptSel = doc.querySelector('#opdDept'); if (dptSel) dptSel.value = dept;
     renderDeptTemplate(doc, dept);

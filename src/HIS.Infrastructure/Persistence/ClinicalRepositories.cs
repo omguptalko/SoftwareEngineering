@@ -159,6 +159,29 @@ VALUES (@appointmentId, NULL, @RecordedUtc, @TempF, @Pulse, @BpSystolic, @BpDias
             new { appointmentId, encounterId }, cancellationToken: ct));
     }
 
+    public async Task<IReadOnlyList<(string Department, string Label, int SortOrder)>> ListDeptTemplatesAsync(CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return (await c.QueryAsync<(string Department, string Label, int SortOrder)>(new CommandDefinition(
+            "SELECT Department, Label, SortOrder FROM master.DeptTemplateField ORDER BY Department, SortOrder, Id",
+            cancellationToken: ct))).ToList();
+    }
+
+    public async Task ReplaceDeptTemplateAsync(string department, IReadOnlyList<string> labels, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        using var tx = c.BeginTransaction();
+        await c.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM master.DeptTemplateField WHERE Department = @department",
+            new { department }, transaction: tx, cancellationToken: ct));
+        var clean = labels.Select(l => (l ?? "").Trim()).Where(l => l.Length > 0).ToList();
+        for (var i = 0; i < clean.Count; i++)
+            await c.ExecuteAsync(new CommandDefinition(
+                "INSERT master.DeptTemplateField (Department, Label, SortOrder) VALUES (@department, @label, @sort)",
+                new { department, label = clean[i], sort = i + 1 }, transaction: tx, cancellationToken: ct));
+        tx.Commit();
+    }
+
     public async Task AddDiagnosisAsync(long encounterId, string icd10, bool provisional, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

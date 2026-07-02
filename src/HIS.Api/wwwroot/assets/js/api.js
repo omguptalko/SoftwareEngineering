@@ -77,6 +77,8 @@ HIS.api = (function () {
     recordVitals:    (apptId, vitals) => post(`/api/appointments/${apptId}/vitals`, vitals),
     callNext:        (apptId) => post(`/api/appointments/${apptId}/call`, {}),
     apptVitals:      (apptId) => get(`/api/appointments/${apptId}/vitals`),
+    opdTemplates:    () => get('/api/opd/templates'),
+    saveOpdTemplate: (department, fields) => post('/api/opd/templates', { department, fields }),
     saveConsultation:(cmd) => post('/api/encounters/consultation', cmd),
     // Phase 2.3 — IPD
     bedBoard:        () => get('/api/ipd/bedboard'),

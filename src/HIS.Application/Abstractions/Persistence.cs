@@ -93,6 +93,10 @@ public interface IEncounterRepository
     Task<Vitals?> GetApptVitalsAsync(long appointmentId, CancellationToken ct = default);
     /// <summary>Attach station-recorded vitals to the encounter created at consultation time.</summary>
     Task LinkApptVitalsAsync(long appointmentId, long encounterId, CancellationToken ct = default);
+    /// <summary>All configured OPD department template fields for this hospital (caller groups by department).</summary>
+    Task<IReadOnlyList<(string Department, string Label, int SortOrder)>> ListDeptTemplatesAsync(CancellationToken ct = default);
+    /// <summary>Replace a department's template fields (admin-configurable, per hospital).</summary>
+    Task ReplaceDeptTemplateAsync(string department, IReadOnlyList<string> labels, CancellationToken ct = default);
     Task AddDiagnosisAsync(long encounterId, string icd10, bool provisional, CancellationToken ct = default);
     Task<long> CreatePrescriptionAsync(long encounterId, CancellationToken ct = default);
     Task AddPrescriptionLineAsync(PrescriptionLine line, CancellationToken ct = default);

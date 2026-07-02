@@ -61,6 +61,7 @@
     <a data-tab="rbac"><i class="bi bi-diagram-3"></i> Modules &amp; Roles</a>
     <a data-tab="entitlements"><i class="bi bi-toggles"></i> Entitlements</a>
     <a data-tab="users"><i class="bi bi-person-plus"></i> Users</a>
+    <a data-tab="opdtpl"><i class="bi bi-clipboard2-pulse"></i> OPD Templates</a>
     <a data-tab="audit"><i class="bi bi-list-check"></i> Audit</a>
     <div class="who"><span class="muted">Signed in as</span><b id="whoName">—</b>
       <div class="signout"><a href="index.html" style="padding:0">← Workspace</a> · <a id="signout" style="padding:0;cursor:pointer">Sign out</a></div>
@@ -199,6 +200,19 @@
         <h2><i class="bi bi-list-check"></i> Recent events <button class="btn ghost sm" id="reloadAudit" style="margin-left:auto"><i class="bi bi-arrow-clockwise"></i> Refresh</button></h2>
         <table><thead><tr><th>When (UTC)</th><th>Actor</th><th>Action</th><th>Entity</th><th>Id</th><th>OK</th></tr></thead>
         <tbody id="auditBody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-opdtpl">
+      <h1>OPD department templates</h1><p class="sub">Extra clinical fields shown in the OPD consult for a specialty — configurable per hospital.</p>
+      <div class="card">
+        <h2><i class="bi bi-clipboard2-pulse"></i> Configure template</h2>
+        <div class="grid2">
+          <label>Department <select id="tplDept"></select></label>
+        </div>
+        <label style="margin-top:12px;display:block">Fields <span class="muted">(one per line)</span>
+          <textarea id="tplFields" rows="9" style="width:100%;font-family:inherit;margin-top:6px" placeholder="Procedure planned&#10;ASA grade&#10;Consent taken"></textarea></label>
+        <div class="actions"><button class="btn" id="tplSaveBtn"><i class="bi bi-check2-circle"></i> Save template</button></div>
       </div>
     </section>
   </main>
@@ -417,7 +431,7 @@
   // Tenant-admin mode: hide superadmin-only nav/panels; lock the tenant code to
   // the admin's own tenant (resolved realm). The server also enforces the scope.
   async function applyTenantAdminMode() {
-    $$('.nav a[data-tab]').forEach(a => { if (a.dataset.tab !== 'users') a.style.display = 'none'; a.classList.remove('active'); });
+    $$('.nav a[data-tab]').forEach(a => { if (a.dataset.tab !== 'users' && a.dataset.tab !== 'opdtpl') a.style.display = 'none'; a.classList.remove('active'); });
     const usersNav = $('.nav a[data-tab="users"]'); if (usersNav) usersNav.classList.add('active');
     $$('.panel').forEach(p => p.classList.remove('active'));
     $('#panel-users').classList.add('active');
@@ -431,6 +445,34 @@
       }
     } catch (e) {}
   }
+
+  // ---- OPD department templates (admin-configurable, per hospital) ----
+  const COMMON_DEPTS = ['General Medicine', 'Cardiology', 'Orthopaedics', 'Surgery', 'Pulmonology', 'Dermatology', 'Emergency Medicine', 'Radiology', 'Occupational Health'];
+  async function loadOpdTemplates() {
+    const tpls = await api('GET', '/api/opd/templates');           // [{department, fields:[]}]
+    window._opdTpls = {};
+    (tpls || []).forEach(t => { window._opdTpls[t.department] = t.fields || []; });
+    COMMON_DEPTS.forEach(d => { if (!(d in window._opdTpls)) window._opdTpls[d] = []; });
+    const all = Object.keys(window._opdTpls).sort();
+    $('#tplDept').innerHTML = all.map(d => `<option>${d}</option>`).join('');
+    showTplFields();
+  }
+  function showTplFields() {
+    const d = $('#tplDept').value;
+    $('#tplFields').value = (window._opdTpls[d] || []).join('\n');
+  }
+  $('#tplDept').addEventListener('change', showTplFields);
+  $('#tplSaveBtn').addEventListener('click', guard(async () => {
+    const d = $('#tplDept').value;
+    const fields = $('#tplFields').value.split('\n').map(s => s.trim()).filter(Boolean);
+    await api('POST', '/api/opd/templates', { department: d, fields });
+    window._opdTpls[d] = fields;
+    toast(`Saved ${d} template — ${fields.length} field(s)`);
+  }));
+  // Lazy-load the templates the first time the tab is opened.
+  $$('.nav a[data-tab]').forEach(a => a.addEventListener('click', () => {
+    if (a.dataset.tab === 'opdtpl' && !window._opdTplsLoaded) { window._opdTplsLoaded = true; guard(loadOpdTemplates)(); }
+  }));
 
   // ---- Initial load ----
   if (isTenantAdmin) {
