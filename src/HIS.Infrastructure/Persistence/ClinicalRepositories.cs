@@ -188,6 +188,26 @@ VALUES (@appointmentId, NULL, @RecordedUtc, @TempF, @Pulse, @BpSystolic, @BpDias
         tx.Commit();
     }
 
+    public async Task SaveTemplateAnswersAsync(long encounterId, string? department, IReadOnlyList<(string Label, string? FieldType, string? Value)> answers, CancellationToken ct = default)
+    {
+        var rows = answers.Where(a => !string.IsNullOrWhiteSpace(a.Value)).ToList();
+        if (rows.Count == 0) return;
+        using var c = await _f.OpenMasterAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"INSERT INTO clinical.EncounterTemplateData (EncounterId, Department, FieldLabel, FieldType, Value)
+              VALUES (@encounterId, @department, @label, @fieldType, @value);",
+            rows.Select(a => new { encounterId, department, label = a.Label, fieldType = a.FieldType, value = a.Value }),
+            cancellationToken: ct));
+    }
+
+    public async Task<IReadOnlyList<(string Label, string? FieldType, string? Value)>> GetTemplateAnswersAsync(long encounterId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return (await c.QueryAsync<(string Label, string? FieldType, string? Value)>(new CommandDefinition(
+            "SELECT FieldLabel, FieldType, Value FROM clinical.EncounterTemplateData WHERE EncounterId = @encounterId ORDER BY Id",
+            new { encounterId }, cancellationToken: ct))).ToList();
+    }
+
     public async Task AddDiagnosisAsync(long encounterId, string icd10, bool provisional, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

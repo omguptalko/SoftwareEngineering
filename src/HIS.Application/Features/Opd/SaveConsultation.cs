@@ -12,6 +12,9 @@ public sealed record VitalsDto(
 
 public sealed record RxLineDto(string DrugCode, string? Dose, string? Frequency, int? Days, string? Route, int? Qty);
 
+/// <summary>A structured answer to a department-template field (persisted on the encounter).</summary>
+public sealed record TemplateAnswerDto(string Label, string? FieldType, string? Value);
+
 /// <summary>Persists an OPD consultation in one unit: encounter + vitals + diagnoses +
 /// prescription + follow-up/advice (SRS §3.3). Codes/UHID resolved server-side.</summary>
 public sealed record SaveConsultationCommand(
@@ -19,7 +22,9 @@ public sealed record SaveConsultationCommand(
     VitalsDto? Vitals, string? Complaints, string? History, string? Advice, DateTime? FollowUpDate,
     IReadOnlyList<string>? DiagnosisCodes, IReadOnlyList<RxLineDto>? Prescription,
     IReadOnlyList<string>? LabTests = null,   // investigations ordered -> raised in the Lab worklist
-    long? AppointmentId = null)   // when consulting a queued patient: links vitals + closes the token
+    long? AppointmentId = null,   // when consulting a queued patient: links vitals + closes the token
+    string? Department = null,    // OPD specialty
+    IReadOnlyList<TemplateAnswerDto>? TemplateAnswers = null)   // structured department-template answers
     : ICommand<SaveConsultationResult>, IAuditable, IAuthorizable
 {
     public string AuditEntity => "Encounter";
@@ -90,6 +95,11 @@ public sealed class SaveConsultationHandler : MediatR.IRequestHandler<SaveConsul
             await _enc.LinkApptVitalsAsync(apptId, encounterId, ct);
             await _appts.SetStatusAsync(apptId, "Completed", ct);
         }
+
+        // Structured department-template answers (queryable, not folded into free-text history).
+        if (c.TemplateAnswers is { Count: > 0 })
+            await _enc.SaveTemplateAnswersAsync(encounterId, c.Department,
+                c.TemplateAnswers.Select(a => (a.Label, a.FieldType, a.Value)).ToList(), ct);
 
         if (c.DiagnosisCodes is { Count: > 0 })
             foreach (var dx in c.DiagnosisCodes.Where(d => !string.IsNullOrWhiteSpace(d)))

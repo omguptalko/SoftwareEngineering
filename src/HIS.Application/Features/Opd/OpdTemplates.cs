@@ -58,3 +58,17 @@ public sealed class SaveOpdTemplateHandler : MediatR.IRequestHandler<SaveOpdTemp
         return true;
     }
 }
+
+// ---------------------------- Read structured answers for an encounter ----------------------------
+public sealed record GetEncounterTemplateDataQuery(long EncounterId) : IQuery<IReadOnlyList<TemplateAnswerDto>>, IRequireAuthentication;
+
+public sealed class GetEncounterTemplateDataHandler : MediatR.IRequestHandler<GetEncounterTemplateDataQuery, IReadOnlyList<TemplateAnswerDto>>
+{
+    private readonly IEncounterRepository _enc;
+    public GetEncounterTemplateDataHandler(IEncounterRepository enc) { _enc = enc; }
+    public async Task<IReadOnlyList<TemplateAnswerDto>> Handle(GetEncounterTemplateDataQuery q, CancellationToken ct)
+    {
+        var rows = await _enc.GetTemplateAnswersAsync(q.EncounterId, ct);
+        return rows.Select(r => new TemplateAnswerDto(r.Label, r.FieldType, r.Value)).ToList();
+    }
+}

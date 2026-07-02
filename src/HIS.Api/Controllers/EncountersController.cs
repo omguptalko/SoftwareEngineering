@@ -27,4 +27,9 @@ public sealed class EncountersController : ControllerBase
             await _hub.Clients.Group(TenantGroups.Name(_tenant)).SendAsync("opdChanged", new { action = "completed", appointmentId = apptId }, ct);
         return Ok(result);
     }
+
+    /// <summary>The structured department-template answers recorded on an encounter.</summary>
+    [HttpGet("{id:long}/template-data")]
+    public Task<IReadOnlyList<TemplateAnswerDto>> TemplateData(long id, CancellationToken ct) =>
+        _mediator.Send(new GetEncounterTemplateDataQuery(id), ct);
 }

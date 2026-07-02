@@ -97,6 +97,10 @@ public interface IEncounterRepository
     Task<IReadOnlyList<(string Department, string Label, string FieldType, string? Options, int SortOrder)>> ListDeptTemplatesAsync(CancellationToken ct = default);
     /// <summary>Replace a department's template fields (admin-configurable, per hospital).</summary>
     Task ReplaceDeptTemplateAsync(string department, IReadOnlyList<(string Label, string FieldType, string? Options)> fields, CancellationToken ct = default);
+    /// <summary>Persist the department-template answers a doctor filled, as structured rows on the encounter.</summary>
+    Task SaveTemplateAnswersAsync(long encounterId, string? department, IReadOnlyList<(string Label, string? FieldType, string? Value)> answers, CancellationToken ct = default);
+    /// <summary>The structured template answers recorded for an encounter.</summary>
+    Task<IReadOnlyList<(string Label, string? FieldType, string? Value)>> GetTemplateAnswersAsync(long encounterId, CancellationToken ct = default);
     Task AddDiagnosisAsync(long encounterId, string icd10, bool provisional, CancellationToken ct = default);
     Task<long> CreatePrescriptionAsync(long encounterId, CancellationToken ct = default);
     Task AddPrescriptionLineAsync(PrescriptionLine line, CancellationToken ct = default);

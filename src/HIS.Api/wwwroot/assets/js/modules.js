@@ -1898,15 +1898,15 @@ window.HIS = window.HIS || {};
         .map(cb => (cb.closest('label') ? cb.closest('label').textContent.trim() : '')).filter(Boolean),
       appointmentId: apptId
     };
-    // Fold the department-specific template fields into the clinical history (all field types).
-    const tplParts = Array.from(doc.querySelectorAll('#deptTplFields input, #deptTplFields select')).map(el => {
-      const l = el.closest('.f'); const lbl = l ? l.querySelector('label').textContent.trim() : el.id;
-      const v = el.type === 'checkbox' ? (el.checked ? 'Yes' : '') : (el.value || '').trim();
-      return v ? (lbl + ': ' + v) : '';
-    }).filter(Boolean);
-    if (tplParts.length) {
-      cmd.history = (cmd.history ? cmd.history + ' | ' : '') + '[' + (val(doc, 'opdDept') || 'Dept') + '] ' + tplParts.join('; ');
-    }
+    // Department-template answers -> persisted as structured rows on the encounter (queryable).
+    const answers = Array.from(doc.querySelectorAll('#deptTplFields input, #deptTplFields select')).map(el => {
+      const l = el.closest('.f'); const label = l ? l.querySelector('label').textContent.trim() : el.id;
+      const value = el.type === 'checkbox' ? (el.checked ? 'Yes' : '') : (el.value || '').trim();
+      const fieldType = el.type === 'checkbox' ? 'checkbox' : (el.tagName === 'SELECT' ? 'select' : (el.type === 'number' ? 'number' : 'text'));
+      return { label, fieldType, value };
+    }).filter(a => a.value);
+    cmd.department = val(doc, 'opdDept') || null;
+    if (answers.length) cmd.templateAnswers = answers;
     try {
       const r = await HIS.api.saveConsultation(cmd);
       HIS.toast('Consultation saved · Encounter #' + r.encounterId + (apptId ? ' · token closed' : ''), 'bi-check-circle-fill');
