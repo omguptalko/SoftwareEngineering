@@ -204,6 +204,10 @@ window.HIS = window.HIS || {};
           <div class="f"><label>Visit Type</label><div class="field"><select class="ctl" id="apptVisit"><option>New</option><option>Follow-up</option><option>Review</option></select></div></div>
           <div class="f"><label>Mode</label><div class="field"><select class="ctl" id="apptMode"><option>Walk-in</option><option>Online</option><option>Tele-consult</option></select></div></div>
         </div>
+        <div class="flex gap6 mt8" style="align-items:center;flex-wrap:wrap">
+          <button class="btn btn--primary" data-act="save"><i class="bi bi-ticket-detailed"></i> Book &amp; Generate Token <span class="fk">F9</span></button>
+          <span class="pill pill--muted" id="apptSelSlot"><i class="bi bi-clock"></i> No slot picked — defaults to 09:00</span>
+        </div>
       </div></div>
       <div class="cols-side">
         <div class="panel"><div class="panel__head"><i class="bi bi-clock"></i> Available Slots <span class="ph-right muted" id="apptSlotHint">pick a doctor &amp; date</span></div>
@@ -1811,7 +1815,10 @@ window.HIS = window.HIS || {};
       host.querySelectorAll('[data-slot]').forEach(b => b.addEventListener('click', () => {
         host.querySelectorAll('[data-slot]').forEach(x => x.classList.remove('is-sel'));
         b.classList.add('is-sel'); doc.dataset.slot = b.dataset.slot;
-        HIS.toast('Slot ' + b.textContent.trim() + ' selected');
+        const t = (b.textContent || '').trim().replace(/\s+Free$/, '');
+        const sel = doc.querySelector('#apptSelSlot');
+        if (sel) { sel.innerHTML = '<i class="bi bi-check2-circle"></i> Selected ' + t + ' — click Book &amp; Generate Token'; sel.className = 'pill pill--ok'; }
+        HIS.toast('Slot ' + t + ' selected — now click Book & Generate Token');
       }));
     } catch (e) { host.innerHTML = '<span class="muted">Slots API unavailable</span>'; }
   }
@@ -1829,7 +1836,10 @@ window.HIS = window.HIS || {};
     };
     try {
       const r = await HIS.api.bookAppointment(cmd);
-      HIS.toast('Booked · Token ' + r.tokenNo, 'bi-ticket-detailed');
+      HIS.toast('Booked · Token ' + r.tokenNo + ' — added to the appointments list', 'bi-ticket-detailed');
+      delete doc.dataset.slot;
+      const sel = doc.querySelector('#apptSelSlot');
+      if (sel) { sel.innerHTML = '<i class="bi bi-clock"></i> No slot picked — defaults to 09:00'; sel.className = 'pill pill--muted'; }
       loadQueue(doc); loadSlots(doc); loadUpcoming(doc);
     } catch (e) { HIS.toast('Booking failed: ' + e.message); }
   }
