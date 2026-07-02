@@ -208,6 +208,20 @@ VALUES (@appointmentId, NULL, @RecordedUtc, @TempF, @Pulse, @BpSystolic, @BpDias
             new { encounterId }, cancellationToken: ct))).ToList();
     }
 
+    public async Task<IReadOnlyList<(long EncounterId, DateTime StartedUtc, string? Doctor, string? Department, string? Diagnosis, string? Complaints)>> GetPatientEncountersAsync(long patientId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return (await c.QueryAsync<(long EncounterId, DateTime StartedUtc, string? Doctor, string? Department, string? Diagnosis, string? Complaints)>(new CommandDefinition(
+            @"SELECT e.EncounterId, e.StartedUtc, d.Name AS Doctor, d.Department,
+                     (SELECT STRING_AGG(ed.Icd10Code, ', ') FROM clinical.EncounterDiagnosis ed WHERE ed.EncounterId = e.EncounterId) AS Diagnosis,
+                     e.Complaints
+              FROM clinical.Encounter e
+              LEFT JOIN master.Doctor d ON d.DoctorId = e.DoctorId
+              WHERE e.PatientId = @patientId
+              ORDER BY e.StartedUtc DESC, e.EncounterId DESC",
+            new { patientId }, cancellationToken: ct))).ToList();
+    }
+
     public async Task AddDiagnosisAsync(long encounterId, string icd10, bool provisional, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

@@ -62,6 +62,7 @@ HIS.api = (function () {
     listPatients:    (q) => get(`/api/patients${q ? `?q=${encodeURIComponent(q)}` : ''}`),
     updatePatient:   (cmd) => post('/api/patients/update', cmd),
     setPatientActive:(uhid, isActive) => post('/api/patients/set-active', { uhid, isActive }),
+    patientEncounters:(uhid) => get(`/api/patients/${encodeURIComponent(uhid)}/encounters`),
     dashboard:       () => get('/api/dashboard'),
     dashboardAlerts: () => get('/api/dashboard/alerts'),
     auditTrail:      (take) => get(`/api/audit${take ? `?take=${take}` : ''}`),

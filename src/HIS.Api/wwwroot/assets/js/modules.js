@@ -181,6 +181,11 @@ window.HIS = window.HIS || {};
           <tbody id="patientsBody">${emptyRow(7, 'Loading…')}</tbody>
         </table></div></div>
       </div>
+
+      <div class="panel" id="patientHistory" hidden>
+        <div class="panel__head"><i class="bi bi-clock-history"></i> Consultation history <span class="ph-right muted" id="phWho"></span></div>
+        <div class="panel__body" id="phBody"></div>
+      </div>
     </div>`;
   }
 
@@ -1628,9 +1633,11 @@ window.HIS = window.HIS || {};
       const rows = await HIS.api.listPatients(val(doc, 'patSearch') || null);
       tb.innerHTML = rows.length ? rows.map(p =>
         `<tr><td><b>${p.uhid}</b></td><td>${p.fullName}</td><td>${p.ageYears ?? ''}/${(p.sex || '').slice(0, 1)}</td><td>${p.bloodGroup || ''}</td><td>${p.mobile || ''}</td><td>${(p.registeredAtUtc || '').slice(0, 10)}</td>
-          <td style="white-space:nowrap"><button class="btn btn--sm" title="Edit" data-edit='${encodeURIComponent(JSON.stringify(p))}'><i class="bi bi-pencil"></i></button>
+          <td style="white-space:nowrap"><button class="btn btn--sm" title="History" data-hist="${p.uhid}" data-name="${p.fullName}"><i class="bi bi-clock-history"></i></button>
+          <button class="btn btn--sm" title="Edit" data-edit='${encodeURIComponent(JSON.stringify(p))}'><i class="bi bi-pencil"></i></button>
           <button class="btn btn--sm" title="Deactivate" data-deact="${p.uhid}" data-name="${p.fullName}"><i class="bi bi-person-x"></i></button></td></tr>`
       ).join('') : emptyRow(7, 'No patients yet — register one above');
+      tb.querySelectorAll('[data-hist]').forEach(b => b.addEventListener('click', () => showPatientHistory(doc, b.dataset.hist, b.dataset.name)));
       tb.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editPatient(doc, JSON.parse(decodeURIComponent(b.dataset.edit)))));
       tb.querySelectorAll('[data-deact]').forEach(b => b.addEventListener('click', () => deactivatePatient(doc, b.dataset.deact, b.dataset.name)));
     } catch (e) { tb.innerHTML = emptyRow(7, 'Patients API unavailable'); }
@@ -1649,6 +1656,29 @@ window.HIS = window.HIS || {};
     if (!confirm(`Deactivate patient ${name} (${uhid})?\nThe record is soft-deleted; clinical history is kept.`)) return;
     try { await HIS.api.setPatientActive(uhid, false); HIS.toast('Deactivated ' + uhid, 'bi-person-x'); loadPatients(doc); }
     catch (e) { HIS.toast('Deactivate failed: ' + e.message); }
+  }
+  // Consultation history (encounters + their structured department-template answers).
+  async function showPatientHistory(doc, uhid, name) {
+    const panel = doc.querySelector('#patientHistory'), body = doc.querySelector('#phBody'), who = doc.querySelector('#phWho');
+    if (!panel || !body) return;
+    if (who) who.textContent = name + ' · ' + uhid;
+    panel.hidden = false; body.innerHTML = '<div class="muted" style="padding:10px">Loading…</div>';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try {
+      const encs = await HIS.api.patientEncounters(uhid);
+      if (!encs.length) { body.innerHTML = '<div class="muted" style="padding:10px">No consultations recorded yet.</div>'; return; }
+      body.innerHTML = encs.map(e => {
+        const dt = (e.dateUtc || '').replace('T', ' ').slice(0, 16);
+        const ans = (e.answers || []).map(a => `<span class="pill pill--muted" style="margin:2px 4px 2px 0;display:inline-block">${a.label}: <b>${a.value}</b></span>`).join('');
+        return `<div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px">
+            <b><i class="bi bi-clipboard2-pulse"></i> ${dt}</b>
+            <span class="muted">${e.doctor || ''}${e.department ? ' · ' + e.department : ''}</span></div>
+          <div style="font-size:12.5px;margin-top:5px">${e.complaints ? '<b>Complaints:</b> ' + e.complaints + '&nbsp; ' : ''}${e.diagnosis ? '<b>Dx:</b> ' + e.diagnosis : ''}</div>
+          ${ans ? `<div style="margin-top:6px">${ans}</div>` : ''}
+        </div>`;
+      }).join('');
+    } catch (e) { body.innerHTML = '<div class="muted" style="padding:10px">History API unavailable</div>'; }
   }
 
   /* ---- Doctor directory + department → doctor filtering --------------- */

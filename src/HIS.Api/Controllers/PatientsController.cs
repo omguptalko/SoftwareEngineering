@@ -39,6 +39,11 @@ public sealed class PatientsController : ControllerBase
         return dto is null ? NotFound() : Ok(dto);
     }
 
+    /// <summary>A patient's consultation history (encounters) with their structured template answers.</summary>
+    [HttpGet("{uhid}/encounters")]
+    public Task<IReadOnlyList<EncounterHistoryDto>> Encounters(string uhid, CancellationToken ct) =>
+        _mediator.Send(new GetPatientEncountersQuery(uhid), ct);
+
     [HttpPost]
     public async Task<ActionResult<RegisterPatientResult>> Register([FromBody] RegisterPatientCommand cmd, CancellationToken ct)
     {
