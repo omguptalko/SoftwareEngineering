@@ -255,6 +255,12 @@ window.HIS = window.HIS || {};
           <thead><tr><th>Token</th><th>Patient</th><th>UHID</th><th>Status</th><th></th></tr></thead>
           <tbody id="opdLobby">${emptyRow(5, 'Enter your doctor code to load your queue')}</tbody>
         </table></div></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-calendar-check"></i> Today's Schedule — all my appointments
+        <span class="ph-right muted" id="opdSchedCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Token</th><th>Patient</th><th>UHID</th><th>Status</th><th>Vitals</th></tr></thead>
+          <tbody id="opdSchedule">${emptyRow(5, 'Enter your doctor code to load your schedule')}</tbody>
+        </table></div></div></div>
       <div id="opdBanner">${banner(p)}</div>
       <div>
         <div class="itabs">
@@ -1892,7 +1898,19 @@ window.HIS = window.HIS || {};
       }).join('') : emptyRow(5, docCode ? 'No patients waiting' : 'Enter your doctor code above');
       tb.querySelectorAll('[data-call]').forEach(b => b.addEventListener('click', () => doCallIn(doc, b.dataset)));
       tb.querySelectorAll('[data-consult]').forEach(b => b.addEventListener('click', () => selectOpdPatient(doc, b.dataset)));
+      renderOpdSchedule(doc, all, docCode);
     } catch (e) { tb.innerHTML = emptyRow(5, 'Lobby API unavailable'); }
+  }
+  // Doctor-facing full day: every appointment booked for this doctor today, any status.
+  function renderOpdSchedule(doc, all, docCode) {
+    const st = doc.querySelector('#opdSchedule'); if (!st) return;
+    const cnt = doc.querySelector('#opdSchedCount');
+    if (cnt) cnt.textContent = all.length ? all.length + ' booked today' : '';
+    st.innerHTML = all.length ? all.map(r => {
+      const cls = r.status === 'Completed' ? 'pill--muted' : r.status === 'InConsultation' ? 'pill--warn' : r.status === 'VitalsDone' ? 'pill--ok' : '';
+      const vit = r.hasVitals ? '<span class="pill pill--ok">Done</span>' : '<span class="pill pill--muted">Pending</span>';
+      return `<tr><td><b>${r.token}</b></td><td>${r.patient}</td><td>${r.uhid}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${vit}</td></tr>`;
+    }).join('') : emptyRow(5, docCode ? 'No appointments today' : 'Enter your doctor code above');
   }
   async function doCallIn(doc, ds) {
     try {
