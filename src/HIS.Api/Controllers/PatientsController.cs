@@ -11,6 +11,19 @@ public sealed class PatientsController : ControllerBase
     private readonly IMediator _mediator;
     public PatientsController(IMediator mediator) => _mediator = mediator;
 
+    /// <summary>List this hospital's patients (tenant-scoped). Optional q filters UHID/name/mobile.</summary>
+    [HttpGet]
+    public Task<IReadOnlyList<PatientListItemDto>> List([FromQuery] string? q, CancellationToken ct) =>
+        _mediator.Send(new GetPatientsQuery(q), ct);
+
+    /// <summary>Update a patient's demographics.</summary>
+    [HttpPost("update")]
+    public Task<bool> Update([FromBody] UpdatePatientCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Deactivate / restore a patient (soft delete — keeps clinical history).</summary>
+    [HttpPost("set-active")]
+    public Task<bool> SetActive([FromBody] SetPatientActiveCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
     /// <summary>Default patient for the workspace banner (replaces HIS.mock.currentPatient).</summary>
     [HttpGet("default")]
     public async Task<ActionResult<PatientDto>> Default(CancellationToken ct)

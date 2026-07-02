@@ -127,13 +127,13 @@ window.HIS = window.HIS || {};
                 <div class="f"><label>UHID</label><div class="field"><input class="ctl code ro" id="regUhid" value="(auto on save)" readonly tabindex="-1"></div></div>
                 <div class="f"><label>Reg. Date/Time</label><div class="field"><input class="ctl ro" id="regDate" readonly tabindex="-1"></div></div>
                 <div class="f"><label>Full Name <span class="req">*</span></label><div class="field"><input class="ctl" id="regName" placeholder="First Middle Last"></div></div>
-                <div class="f"><label>Father / Spouse</label><div class="field"><input class="ctl" placeholder="Guardian name"></div></div>
+                <div class="f"><label>Father / Spouse</label><div class="field"><input class="ctl" id="regGuardian" placeholder="Guardian name"></div></div>
                 <div class="f"><label>Age <span class="req">*</span></label><div class="field with-unit"><input class="ctl" id="regAge" style="width:70px"><span class="unit">Yrs</span></div></div>
                 <div class="f"><label>Date of Birth</label><div class="field"><input class="ctl" type="date"></div></div>
                 <div class="f"><label>Sex <span class="req">*</span></label><div class="field"><select class="ctl" id="regSex"><option value="">—</option><option>Female</option><option>Male</option><option>Other</option></select></div></div>
-                <div class="f"><label>Blood Group</label><div class="field"><select class="ctl"><option value="">Unknown</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></div></div>
+                <div class="f"><label>Blood Group</label><div class="field"><select class="ctl" id="regBlood"><option value="">Unknown</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></div></div>
                 <div class="f"><label>Mobile <span class="req">*</span></label><div class="field"><input class="ctl" id="regMobile" placeholder="10-digit mobile" maxlength="10"></div></div>
-                <div class="f"><label>Email</label><div class="field"><input class="ctl" type="email" placeholder="name@email"></div></div>
+                <div class="f"><label>Email</label><div class="field"><input class="ctl" id="regEmail" type="email" placeholder="name@email"></div></div>
                 <div class="f"><label>Category</label><div class="field"><select class="ctl"><option>General (Cash)</option><option>Insurance / Cashless</option><option>PM-JAY</option><option>ESIC</option><option>Corporate / Industrial</option></select></div></div>
                 <div class="f"><label>Employer / Company</label><div class="field with-btn"><input class="ctl" data-lookup="payer" placeholder="F3 corporate / payer…"><button class="lk" data-lookup="payer">F3</button></div></div>
               </div>
@@ -166,10 +166,20 @@ window.HIS = window.HIS || {};
             <div class="panel__head"><i class="bi bi-lightning-charge"></i> Quick Actions</div>
             <div class="panel__body" style="display:grid;gap:6px">
               <button class="btn btn--primary" data-act="save"><i class="bi bi-save"></i> Register &amp; Generate UHID <span class="fk">F9</span></button>
+              <button class="btn" id="regClear"><i class="bi bi-x-circle"></i> Clear / New</button>
               <button class="btn"><i class="bi bi-printer"></i> Print UHID Card</button>
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head"><i class="bi bi-people"></i> Registered Patients — this hospital
+          <span class="ph-right"><input class="ctl" id="patSearch" placeholder="Search UHID / name / mobile…" style="width:220px;display:inline-block"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>UHID</th><th>Name</th><th>Age/Sex</th><th>Blood</th><th>Mobile</th><th>Registered</th><th></th></tr></thead>
+          <tbody id="patientsBody">${emptyRow(7, 'Loading…')}</tbody>
+        </table></div></div>
       </div>
     </div>`;
   }
@@ -1574,18 +1584,68 @@ window.HIS = window.HIS || {};
 
   /* ---- Phase 1: register patient (POST /api/patients) ----------------- */
   async function doRegister(doc) {
-    const cmd = {
+    const editUhid = doc.dataset.editUhid;
+    const base = {
       fullName: val(doc, 'regName'),
+      guardianName: val(doc, 'regGuardian') || null,
+      ageYears: intOrNull(val(doc, 'regAge')),
       sex: val(doc, 'regSex'),
+      bloodGroup: val(doc, 'regBlood') || null,
       mobile: val(doc, 'regMobile'),
-      ageYears: intOrNull(val(doc, 'regAge'))
+      email: val(doc, 'regEmail') || null
     };
-    if (!cmd.fullName || !cmd.sex || !cmd.mobile) { HIS.toast('Name, sex and mobile are required'); return; }
+    if (!base.fullName || !base.sex || !base.mobile) { HIS.toast('Name, sex and mobile are required'); return; }
     try {
-      const r = await HIS.api.registerPatient(cmd);
-      const u = doc.querySelector('#regUhid'); if (u) u.value = r.uhid;
-      HIS.toast('Registered · UHID ' + r.uhid, 'bi-check-circle-fill');
-    } catch (e) { HIS.toast('Registration failed: ' + e.message); }
+      if (editUhid) {
+        const ep = doc._editPatient || {};
+        await HIS.api.updatePatient(Object.assign({ uhid: editUhid, address: ep.address ?? null, city: ep.city ?? null }, base));
+        HIS.toast('Updated · ' + editUhid, 'bi-check-circle-fill');
+        clearRegForm(doc);
+      } else {
+        const r = await HIS.api.registerPatient(base);
+        const u = doc.querySelector('#regUhid'); if (u) u.value = r.uhid;
+        HIS.toast('Registered · UHID ' + r.uhid, 'bi-check-circle-fill');
+        clearRegForm(doc, true);
+      }
+      loadPatients(doc);
+    } catch (e) { HIS.toast((editUhid ? 'Update' : 'Registration') + ' failed: ' + e.message); }
+  }
+  function clearRegForm(doc, keepUhid) {
+    delete doc.dataset.editUhid; doc._editPatient = null;
+    ['regName', 'regGuardian', 'regAge', 'regBlood', 'regMobile', 'regEmail'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+    const sx = doc.querySelector('#regSex'); if (sx) sx.value = '';
+    if (!keepUhid) { const u = doc.querySelector('#regUhid'); if (u) u.value = '(auto on save)'; }
+    const btn = doc.querySelector('#regGrid [data-act="save"], [data-act="save"]');
+    if (btn) btn.innerHTML = '<i class="bi bi-save"></i> Register &amp; Generate UHID <span class="fk">F9</span>';
+  }
+  /* ---- Registration: this hospital's patients + CRUD (tenant-scoped) ---- */
+  async function loadPatients(doc) {
+    const tb = doc.querySelector('#patientsBody'); if (!tb) return;
+    try {
+      const rows = await HIS.api.listPatients(val(doc, 'patSearch') || null);
+      tb.innerHTML = rows.length ? rows.map(p =>
+        `<tr><td><b>${p.uhid}</b></td><td>${p.fullName}</td><td>${p.ageYears ?? ''}/${(p.sex || '').slice(0, 1)}</td><td>${p.bloodGroup || ''}</td><td>${p.mobile || ''}</td><td>${(p.registeredAtUtc || '').slice(0, 10)}</td>
+          <td style="white-space:nowrap"><button class="btn btn--sm" title="Edit" data-edit='${encodeURIComponent(JSON.stringify(p))}'><i class="bi bi-pencil"></i></button>
+          <button class="btn btn--sm" title="Deactivate" data-deact="${p.uhid}" data-name="${p.fullName}"><i class="bi bi-person-x"></i></button></td></tr>`
+      ).join('') : emptyRow(7, 'No patients yet — register one above');
+      tb.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editPatient(doc, JSON.parse(decodeURIComponent(b.dataset.edit)))));
+      tb.querySelectorAll('[data-deact]').forEach(b => b.addEventListener('click', () => deactivatePatient(doc, b.dataset.deact, b.dataset.name)));
+    } catch (e) { tb.innerHTML = emptyRow(7, 'Patients API unavailable'); }
+  }
+  function editPatient(doc, p) {
+    doc.dataset.editUhid = p.uhid; doc._editPatient = p;
+    const set = (id, v) => { const el = doc.querySelector('#' + id); if (el) el.value = (v == null ? '' : v); };
+    set('regName', p.fullName); set('regGuardian', p.guardianName); set('regAge', p.ageYears);
+    set('regSex', p.sex); set('regBlood', p.bloodGroup); set('regMobile', p.mobile); set('regEmail', p.email);
+    const u = doc.querySelector('#regUhid'); if (u) u.value = p.uhid;
+    const btn = doc.querySelector('[data-act="save"]'); if (btn) btn.innerHTML = '<i class="bi bi-save"></i> Update Patient <span class="fk">F9</span>';
+    HIS.toast('Editing ' + p.fullName + ' — change fields and Save', 'bi-pencil');
+    const nm = doc.querySelector('#regName'); if (nm) nm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  async function deactivatePatient(doc, uhid, name) {
+    if (!confirm(`Deactivate patient ${name} (${uhid})?\nThe record is soft-deleted; clinical history is kept.`)) return;
+    try { await HIS.api.setPatientActive(uhid, false); HIS.toast('Deactivated ' + uhid, 'bi-person-x'); loadPatients(doc); }
+    catch (e) { HIS.toast('Deactivate failed: ' + e.message); }
   }
 
   /* ---- Phase 2: appointments queue + slots + booking ------------------ */
@@ -1841,6 +1901,11 @@ window.HIS = window.HIS || {};
         `<tr><td>${v.date}</td><td>${v.branch}</td><td>${v.type}</td><td>${v.doctor}</td><td>${v.diagnosis}</td><td>${v.payer}</td></tr>`
       ).join('');
     }
+    // This hospital's patient list (tenant-scoped) + CRUD.
+    loadPatients(doc);
+    const s = doc.querySelector('#patSearch');
+    if (s) { let t; s.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => loadPatients(doc), 250); }); }
+    const clr = doc.querySelector('#regClear'); if (clr) clr.addEventListener('click', () => clearRegForm(doc));
   }
 
   /* ---- ipd: render the live bed board (with occupants) --------------- */

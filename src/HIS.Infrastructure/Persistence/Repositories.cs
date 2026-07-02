@@ -145,6 +145,28 @@ public sealed class PatientRepository : IPatientRepository
             new { patientId }, cancellationToken: ct))).ToList();
     }
 
+    public async Task<bool> UpdateAsync(Patient p, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        // Only the editable demographics are touched; identity/clinical columns are left intact.
+        var n = await c.ExecuteAsync(new CommandDefinition(
+            @"UPDATE patient.Patient
+                 SET FullName = @FullName, GuardianName = @GuardianName, AgeYears = @AgeYears, Sex = @Sex,
+                     BloodGroup = @BloodGroup, Mobile = @Mobile, Email = @Email, Address = @Address, City = @City
+               WHERE Uhid = @Uhid",
+            p, cancellationToken: ct));
+        return n > 0;
+    }
+
+    public async Task<bool> SetActiveAsync(string uhid, bool isActive, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        var n = await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE patient.Patient SET IsActive = @isActive WHERE Uhid = @uhid",
+            new { uhid, isActive }, cancellationToken: ct));
+        return n > 0;
+    }
+
     public async Task<string> GetNextUhidAsync(int branchId, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

@@ -51,6 +51,10 @@ public interface IPatientRepository
     Task<Patient?> GetByUhidAsync(string uhid, CancellationToken ct = default);
     Task<IReadOnlyList<Patient>> SearchAsync(string? q, int branchId, int take, CancellationToken ct = default);
     Task<IReadOnlyList<PatientVisit>> GetVisitsAsync(long patientId, CancellationToken ct = default);
+    /// <summary>Update a patient's editable demographics (by UHID, within the tenant's master DB).</summary>
+    Task<bool> UpdateAsync(Patient p, CancellationToken ct = default);
+    /// <summary>Soft delete / restore a patient (IsActive) — keeps history intact.</summary>
+    Task<bool> SetActiveAsync(string uhid, bool isActive, CancellationToken ct = default);
     Task<string> GetNextUhidAsync(int branchId, CancellationToken ct = default);
     Task<long> InsertAsync(Patient patient, CancellationToken ct = default);
     Task<bool> AadhaarExistsAsync(string aadhaarMasked, CancellationToken ct = default);
