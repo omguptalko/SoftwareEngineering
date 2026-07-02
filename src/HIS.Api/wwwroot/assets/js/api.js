@@ -74,6 +74,7 @@ HIS.api = (function () {
     // Phase 2 — Appointments & OPD
     apptQueue:       (doctorCode, status) => { const q = new URLSearchParams(); if (doctorCode) q.set('doctorCode', doctorCode); if (status) q.set('status', status); const s = q.toString(); return get('/api/appointments/queue' + (s ? '?' + s : '')); },
     apptSlots:       (doctorCode, date) => get(`/api/appointments/slots?doctorCode=${encodeURIComponent(doctorCode)}&date=${encodeURIComponent(date)}`),
+    upcomingAppts:   (doctorCode, followUpOnly) => { const q = new URLSearchParams(); if (doctorCode) q.set('doctorCode', doctorCode); if (followUpOnly) q.set('followUpOnly', 'true'); const s = q.toString(); return get('/api/appointments/upcoming' + (s ? '?' + s : '')); },
     bookAppointment: (cmd) => post('/api/appointments', cmd),
     recordVitals:    (apptId, vitals) => post(`/api/appointments/${apptId}/vitals`, vitals),
     callNext:        (apptId) => post(`/api/appointments/${apptId}/call`, {}),

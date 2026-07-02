@@ -30,6 +30,32 @@ public sealed class GetTodayQueueHandler : MediatR.IRequestHandler<GetTodayQueue
     }
 }
 
+// ---- Upcoming appointments (future-dated) — surfaces follow-ups booked from a
+//      consult, which the date-scoped Today's Queue never shows. ----
+public sealed record UpcomingApptDto(long AppointmentId, DateTime SlotStart, string Token, string Uhid, string Patient, string Doctor, string Department, string VisitType, string Status);
+
+public sealed record GetUpcomingApptsQuery(string? DoctorCode = null, bool FollowUpOnly = false) : IQuery<IReadOnlyList<UpcomingApptDto>>;
+
+public sealed class GetUpcomingApptsHandler : MediatR.IRequestHandler<GetUpcomingApptsQuery, IReadOnlyList<UpcomingApptDto>>
+{
+    private readonly IAppointmentRepository _appts;
+    private readonly IBranchContext _ctx;
+
+    public GetUpcomingApptsHandler(IAppointmentRepository appts, IBranchContext ctx) { _appts = appts; _ctx = ctx; }
+
+    public async Task<IReadOnlyList<UpcomingApptDto>> Handle(GetUpcomingApptsQuery q, CancellationToken ct)
+    {
+        var branchId = _ctx.BranchId ?? 0;
+        int? doctorId = null;
+        if (!string.IsNullOrWhiteSpace(q.DoctorCode))
+            doctorId = await _appts.GetDoctorIdByCodeAsync(LookupCode.Parse(q.DoctorCode!), ct);
+
+        // From tomorrow onward: today's appointments already appear in the Today's Queue.
+        var rows = await _appts.GetUpcomingAsync(branchId, DateTime.Now.Date.AddDays(1), doctorId, q.FollowUpOnly, ct);
+        return rows.Select(r => new UpcomingApptDto(r.AppointmentId, r.SlotStart, r.TokenNo, r.Uhid, r.PatientName, r.DoctorName, r.Department, r.VisitType, r.Status)).ToList();
+    }
+}
+
 // ---- Doctor slots for a date (working hours from config, never hardcoded) ----
 public sealed record SlotDto(string Time, DateTime SlotStart, bool Booked);
 

@@ -216,6 +216,15 @@ window.HIS = window.HIS || {};
           </table></div></div>
         </div>
       </div>
+      <div class="panel">
+        <div class="panel__head"><i class="bi bi-calendar2-week"></i> Upcoming Appointments
+          <span class="ph-right"><label class="muted" style="font-size:12px;cursor:pointer"><input type="checkbox" id="apptFuOnly"> Follow-ups only</label></span>
+        </div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Date &amp; Time</th><th>Token</th><th>Patient</th><th>Doctor</th><th>Department</th><th>Type</th><th>Status</th></tr></thead>
+          <tbody id="apptUpcoming">${emptyRow(7, 'Loading…')}</tbody>
+        </table></div></div>
+      </div>
       <div class="panel" id="vitalsStation" hidden><div class="panel__head"><i class="bi bi-heart-pulse"></i> Vitals Station <span class="ph-right muted" id="vsWho"></span></div>
         <div class="panel__body">
           <div class="form-grid three">
@@ -1719,6 +1728,8 @@ window.HIS = window.HIS || {};
   function initAppointments(doc) {
     const d = doc.querySelector('#apptDate'); if (d) d.value = new Date().toISOString().slice(0, 10);
     loadQueue(doc);
+    loadUpcoming(doc);
+    const fu = doc.querySelector('#apptFuOnly'); if (fu) fu.addEventListener('change', () => loadUpcoming(doc));
     // Specialty/Department -> filtered doctor dropdown (select a dept to narrow the doctors).
     loadDoctorDirectory().then(() => {
       const dept = doc.querySelector('#apptDept'), docSel = doc.querySelector('#apptDoctor');
@@ -1731,6 +1742,7 @@ window.HIS = window.HIS || {};
       const el = doc.querySelector('#' + id);
       if (el) { el.addEventListener('change', reload); el.addEventListener('blur', reload); }
     });
+    const dsel = doc.querySelector('#apptDoctor'); if (dsel) dsel.addEventListener('change', () => { loadQueue(doc); loadUpcoming(doc); });
     const vs = doc.querySelector('#vsSave'); if (vs) vs.addEventListener('click', () => doSaveVitals(doc));
     const vc = doc.querySelector('#vsCancel'); if (vc) vc.addEventListener('click', () => { doc.querySelector('#vitalsStation').hidden = true; });
   }
@@ -1748,6 +1760,19 @@ window.HIS = window.HIS || {};
       }).join('') : emptyRow(5, 'No appointments today');
       tb.querySelectorAll('[data-vitals]').forEach(b => b.addEventListener('click', () => openVitalsStation(doc, b.dataset)));
     } catch (e) { tb.innerHTML = emptyRow(5, 'Queue API unavailable'); }
+  }
+  async function loadUpcoming(doc) {
+    const tb = doc.querySelector('#apptUpcoming'); if (!tb) return;
+    const fuOnly = !!(doc.querySelector('#apptFuOnly') && doc.querySelector('#apptFuOnly').checked);
+    try {
+      const rows = await HIS.api.upcomingAppts(val(doc, 'apptDoctor') || null, fuOnly);
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const when = (r.slotStart || '').replace('T', ' ').slice(0, 16);
+        const typeCls = r.visitType === 'Follow-up' ? 'pill--ok' : '';
+        return `<tr><td>${when}</td><td><b>${r.token || ''}</b></td><td>${r.patient}</td><td>${r.doctor}</td><td>${r.department || ''}</td>`
+          + `<td><span class="pill ${typeCls}">${r.visitType || '—'}</span></td><td><span class="pill pill--muted">${r.status}</span></td></tr>`;
+      }).join('') : emptyRow(7, fuOnly ? 'No upcoming follow-ups' : 'No upcoming appointments');
+    } catch (e) { tb.innerHTML = emptyRow(7, 'Upcoming API unavailable'); }
   }
   function openVitalsStation(doc, ds) {
     doc.dataset.vitalsAppt = ds.vitals;
@@ -1805,7 +1830,7 @@ window.HIS = window.HIS || {};
     try {
       const r = await HIS.api.bookAppointment(cmd);
       HIS.toast('Booked · Token ' + r.tokenNo, 'bi-ticket-detailed');
-      loadQueue(doc); loadSlots(doc);
+      loadQueue(doc); loadSlots(doc); loadUpcoming(doc);
     } catch (e) { HIS.toast('Booking failed: ' + e.message); }
   }
 

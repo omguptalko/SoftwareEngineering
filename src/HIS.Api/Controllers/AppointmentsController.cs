@@ -28,6 +28,12 @@ public sealed class AppointmentsController : ControllerBase
     public Task<IReadOnlyList<QueueItemDto>> Queue([FromQuery] string? doctorCode, [FromQuery] string? status, CancellationToken ct) =>
         _mediator.Send(new GetTodayQueueQuery(doctorCode, status), ct);
 
+    /// <summary>Upcoming (future-dated) appointments — surfaces follow-ups scheduled from a
+    /// consultation. Optional doctorCode + followUpOnly filter.</summary>
+    [HttpGet("upcoming")]
+    public Task<IReadOnlyList<UpcomingApptDto>> Upcoming([FromQuery] string? doctorCode, [FromQuery] bool followUpOnly, CancellationToken ct) =>
+        _mediator.Send(new GetUpcomingApptsQuery(doctorCode, followUpOnly), ct);
+
     /// <summary>Vitals station: an attendant records vitals for a booked appointment,
     /// advancing it to 'VitalsDone' (patient enters the doctor's OPD lobby).</summary>
     [HttpPost("{id:long}/vitals")]

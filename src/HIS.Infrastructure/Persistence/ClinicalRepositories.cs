@@ -67,6 +67,32 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<(long, DateTime, string, string, string, string, string, string, string)>> GetUpcomingAsync(int branchId, DateTime fromDate, int? doctorId, bool followUpOnly, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        var rows = await c.QueryAsync<(long, DateTime, string, string, string, string, string, string, string)>(new CommandDefinition(
+            @"SELECT a.AppointmentId,
+                     a.SlotStart,
+                     ISNULL(a.TokenNo,'') AS TokenNo,
+                     ISNULL(p.Uhid,'') AS Uhid,
+                     ISNULL(p.FullName,'(walk-in)') AS PatientName,
+                     ISNULL(d.Name,'') AS DoctorName,
+                     ISNULL(a.Department,'') AS Department,
+                     ISNULL(a.VisitType,'') AS VisitType,
+                     a.Status
+              FROM clinical.Appointment a
+              LEFT JOIN patient.Patient p ON p.PatientId = a.PatientId
+              LEFT JOIN master.Doctor  d ON d.DoctorId  = a.DoctorId
+              WHERE a.BranchId = @branchId
+                    AND CAST(a.SlotStart AS DATE) >= @fromDate
+                    AND a.Status NOT IN ('Cancelled', 'Completed')
+                    AND (@doctorId IS NULL OR a.DoctorId = @doctorId)
+                    AND (@followUpOnly = 0 OR a.VisitType = 'Follow-up')
+              ORDER BY a.SlotStart, a.AppointmentId",
+            new { branchId, fromDate = fromDate.Date, doctorId, followUpOnly = followUpOnly ? 1 : 0 }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
     public async Task<(long? PatientId, int DoctorId, int BranchId, string Status)?> GetAppointmentAsync(long appointmentId, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

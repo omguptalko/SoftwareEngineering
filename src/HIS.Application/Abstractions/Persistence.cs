@@ -73,6 +73,8 @@ public interface IAppointmentRepository
     Task<string> NextTokenAsync(int branchId, int doctorId, DateTime date, CancellationToken ct = default);
     Task<long> InsertAsync(Appointment appt, CancellationToken ct = default);
     Task<IReadOnlyList<(long AppointmentId, string TokenNo, string Uhid, string PatientName, string DoctorName, string Status, bool HasVitals)>> GetTodayQueueAsync(int branchId, int? doctorId, DateTime date, string? status, CancellationToken ct = default);
+    /// <summary>Upcoming (future-dated) booked appointments — e.g. follow-ups scheduled from a consult.</summary>
+    Task<IReadOnlyList<(long AppointmentId, DateTime SlotStart, string TokenNo, string Uhid, string PatientName, string DoctorName, string Department, string VisitType, string Status)>> GetUpcomingAsync(int branchId, DateTime fromDate, int? doctorId, bool followUpOnly, CancellationToken ct = default);
     /// <summary>Appointment header for the OPD flow (patient/doctor/branch/status), or null.</summary>
     Task<(long? PatientId, int DoctorId, int BranchId, string Status)?> GetAppointmentAsync(long appointmentId, CancellationToken ct = default);
     /// <summary>Advance the appointment through its lifecycle: Booked -> VitalsDone -> InConsultation -> Completed.</summary>
