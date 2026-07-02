@@ -350,8 +350,8 @@ window.HIS = window.HIS || {};
     const p = HIS.mock.currentPatient;
     return `<div class="screen">
       ${head('bi-hospital', 'IPD Admission &amp; Bed Board', 'Ward management · transfers · discharge',
-        `<button class="btn btn--ghost btn--sm"><i class="bi bi-arrow-left-right"></i> Transfer</button>
-         <button class="btn btn--ghost btn--sm"><i class="bi bi-box-arrow-right"></i> Discharge</button>
+        `<button class="btn btn--ghost btn--sm" id="ipdTransferBtn"><i class="bi bi-arrow-left-right"></i> Transfer</button>
+         <button class="btn btn--ghost btn--sm" id="ipdDischargeBtn"><i class="bi bi-box-arrow-right"></i> Discharge</button>
          <button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-save"></i> Admit <span class="fk">F9</span></button>`)}
       ${banner(p)}
       <div class="cols-side">
@@ -380,8 +380,8 @@ window.HIS = window.HIS || {};
       <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-heart"></i> Admitted Patients — who is in which bed
         <span class="ph-right muted" id="ipdAdmCount"></span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
-          <thead><tr><th>Admission No.</th><th>Patient</th><th>UHID</th><th>Ward / Room</th><th>Bed</th><th>Consultant</th><th>Admitted</th></tr></thead>
-          <tbody id="ipdAdmitted">${emptyRow(7, 'Loading…')}</tbody>
+          <thead><tr><th>Admission No.</th><th>Patient</th><th>UHID</th><th>Ward / Room</th><th>Bed</th><th>Consultant</th><th>Admitted</th><th></th></tr></thead>
+          <tbody id="ipdAdmitted">${emptyRow(8, 'Loading…')}</tbody>
         </table></div></div></div>
     </div>`;
   }
@@ -1015,7 +1015,17 @@ window.HIS = window.HIS || {};
       const cp = doc.querySelector('#btnCollectPay'); if (cp) cp.addEventListener('click', () => doCollectPayment(doc)); }
     if (id === 'dashboard') loadDashboard(doc);
     if (id === 'registration') { initRegistration(doc); HIS.saveHandlers.registration = () => doRegister(doc); }
-    if (id === 'ipd') { loadBedBoard(doc); loadAdmissions(doc); HIS.saveHandlers.ipd = () => doAdmit(doc); }
+    if (id === 'ipd') {
+      loadBedBoard(doc); loadAdmissions(doc); HIS.saveHandlers.ipd = () => doAdmit(doc);
+      const dbtn = doc.querySelector('#ipdDischargeBtn');
+      if (dbtn) dbtn.addEventListener('click', () => {
+        const t = doc.querySelector('#ipdAdmitted');
+        if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        HIS.toast('Pick a patient to discharge from the Admitted Patients list below', 'bi-box-arrow-right');
+      });
+      const tbtn = doc.querySelector('#ipdTransferBtn');
+      if (tbtn) tbtn.addEventListener('click', () => HIS.toast('Transfer: admit flow handles bed moves — discharge & re-admit, or use the bed board'));
+    }
     if (id === 'appointments') { initAppointments(doc); HIS.saveHandlers.appointments = () => doBookAppointment(doc); }
     if (id === 'opd') { initOpd(doc); HIS.saveHandlers.opd = () => doSaveConsultation(doc); }
     if (id === 'lab') { initLab(doc); HIS.saveHandlers.lab = () => doEnterResults(doc); }
@@ -1575,10 +1585,22 @@ window.HIS = window.HIS || {};
       const cnt = doc.querySelector('#ipdAdmCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' admitted' : '';
       tb.innerHTML = rows.length ? rows.map(r => {
         const when = (r.admittedUtc || '').replace('T', ' ').slice(0, 16);
+        const act = `<button class="btn btn--sm" data-discharge="${r.admissionId}" data-patient="${r.patient}" data-bed="${r.bedNo || ''}"><i class="bi bi-box-arrow-right"></i> Discharge</button>`;
         return `<tr><td><b>${r.admissionNo}</b></td><td>${r.patient}</td><td>${r.uhid}</td><td>${r.ward || ''}</td>`
-          + `<td><span class="pill pill--warn">${r.bedNo || ''}</span></td><td>${r.consultant || '—'}</td><td>${when}</td></tr>`;
-      }).join('') : emptyRow(7, 'No patients currently admitted');
-    } catch (e) { tb.innerHTML = emptyRow(7, 'Admissions API unavailable'); }
+          + `<td><span class="pill pill--warn">${r.bedNo || ''}</span></td><td>${r.consultant || '—'}</td><td>${when}</td><td>${act}</td></tr>`;
+      }).join('') : emptyRow(8, 'No patients currently admitted');
+      tb.querySelectorAll('[data-discharge]').forEach(b => b.addEventListener('click', () => doDischarge(doc, b.dataset)));
+    } catch (e) { tb.innerHTML = emptyRow(8, 'Admissions API unavailable'); }
+  }
+  async function doDischarge(doc, ds) {
+    const win = doc.defaultView || window;
+    if (!win.confirm('Discharge ' + ds.patient + (ds.bed ? ' from bed ' + ds.bed : '') + '?')) return;
+    const summary = win.prompt('Discharge summary (optional):', 'Recovered, advised rest. Follow-up in 1 week.');
+    try {
+      await HIS.api.dischargePatient({ admissionId: parseInt(ds.discharge, 10), dischargeSummary: summary || null });
+      HIS.toast('Discharged ' + ds.patient + (ds.bed ? ' · bed ' + ds.bed + ' now cleaning — Mark ready to free it' : ''), 'bi-box-arrow-right');
+      loadBedBoard(doc); loadAdmissions(doc);
+    } catch (e) { HIS.toast('Discharge failed: ' + e.message); }
   }
 
   /* ---- Phase 3: LIS worklist + create order + enter results ----------- */
