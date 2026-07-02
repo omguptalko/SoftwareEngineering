@@ -1969,6 +1969,7 @@ window.HIS = window.HIS || {};
     try {
       const p = await HIS.api.patientByUhid(uhid);
       if (!p) { HIS.toast('Patient not found: ' + uhid); return; }
+      clearConsultForm(doc);   // fresh form for this walk-in patient
       doc.dataset.opdUhid = p.uhid;
       delete doc.dataset.opdAppt;   // walk-in: no queued appointment/token to close
       const b = doc.querySelector('#opdBanner'); if (b) b.innerHTML = banner(p);
@@ -2015,7 +2016,19 @@ window.HIS = window.HIS || {};
       loadOpdLobby(doc);
     } catch (e) { HIS.toast('Call failed: ' + e.message); }
   }
+  // Reset every consultation field so each patient starts on a clean form (no stale/prev data).
+  function clearConsultForm(doc) {
+    ['opdComplaints', 'opdHistory', 'opdAdvice', 'opdDx1', 'opdDx2', 'opdFollowup',
+     'opdTemp', 'opdPulse', 'opdBp', 'opdSpo2', 'opdResp', 'opdWeight'].forEach(id => {
+      const el = doc.querySelector('#' + id); if (el) el.value = '';
+    });
+    doc.querySelectorAll('#rxBody input, #rxBody select').forEach(el => { if (el.type === 'checkbox') el.checked = false; else el.value = ''; });
+    doc.querySelectorAll('[data-pane="ord"] input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    doc.querySelectorAll('#deptTplFields input, #deptTplFields select').forEach(el => { if (el.type === 'checkbox') el.checked = false; else el.value = ''; });
+    const fu = doc.querySelector('#opdFollowupResult'); if (fu) fu.style.display = 'none';
+  }
   async function selectOpdPatient(doc, ds) {
+    clearConsultForm(doc);   // fresh form for this patient
     doc.dataset.opdAppt = ds.consult;
     doc.dataset.opdUhid = ds.uhid;
     const b = doc.querySelector('#opdBanner');
