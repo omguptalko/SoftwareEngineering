@@ -268,8 +268,13 @@ public sealed class ExperienceRepository : IExperienceRepository
     public async Task<string?> CallNextAsync(int counterId, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);
+        // Only today's waiting tokens (matches the board's date filter) so stale tokens from
+        // previous days don't get called ahead of today's queue.
         return await c.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
-            @";WITH n AS (SELECT TOP 1 * FROM support.QueueToken WHERE CounterId = @counterId AND Status = 'Waiting' ORDER BY TokenId)
+            @";WITH n AS (SELECT TOP 1 * FROM support.QueueToken
+                          WHERE CounterId = @counterId AND Status = 'Waiting'
+                                AND CAST(IssuedUtc AS DATE) = CAST(SYSUTCDATETIME() AS DATE)
+                          ORDER BY TokenId)
               UPDATE n SET Status = 'Called' OUTPUT inserted.TokenNo;", new { counterId }, cancellationToken: ct));
     }
     public async Task<IReadOnlyList<(string, string, string, string)>> GetQueueAsync(int branchId, CancellationToken ct = default)
