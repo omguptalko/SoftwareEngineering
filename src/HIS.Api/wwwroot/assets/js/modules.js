@@ -864,8 +864,96 @@ window.HIS = window.HIS || {};
     </div>`;
   };
 
+  /* ====================== EMERGENCY & TRAUMA — Triage (SRS §3.5) ========= */
+  function emergency() {
+    return `<div class="screen">
+      ${head('bi-truck-front', 'Emergency &amp; Trauma — Triage', 'Arrival · 5-level colour triage · disposition', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-pulse"></i> Triage Board — live
+        <span class="ph-right legend-row">
+          <span><i class="sw" style="background:#e5484d"></i>1 Red</span>
+          <span><i class="sw" style="background:#f5820e"></i>2 Orange</span>
+          <span><i class="sw" style="background:#f2c94c"></i>3 Yellow</span>
+          <span><i class="sw" style="background:#37a35e"></i>4 Green</span>
+          <span><i class="sw" style="background:#3b82f6"></i>5 Blue</span>
+        </span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Acuity</th><th>Patient</th><th>Complaint</th><th>Arrived</th><th>Mode</th><th>MLC</th><th>Status</th><th></th></tr></thead>
+          <tbody id="erBoard">${emptyRow(8, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-plus-square"></i> New Arrival + Triage</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Patient</label><div class="field with-btn"><input class="ctl" id="erPatient" data-lookup="patient" placeholder="F3 patient (blank = unidentified)…"><button class="lk" data-lookup="patient">F3</button></div></div>
+            <div class="f"><label>Arrival Mode</label><div class="field"><select class="ctl" id="erMode"><option>Ambulance</option><option>Walk-in</option><option>Referral</option><option>Police</option><option>BroughtDead</option></select></div></div>
+            <div class="f wide"><label>Chief Complaint</label><div class="field"><input class="ctl" id="erComplaint" placeholder="e.g. RTA polytrauma"></div></div>
+            <div class="f"><label>Acuity (colour)</label><div class="field"><select class="ctl" id="erColour"><option value="Red">1 · Red · Resuscitation</option><option value="Orange">2 · Orange · Emergent</option><option value="Yellow" selected>3 · Yellow · Urgent</option><option value="Green">4 · Green · Less urgent</option><option value="Blue">5 · Blue · Non-urgent</option></select></div></div>
+            <div class="f"><label>Attending Doctor</label><div class="field with-btn"><input class="ctl" id="erDoctor" data-lookup="doctor" placeholder="F3 doctor…"><button class="lk" data-lookup="doctor">F3</button></div></div>
+            <div class="f"><label style="display:flex;align-items:center;gap:6px;height:34px"><input type="checkbox" id="erMlc"> Medico-legal (MLC)</label></div>
+          </div>
+          <div class="subhead mt12">Triage Vitals</div>
+          <div class="form-grid three">
+            <div class="f"><label>Temp °F</label><div class="field"><input class="ctl" id="erTemp"></div></div>
+            <div class="f"><label>Pulse</label><div class="field"><input class="ctl" id="erPulse"></div></div>
+            <div class="f"><label>BP</label><div class="field"><input class="ctl" id="erBp" placeholder="120/80"></div></div>
+            <div class="f"><label>SpO₂</label><div class="field"><input class="ctl" id="erSpo2"></div></div>
+            <div class="f"><label>Resp</label><div class="field"><input class="ctl" id="erResp"></div></div>
+            <div class="f"><label>GRBS</label><div class="field"><input class="ctl" id="erGrbs"></div></div>
+            <div class="f"><label>GCS (3–15)</label><div class="field"><input class="ctl" id="erGcs"></div></div>
+            <div class="f"><label>Pain (0–10)</label><div class="field"><input class="ctl" id="erPain"></div></div>
+          </div>
+          <button class="btn btn--primary mt8" style="width:100%" data-act="save"><i class="bi bi-clipboard-check"></i> Register &amp; Triage <span class="fk">F9</span></button>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-box-arrow-right"></i> Disposition <span class="ph-right muted" id="erDispWho">select a board row</span></div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Disposition</label><div class="field"><select class="ctl" id="erDisp"><option>AdmitICU</option><option>AdmitWard</option><option>Discharge</option><option>Refer</option><option>LAMA</option><option>Expired</option></select></div></div>
+            <div class="f"><label>Bed (for admit)</label><div class="field with-btn"><input class="ctl" id="erBed" data-lookup="ward" placeholder="F3 free bed…"><button class="lk" data-lookup="ward">F3</button></div></div>
+            <div class="f"><label>Consultant</label><div class="field with-btn"><input class="ctl" id="erDispDoctor" data-lookup="doctor" placeholder="F3 doctor…"><button class="lk" data-lookup="doctor">F3</button></div></div>
+          </div>
+          <button class="btn mt8" style="width:100%" id="erDisposeBtn"><i class="bi bi-check2-circle"></i> Confirm Disposition</button>
+        </div></div>
+      </div>
+    </div>`;
+  }
+
+  /* ====================== ICU MONITORING (SRS §3.6) ========= */
+  function icu() {
+    return `<div class="screen">
+      ${head('bi-activity', 'ICU Monitoring', 'Critical-care census · monitoring flowsheet', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-people"></i> ICU Census <span class="ph-right muted" id="icuCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Patient</th><th>UHID</th><th>Ward</th><th>Bed</th><th>Consultant</th><th></th></tr></thead>
+          <tbody id="icuCensus">${emptyRow(6, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div id="icuBanner"><div class="pbanner selectable"><div class="av">—</div>
+        <div><div class="nm">No ICU patient selected</div>
+        <div class="meta"><span>Pick a patient from the ICU census above to monitor</span></div></div></div></div>
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-heart-pulse"></i> Record Observation</div><div class="panel__body">
+          <div class="form-grid three">
+            <div class="f"><label>HR</label><div class="field"><input class="ctl" id="icuHr"></div></div>
+            <div class="f"><label>BP</label><div class="field"><input class="ctl" id="icuBp" placeholder="120/80"></div></div>
+            <div class="f"><label>SpO₂</label><div class="field"><input class="ctl" id="icuSpo2"></div></div>
+            <div class="f"><label>Resp</label><div class="field"><input class="ctl" id="icuResp"></div></div>
+            <div class="f"><label>Temp °F</label><div class="field"><input class="ctl" id="icuTemp"></div></div>
+            <div class="f"><label>GCS</label><div class="field"><input class="ctl" id="icuGcs"></div></div>
+            <div class="f"><label>FiO₂ %</label><div class="field"><input class="ctl" id="icuFio2"></div></div>
+            <div class="f"><label>Vent Mode</label><div class="field"><select class="ctl" id="icuVent"><option value=""></option><option>RoomAir</option><option>CPAP</option><option>SIMV</option><option>AC</option></select></div></div>
+            <div class="f"><label>Urine (ml)</label><div class="field"><input class="ctl" id="icuUrine"></div></div>
+          </div>
+          <div class="f wide" style="margin-top:6px"><label>Notes</label><div class="field"><input class="ctl" id="icuNotes"></div></div>
+          <button class="btn btn--primary mt8" style="width:100%" id="icuSaveBtn"><i class="bi bi-check2-circle"></i> Record Observation</button>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-graph-up"></i> Flowsheet</div>
+          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>Time</th><th>HR</th><th>BP</th><th>MAP</th><th>SpO₂</th><th>RR</th><th>Temp</th><th>GCS</th><th>FiO₂</th><th>Urine</th><th>Vent</th></tr></thead>
+            <tbody id="icuFlow">${emptyRow(11, 'Select an ICU patient above')}</tbody>
+          </table></div></div></div>
+      </div>
+    </div>`;
+  }
+
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, opd, ipd, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, opd, ipd, emergency, icu, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1031,6 +1119,8 @@ window.HIS = window.HIS || {};
       const cp = doc.querySelector('#btnCollectPay'); if (cp) cp.addEventListener('click', () => doCollectPayment(doc)); }
     if (id === 'dashboard') loadDashboard(doc);
     if (id === 'registration') { initRegistration(doc); HIS.saveHandlers.registration = () => doRegister(doc); }
+    if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
+    if (id === 'icu') { initIcu(doc); }
     if (id === 'ipd') {
       loadBedBoard(doc); loadAdmissions(doc); HIS.saveHandlers.ipd = () => doAdmit(doc);
       const dbtn = doc.querySelector('#ipdDischargeBtn');
@@ -1629,6 +1719,124 @@ window.HIS = window.HIS || {};
       HIS.toast('Discharged ' + ds.patient + (ds.bed ? ' · bed ' + ds.bed + ' now cleaning — Mark ready to free it' : ''), 'bi-box-arrow-right');
       loadBedBoard(doc); loadAdmissions(doc);
     } catch (e) { HIS.toast('Discharge failed: ' + e.message); }
+  }
+
+  /* ---- ICU & Emergency Trauma (SRS §3.5/§3.6) ------------------------- */
+  const TRIAGE_COLOUR = { 1: '#e5484d', 2: '#f5820e', 3: '#f2c94c', 4: '#37a35e', 5: '#3b82f6' };
+  function initEmergency(doc) {
+    loadTriageBoard(doc);
+    const b = doc.querySelector('#erDisposeBtn'); if (b) b.addEventListener('click', () => doDispose(doc));
+  }
+  async function loadTriageBoard(doc) {
+    const tb = doc.querySelector('#erBoard'); if (!tb) return;
+    try {
+      const rows = await HIS.api.triageBoard();
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const lvl = r.triageLevel || '';
+        const dot = `<span class="sw" style="background:${TRIAGE_COLOUR[r.triageLevel] || '#999'};display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px"></span>`;
+        const when = (r.arrivedUtc || '').replace('T', ' ').slice(11, 16);
+        const done = r.status !== 'Waiting' && r.status !== 'InTreatment';
+        const act = done ? '' : `<button class="btn btn--sm" data-dispo="${r.triageId}" data-uhid="${r.uhid || ''}" data-patient="${r.patient || 'Unidentified'}"><i class="bi bi-box-arrow-right"></i> Dispose</button>`;
+        return `<tr><td>${dot}<b>${lvl ? 'L' + lvl : ''}</b> ${r.category}</td><td>${r.patient || '<i>Unidentified</i>'}</td><td>${r.chiefComplaint || ''}</td>`
+          + `<td>${when}</td><td>${r.arrivalMode || ''}</td><td>${r.isMlc ? '<span class="pill pill--warn">MLC</span>' : ''}</td>`
+          + `<td><span class="pill ${done ? 'pill--muted' : 'pill--ok'}">${r.status}</span></td><td>${act}</td></tr>`;
+      }).join('') : emptyRow(8, 'No arrivals today');
+      tb.querySelectorAll('[data-dispo]').forEach(b => b.addEventListener('click', () => {
+        doc.dataset.erTriage = b.dataset.dispo; doc.dataset.erUhid = b.dataset.uhid;
+        const who = doc.querySelector('#erDispWho'); if (who) who.textContent = b.dataset.patient + (b.dataset.uhid ? ' · ' + b.dataset.uhid : '');
+        const ep = doc.querySelector('#erPatient'); // prefill disposition consultant helper
+        HIS.toast('Selected ' + b.dataset.patient + ' — choose a disposition', 'bi-box-arrow-right');
+      }));
+    } catch (e) { tb.innerHTML = emptyRow(8, 'Triage board API unavailable'); }
+  }
+  async function doRegisterTriage(doc) {
+    const bp = (val(doc, 'erBp') || '').split('/');
+    const cmd = {
+      patientUhid: val(doc, 'erPatient') || null,
+      category: val(doc, 'erColour') || 'Yellow',
+      isMlc: !!(doc.querySelector('#erMlc') && doc.querySelector('#erMlc').checked),
+      chiefComplaint: val(doc, 'erComplaint') || null,
+      arrivalMode: val(doc, 'erMode') || null,
+      attendingDoctorCode: val(doc, 'erDoctor') || null,
+      painScore: intOrNull(val(doc, 'erPain')), gcsTotal: intOrNull(val(doc, 'erGcs')),
+      tempF: numOrNull(val(doc, 'erTemp')), pulse: intOrNull(val(doc, 'erPulse')),
+      bpSystolic: intOrNull(bp[0]), bpDiastolic: intOrNull(bp[1]),
+      spo2: intOrNull(val(doc, 'erSpo2')), respRate: intOrNull(val(doc, 'erResp')), grbs: intOrNull(val(doc, 'erGrbs'))
+    };
+    try {
+      const r = await HIS.api.registerTriage(cmd);
+      HIS.toast('Triaged · ' + r.category + ' (L' + (r.triageLevel || '?') + ') · #' + r.triageId, 'bi-clipboard-check');
+      ['erComplaint', 'erTemp', 'erPulse', 'erBp', 'erSpo2', 'erResp', 'erGrbs', 'erGcs', 'erPain', 'erPatient', 'erDoctor'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      const mlc = doc.querySelector('#erMlc'); if (mlc) mlc.checked = false;
+      loadTriageBoard(doc);
+    } catch (e) { HIS.toast('Triage failed: ' + e.message); }
+  }
+  async function doDispose(doc) {
+    const triageId = doc.dataset.erTriage;
+    if (!triageId) { HIS.toast('Select a patient from the triage board first'); return; }
+    const disp = val(doc, 'erDisp');
+    const cmd = { triageId: parseInt(triageId, 10), disposition: disp,
+      patientUhid: doc.dataset.erUhid || null, bedLabel: val(doc, 'erBed') || null, consultantCode: val(doc, 'erDispDoctor') || null };
+    try {
+      const r = await HIS.api.disposeTriage(cmd);
+      HIS.toast('Disposed · ' + disp + (r.admissionNo ? ' · ' + r.admissionNo + ' (bed ' + r.bedNo + ')' : ''), 'bi-check2-circle');
+      delete doc.dataset.erTriage; delete doc.dataset.erUhid;
+      const who = doc.querySelector('#erDispWho'); if (who) who.textContent = 'select a board row';
+      const eb = doc.querySelector('#erBed'); if (eb) eb.value = '';
+      loadTriageBoard(doc);
+    } catch (e) { HIS.toast('Disposition failed: ' + e.message); }
+  }
+
+  function initIcu(doc) {
+    loadIcuCensus(doc);
+    const b = doc.querySelector('#icuSaveBtn'); if (b) b.addEventListener('click', () => doRecordObs(doc));
+  }
+  async function loadIcuCensus(doc) {
+    const tb = doc.querySelector('#icuCensus'); if (!tb) return;
+    try {
+      const rows = await HIS.api.icuAdmissions();
+      const cnt = doc.querySelector('#icuCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' in ICU/HDU' : '';
+      tb.innerHTML = rows.length ? rows.map(r =>
+        `<tr><td>${r.patient}</td><td>${r.uhid}</td><td>${r.ward}</td><td><span class="pill pill--warn">${r.bedNo}</span></td><td>${r.consultant || '—'}</td>`
+        + `<td><button class="btn btn--sm btn--primary" data-mon="${r.admissionId}" data-patient="${r.patient}" data-uhid="${r.uhid}" data-bed="${r.ward} ${r.bedNo}"><i class="bi bi-activity"></i> Monitor</button></td></tr>`
+      ).join('') : emptyRow(6, 'No patients currently in ICU/HDU');
+      tb.querySelectorAll('[data-mon]').forEach(b => b.addEventListener('click', () => selectIcuPatient(doc, b.dataset)));
+    } catch (e) { tb.innerHTML = emptyRow(6, 'ICU census API unavailable'); }
+  }
+  function selectIcuPatient(doc, ds) {
+    doc.dataset.icuAdm = ds.mon;
+    const b = doc.querySelector('#icuBanner');
+    if (b) b.innerHTML = `<div class="pbanner selectable"><div class="av">${initials(ds.patient)}</div><div><div class="nm">${ds.patient}</div><div class="meta"><span>UHID <b>${ds.uhid}</b></span><span>Bed <b>${ds.bed}</b></span></div></div></div>`;
+    loadIcuFlowsheet(doc, ds.mon);
+    HIS.toast('Monitoring ' + ds.patient, 'bi-activity');
+  }
+  async function loadIcuFlowsheet(doc, admId) {
+    const tb = doc.querySelector('#icuFlow'); if (!tb) return;
+    try {
+      const rows = await HIS.api.icuFlowsheet(admId);
+      tb.innerHTML = rows.length ? rows.map(o => {
+        const t = (o.recordedUtc || '').replace('T', ' ').slice(0, 16);
+        const bp = (o.bpSystolic != null || o.bpDiastolic != null) ? `${o.bpSystolic ?? ''}/${o.bpDiastolic ?? ''}` : '—';
+        return `<tr><td>${t}</td><td>${o.heartRate ?? '—'}</td><td>${bp}</td><td>${o.map ?? '—'}</td><td>${o.spo2 ?? '—'}</td><td>${o.respRate ?? '—'}</td><td>${o.tempF ?? '—'}</td><td>${o.gcsTotal ?? '—'}</td><td>${o.fio2 ?? '—'}</td><td>${o.urineOutputMl ?? '—'}</td><td>${o.ventMode || '—'}</td></tr>`;
+      }).join('') : emptyRow(11, 'No observations yet');
+    } catch (e) { tb.innerHTML = emptyRow(11, 'Flowsheet API unavailable'); }
+  }
+  async function doRecordObs(doc) {
+    const admId = doc.dataset.icuAdm;
+    if (!admId) { HIS.toast('Pick an ICU patient from the census first'); return; }
+    const bp = (val(doc, 'icuBp') || '').split('/');
+    const cmd = {
+      heartRate: intOrNull(val(doc, 'icuHr')), bpSystolic: intOrNull(bp[0]), bpDiastolic: intOrNull(bp[1]),
+      spo2: intOrNull(val(doc, 'icuSpo2')), respRate: intOrNull(val(doc, 'icuResp')), tempF: numOrNull(val(doc, 'icuTemp')),
+      gcsTotal: intOrNull(val(doc, 'icuGcs')), fio2: intOrNull(val(doc, 'icuFio2')),
+      urineOutputMl: intOrNull(val(doc, 'icuUrine')), ventMode: val(doc, 'icuVent') || null, notes: val(doc, 'icuNotes') || null
+    };
+    try {
+      await HIS.api.recordIcuObs(parseInt(admId, 10), cmd);
+      HIS.toast('Observation recorded', 'bi-check2-circle');
+      ['icuHr', 'icuBp', 'icuSpo2', 'icuResp', 'icuTemp', 'icuGcs', 'icuFio2', 'icuUrine', 'icuNotes'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      loadIcuFlowsheet(doc, admId);
+    } catch (e) { HIS.toast('Record failed: ' + e.message); }
   }
 
   /* ---- Phase 3: LIS worklist + create order + enter results ----------- */

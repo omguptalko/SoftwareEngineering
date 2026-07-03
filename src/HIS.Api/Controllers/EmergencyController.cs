@@ -38,4 +38,17 @@ public sealed class EmergencyController : ControllerBase
 
     [HttpPost("triage/disposition")]
     public Task<bool> Disposition([FromBody] SetTriageDispositionCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Final ED disposition (admit to ICU/ward, discharge, refer, LAMA, expired).
+    /// Admit dispositions create an emergency admission and broadcast a board update.</summary>
+    [HttpPost("triage/dispose")]
+    public async Task<DisposeEmergencyVisitResult> Dispose([FromBody] DisposeEmergencyVisitCommand cmd, CancellationToken ct)
+    {
+        var result = await _mediator.Send(cmd, ct);
+        await _alerts.Clients.Group(TenantGroups.Name(_tenant)).SendAsync("emergencyAlert", new
+        {
+            triageId = cmd.TriageId, action = "disposed", disposition = cmd.Disposition, admissionNo = result.AdmissionNo
+        }, ct);
+        return result;
+    }
 }

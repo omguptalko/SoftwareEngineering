@@ -89,6 +89,13 @@ HIS.api = (function () {
     transferBed:     (cmd) => post('/api/ipd/transfer', cmd),
     dischargePatient:(cmd) => post('/api/ipd/discharge', cmd),
     markBedReady:    (bedNo) => post(`/api/ipd/beds/${encodeURIComponent(bedNo)}/ready`, {}),
+    // ICU & Emergency Trauma
+    triageBoard:     () => get('/api/emergency/triage'),
+    registerTriage:  (cmd) => post('/api/emergency/triage', cmd),
+    disposeTriage:   (cmd) => post('/api/emergency/triage/dispose', cmd),
+    icuAdmissions:   () => get('/api/icu/admissions'),
+    icuFlowsheet:    (admissionId) => get(`/api/icu/admissions/${admissionId}/observations`),
+    recordIcuObs:    (admissionId, cmd) => post(`/api/icu/admissions/${admissionId}/observations`, cmd),
     // Phase 3 — Diagnostics
     labWorklist:     () => get('/api/lab/worklist'),
     createLabOrder:  (cmd) => post('/api/lab/orders', cmd),

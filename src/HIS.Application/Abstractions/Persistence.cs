@@ -131,8 +131,19 @@ public interface IEmergencyRepository
     Task<long> InsertTriageAsync(EmergencyTriage t, CancellationToken ct = default);
     Task<EmergencyTriage?> GetTriageAsync(long triageId, CancellationToken ct = default);
     Task SetTriageStatusAsync(long triageId, string status, CancellationToken ct = default);
+    Task<int?> GetDoctorIdByCodeAsync(string code, CancellationToken ct = default);
+    /// <summary>Dispose a triage: set status + link the admission it created + stamp disposed time.</summary>
+    Task DisposeAsync(long triageId, string status, long? admissionId, CancellationToken ct = default);
     /// <summary>Live ED board for today, ordered by triage severity (config order) then arrival.</summary>
-    Task<IReadOnlyList<(long TriageId, string? Patient, string Category, bool IsMlc, string Status, DateTime ArrivedUtc)>> GetBoardAsync(int branchId, IReadOnlyList<string> severityOrder, CancellationToken ct = default);
+    Task<IReadOnlyList<(long TriageId, string? Patient, string? Uhid, string Category, byte? TriageLevel, string? ChiefComplaint, string? ArrivalMode, bool IsMlc, string Status, DateTime ArrivedUtc)>> GetBoardAsync(int branchId, IReadOnlyList<string> severityOrder, CancellationToken ct = default);
+}
+
+public interface IIcuRepository
+{
+    /// <summary>Patients currently admitted in an ICU/HDU/Critical-care ward (for the monitoring picker).</summary>
+    Task<IReadOnlyList<(long AdmissionId, string Patient, string Uhid, string Ward, string BedNo, string? Consultant)>> GetIcuAdmissionsAsync(int branchId, CancellationToken ct = default);
+    Task<long> InsertObservationAsync(IcuObservation o, CancellationToken ct = default);
+    Task<IReadOnlyList<IcuObservation>> GetFlowsheetAsync(long admissionId, CancellationToken ct = default);
 }
 
 public interface INursingRepository

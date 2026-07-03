@@ -14,8 +14,14 @@ public sealed class EmergencyRepository : IEmergencyRepository
     {
         using var c = await _f.OpenMasterAsync(ct);
         const string sql = @"
-INSERT INTO clinical.EmergencyTriage (BranchId, PatientId, ArrivedUtc, Category, IsMlc, Notes, Status)
-VALUES (@BranchId, @PatientId, @ArrivedUtc, @Category, @IsMlc, @Notes, @Status);
+INSERT INTO clinical.EmergencyTriage
+    (BranchId, PatientId, ArrivedUtc, Category, IsMlc, Notes, Status,
+     ChiefComplaint, ArrivalMode, TriageLevel, PainScore, GcsTotal,
+     TempF, Pulse, BpSystolic, BpDiastolic, Spo2, RespRate, Grbs, AttendingDoctorId)
+VALUES
+    (@BranchId, @PatientId, @ArrivedUtc, @Category, @IsMlc, @Notes, @Status,
+     @ChiefComplaint, @ArrivalMode, @TriageLevel, @PainScore, @GcsTotal,
+     @TempF, @Pulse, @BpSystolic, @BpDiastolic, @Spo2, @RespRate, @Grbs, @AttendingDoctorId);
 SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return await c.QuerySingleAsync<long>(new CommandDefinition(sql, t, cancellationToken: ct));
     }
@@ -35,31 +41,90 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
             new { triageId, status }, cancellationToken: ct));
     }
 
-    public async Task<IReadOnlyList<(long, string?, string, bool, string, DateTime)>> GetBoardAsync(
+    public async Task<int?> GetDoctorIdByCodeAsync(string code, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
+            "SELECT DoctorId FROM master.Doctor WHERE Code = @code AND IsActive = 1", new { code }, cancellationToken: ct));
+    }
+
+    public async Task DisposeAsync(long triageId, string status, long? admissionId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"UPDATE clinical.EmergencyTriage
+              SET Status = @status, AdmissionId = @admissionId, DisposedUtc = SYSUTCDATETIME()
+              WHERE TriageId = @triageId",
+            new { triageId, status, admissionId }, cancellationToken: ct));
+    }
+
+    public async Task<IReadOnlyList<(long, string?, string?, string, byte?, string?, string?, bool, string, DateTime)>> GetBoardAsync(
         int branchId, IReadOnlyList<string> severityOrder, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);
-        var rows = (await c.QueryAsync<(long, string?, string, bool, string, DateTime)>(new CommandDefinition(
-            @"SELECT t.TriageId, p.FullName AS Patient, t.Category, t.IsMlc, t.Status, t.ArrivedUtc
+        var rows = (await c.QueryAsync<(long, string?, string?, string, byte?, string?, string?, bool, string, DateTime)>(new CommandDefinition(
+            @"SELECT t.TriageId, p.FullName AS Patient, p.Uhid, t.Category, t.TriageLevel,
+                     t.ChiefComplaint, t.ArrivalMode, t.IsMlc, t.Status, t.ArrivedUtc
               FROM clinical.EmergencyTriage t
               LEFT JOIN patient.Patient p ON p.PatientId = t.PatientId
               WHERE t.BranchId = @branchId
                 AND CAST(t.ArrivedUtc AS DATE) = CAST(SYSUTCDATETIME() AS DATE)",
             new { branchId }, cancellationToken: ct))).ToList();
 
-        // Rank by config-driven severity order (e.g. Red → Yellow → Green), then by arrival.
-        // Unknown categories sort last. Nothing about the order is hardcoded in SQL.
-        int Rank(string cat)
+        // Sort by acuity: numeric TriageLevel first (1=most urgent), else config category order; then arrival.
+        int Rank((long, string?, string?, string, byte?, string?, string?, bool, string, DateTime) r)
         {
-            var i = -1;
-            for (var k = 0; k < severityOrder.Count; k++)
-                if (string.Equals(severityOrder[k], cat, StringComparison.OrdinalIgnoreCase)) { i = k; break; }
-            return i < 0 ? int.MaxValue : i;
+            if (r.Item5 is byte lvl) return lvl;               // TriageLevel 1..5
+            for (var k = 0; k < severityOrder.Count; k++)      // fall back to config colour order
+                if (string.Equals(severityOrder[k], r.Item4, StringComparison.OrdinalIgnoreCase)) return k + 1;
+            return int.MaxValue;
         }
-        return rows
-            .OrderBy(r => Rank(r.Item3))
-            .ThenBy(r => r.Item6)
-            .ToList();
+        return rows.OrderBy(Rank).ThenBy(r => r.Item10).ToList();
+    }
+}
+
+// ============================ ICU monitoring flowsheet (§3.6) ============================
+public sealed class IcuRepository : IIcuRepository
+{
+    private readonly ITenantConnectionFactory _f;
+    public IcuRepository(ITenantConnectionFactory f) => _f = f;
+
+    public async Task<IReadOnlyList<(long, string, string, string, string, string?)>> GetIcuAdmissionsAsync(int branchId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return (await c.QueryAsync<(long, string, string, string, string, string?)>(new CommandDefinition(
+            @"SELECT a.AdmissionId, ISNULL(p.FullName,'') AS Patient, ISNULL(p.Uhid,'') AS Uhid,
+                     ISNULL(w.Name,'') AS Ward, ISNULL(b.BedNo,'') AS BedNo, d.Name AS Consultant
+              FROM clinical.Admission a
+              INNER JOIN patient.Patient p ON p.PatientId = a.PatientId
+              LEFT JOIN master.Bed b ON b.BedId = a.BedId
+              LEFT JOIN master.Ward w ON w.WardId = b.WardId
+              LEFT JOIN master.Doctor d ON d.DoctorId = a.ConsultantId
+              WHERE a.BranchId = @branchId AND a.Status = 'Admitted'
+                    AND (w.Name LIKE '%ICU%' OR w.Name LIKE '%HDU%' OR w.Name LIKE '%Critical%')
+              ORDER BY w.Name, b.BedNo", new { branchId }, cancellationToken: ct))).ToList();
+    }
+
+    public async Task<long> InsertObservationAsync(IcuObservation o, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        const string sql = @"
+INSERT INTO clinical.IcuObservation
+    (AdmissionId, RecordedUtc, HeartRate, BpSystolic, BpDiastolic, Map, Spo2, RespRate, TempF,
+     Cvp, EtCo2, Fio2, GcsTotal, PainScore, UrineOutputMl, BloodSugar, VentMode, Notes, RecordedById)
+VALUES
+    (@AdmissionId, @RecordedUtc, @HeartRate, @BpSystolic, @BpDiastolic, @Map, @Spo2, @RespRate, @TempF,
+     @Cvp, @EtCo2, @Fio2, @GcsTotal, @PainScore, @UrineOutputMl, @BloodSugar, @VentMode, @Notes, @RecordedById);
+SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
+        return await c.QuerySingleAsync<long>(new CommandDefinition(sql, o, cancellationToken: ct));
+    }
+
+    public async Task<IReadOnlyList<IcuObservation>> GetFlowsheetAsync(long admissionId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return (await c.QueryAsync<IcuObservation>(new CommandDefinition(
+            "SELECT * FROM clinical.IcuObservation WHERE AdmissionId = @admissionId ORDER BY RecordedUtc DESC, IcuObservationId DESC",
+            new { admissionId }, cancellationToken: ct))).ToList();
     }
 }
 
