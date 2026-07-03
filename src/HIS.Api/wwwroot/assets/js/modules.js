@@ -1796,11 +1796,17 @@ window.HIS = window.HIS || {};
     try {
       const rows = await HIS.api.icuAdmissions();
       const cnt = doc.querySelector('#icuCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' in ICU/HDU' : '';
-      tb.innerHTML = rows.length ? rows.map(r =>
-        `<tr><td>${r.patient}</td><td>${r.uhid}</td><td>${r.ward}</td><td><span class="pill pill--warn">${r.bedNo}</span></td><td>${r.consultant || '—'}</td>`
-        + `<td><button class="btn btn--sm btn--primary" data-mon="${r.admissionId}" data-patient="${r.patient}" data-uhid="${r.uhid}" data-bed="${r.ward} ${r.bedNo}"><i class="bi bi-activity"></i> Monitor</button></td></tr>`
-      ).join('') : emptyRow(6, 'No patients currently in ICU/HDU');
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const active = doc.dataset.icuAdm === String(r.admissionId);
+        return `<tr${active ? ' style="background:#eef6ff"' : ''}><td>${r.patient}</td><td>${r.uhid}</td><td>${r.ward}</td><td><span class="pill pill--warn">${r.bedNo}</span></td><td>${r.consultant || '—'}</td>`
+        + `<td><button class="btn btn--sm ${active ? '' : 'btn--primary'}" data-mon="${r.admissionId}" data-patient="${r.patient}" data-uhid="${r.uhid}" data-bed="${r.ward} ${r.bedNo}"><i class="bi bi-activity"></i> ${active ? 'Monitoring' : 'Monitor'}</button></td></tr>`;
+      }).join('') : emptyRow(6, 'No patients currently in ICU/HDU');
       tb.querySelectorAll('[data-mon]').forEach(b => b.addEventListener('click', () => selectIcuPatient(doc, b.dataset)));
+      // Auto-select the first ICU patient so "Record Observation" is usable immediately.
+      if (rows.length && !doc.dataset.icuAdm) {
+        const r0 = rows[0];
+        selectIcuPatient(doc, { mon: String(r0.admissionId), patient: r0.patient, uhid: r0.uhid, bed: r0.ward + ' ' + r0.bedNo });
+      }
     } catch (e) { tb.innerHTML = emptyRow(6, 'ICU census API unavailable'); }
   }
   function selectIcuPatient(doc, ds) {
