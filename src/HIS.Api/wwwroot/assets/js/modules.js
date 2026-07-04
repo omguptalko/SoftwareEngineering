@@ -952,8 +952,33 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== VITALS STATION (SRS §3.2 — dedicated desk) ========= */
+  function vitals() {
+    return `<div class="screen">
+      ${head('bi-heart-pulse', 'Vitals Station', 'Record vitals for booked patients — sends them to the doctor lobby', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-list-check"></i> Vitals Worklist — today
+        <span class="ph-right"><select class="ctl" id="vstDoctor" style="width:210px;display:inline-block"><option value="">— all doctors —</option></select></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Token</th><th>Patient</th><th>UHID</th><th>Doctor</th><th>Status</th><th></th></tr></thead>
+          <tbody id="vstQueue">${emptyRow(6, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div class="panel" id="vstStation" hidden><div class="panel__head"><i class="bi bi-heart-pulse"></i> Record Vitals <span class="ph-right muted" id="vstWho"></span></div>
+        <div class="panel__body">
+          <div class="form-grid three">
+            <div class="f"><label>Temp</label><div class="field with-unit"><input class="ctl" id="vstTemp"><span class="unit">°F</span></div></div>
+            <div class="f"><label>Pulse</label><div class="field with-unit"><input class="ctl" id="vstPulse"><span class="unit">/min</span></div></div>
+            <div class="f"><label>BP</label><div class="field with-unit"><input class="ctl" id="vstBp" placeholder="120/80"><span class="unit">mmHg</span></div></div>
+            <div class="f"><label>SpO₂</label><div class="field with-unit"><input class="ctl" id="vstSpo2"><span class="unit">%</span></div></div>
+            <div class="f"><label>Resp. Rate</label><div class="field with-unit"><input class="ctl" id="vstResp"><span class="unit">/min</span></div></div>
+            <div class="f"><label>Weight</label><div class="field with-unit"><input class="ctl" id="vstWeight"><span class="unit">kg</span></div></div>
+          </div>
+          <div class="flex gap6 mt8"><button class="btn btn--primary" id="vstSave"><i class="bi bi-check2-circle"></i> Save Vitals &amp; Send to Doctor</button><button class="btn" id="vstCancel">Cancel</button></div>
+        </div></div>
+    </div>`;
+  }
+
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, opd, ipd, emergency, icu, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1119,6 +1144,7 @@ window.HIS = window.HIS || {};
       const cp = doc.querySelector('#btnCollectPay'); if (cp) cp.addEventListener('click', () => doCollectPayment(doc)); }
     if (id === 'dashboard') loadDashboard(doc);
     if (id === 'registration') { initRegistration(doc); HIS.saveHandlers.registration = () => doRegister(doc); }
+    if (id === 'vitals') { initVitals(doc); }
     if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
     if (id === 'icu') { initIcu(doc); }
     if (id === 'ipd') {
@@ -1269,6 +1295,7 @@ window.HIS = window.HIS || {};
   /* ---- Phase 10: Queue — live board over SignalR (task 0.9) ----------- */
   let queueLiveDoc = null;          // the currently-open queue screen
   let opdLiveDoc = null;            // the currently-open OPD lobby screen
+  let vitalsLiveDoc = null;         // the currently-open Vitals Station screen
   function ensureQueueHub() {
     if (HIS._queueHub || !window.signalR) return;
     const conn = new signalR.HubConnectionBuilder()
@@ -1282,9 +1309,10 @@ window.HIS = window.HIS || {};
         setQueueLive(queueLiveDoc, true);
       }
     });
-    // OPD vitals-done / called / completed → refresh the doctor lobby live.
+    // OPD vitals-done / called / completed → refresh the doctor lobby + vitals worklist live.
     conn.on('opdChanged', () => {
       if (opdLiveDoc && document.body.contains(opdLiveDoc)) loadOpdLobby(opdLiveDoc);
+      if (vitalsLiveDoc && document.body.contains(vitalsLiveDoc)) loadVitalsWorklist(vitalsLiveDoc);
     });
     conn.onreconnecting(() => queueLiveDoc && setQueueLive(queueLiveDoc, false));
     conn.onreconnected(() => queueLiveDoc && setQueueLive(queueLiveDoc, true));
@@ -1719,6 +1747,52 @@ window.HIS = window.HIS || {};
       HIS.toast('Discharged ' + ds.patient + (ds.bed ? ' · bed ' + ds.bed + ' now cleaning — Mark ready to free it' : ''), 'bi-box-arrow-right');
       loadBedBoard(doc); loadAdmissions(doc);
     } catch (e) { HIS.toast('Discharge failed: ' + e.message); }
+  }
+
+  /* ---- Vitals Station: dedicated desk that records vitals for booked patients ---- */
+  function initVitals(doc) {
+    vitalsLiveDoc = doc; ensureQueueHub();   // live: new bookings / vitals-done refresh the worklist
+    loadDoctorDirectory().then(() => { const d = doc.querySelector('#vstDoctor'); if (d) fillDoctorSelect(d, ''); });
+    const dsel = doc.querySelector('#vstDoctor'); if (dsel) dsel.addEventListener('change', () => loadVitalsWorklist(doc));
+    const s = doc.querySelector('#vstSave'); if (s) s.addEventListener('click', () => doSaveVitalsStation(doc));
+    const c = doc.querySelector('#vstCancel'); if (c) c.addEventListener('click', () => { doc.querySelector('#vstStation').hidden = true; });
+    loadVitalsWorklist(doc);
+  }
+  async function loadVitalsWorklist(doc) {
+    const tb = doc.querySelector('#vstQueue'); if (!tb) return;
+    try {
+      const rows = await HIS.api.apptQueue(val(doc, 'vstDoctor') || null);
+      const work = rows.filter(r => r.status === 'Booked' || r.status === 'VitalsDone');
+      tb.innerHTML = work.length ? work.map(r => {
+        const cls = r.status === 'VitalsDone' ? 'pill--ok' : '';
+        const act = `<button class="btn btn--sm" data-vst="${r.appointmentId}" data-token="${r.token}" data-patient="${r.patient}"><i class="bi bi-heart-pulse"></i> ${r.hasVitals ? 'Edit Vitals' : 'Take Vitals'}</button>`;
+        return `<tr><td><b>${r.token}</b></td><td>${r.patient}</td><td>${r.uhid}</td><td>${r.doctor}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${act}</td></tr>`;
+      }).join('') : emptyRow(6, 'No patients waiting for vitals');
+      tb.querySelectorAll('[data-vst]').forEach(b => b.addEventListener('click', () => openVst(doc, b.dataset)));
+    } catch (e) { tb.innerHTML = emptyRow(6, 'Worklist API unavailable'); }
+  }
+  function openVst(doc, ds) {
+    doc.dataset.vstAppt = ds.vst;
+    const who = doc.querySelector('#vstWho'); if (who) who.textContent = `Token ${ds.token} · ${ds.patient}`;
+    const p = doc.querySelector('#vstStation'); if (p) { p.hidden = false; p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
+  async function doSaveVitalsStation(doc) {
+    const apptId = doc.dataset.vstAppt; if (!apptId) { HIS.toast('Pick a patient from the worklist first'); return; }
+    const bp = (val(doc, 'vstBp') || '').split('/');
+    const vitals = {
+      tempF: numOrNull(val(doc, 'vstTemp')), pulse: intOrNull(val(doc, 'vstPulse')),
+      bpSystolic: intOrNull(bp[0]), bpDiastolic: intOrNull(bp[1]),
+      spo2: intOrNull(val(doc, 'vstSpo2')), respRate: intOrNull(val(doc, 'vstResp')),
+      weightKg: numOrNull(val(doc, 'vstWeight')), heightCm: null, grbs: null
+    };
+    try {
+      await HIS.api.recordVitals(apptId, vitals);
+      HIS.toast('Vitals recorded — patient sent to the doctor lobby', 'bi-heart-pulse');
+      doc.querySelector('#vstStation').hidden = true;
+      ['vstTemp', 'vstPulse', 'vstBp', 'vstSpo2', 'vstResp', 'vstWeight'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      delete doc.dataset.vstAppt;
+      loadVitalsWorklist(doc);
+    } catch (e) { HIS.toast('Save vitals failed: ' + e.message); }
   }
 
   /* ---- ICU & Emergency Trauma (SRS §3.5/§3.6) ------------------------- */
