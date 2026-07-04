@@ -1818,8 +1818,11 @@ window.HIS = window.HIS || {};
       tb.querySelectorAll('[data-dispo]').forEach(b => b.addEventListener('click', () => {
         doc.dataset.erTriage = b.dataset.dispo; doc.dataset.erUhid = b.dataset.uhid;
         const who = doc.querySelector('#erDispWho'); if (who) who.textContent = b.dataset.patient + (b.dataset.uhid ? ' · ' + b.dataset.uhid : '');
-        const ep = doc.querySelector('#erPatient'); // prefill disposition consultant helper
-        HIS.toast('Selected ' + b.dataset.patient + ' — choose a disposition', 'bi-box-arrow-right');
+        tb.querySelectorAll('tr').forEach(tr => { tr.style.background = ''; });
+        const row = b.closest('tr'); if (row) row.style.background = '#eef6ff';
+        // Bring the Disposition panel into view so the next step is obvious.
+        const db = doc.querySelector('#erDisposeBtn'); if (db && db.closest('.panel')) db.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        HIS.toast('Selected ' + b.dataset.patient + ' → set Disposition below, then Confirm', 'bi-box-arrow-right');
       }));
     } catch (e) { tb.innerHTML = emptyRow(8, 'Triage board API unavailable'); }
   }
@@ -1847,8 +1850,11 @@ window.HIS = window.HIS || {};
   }
   async function doDispose(doc) {
     const triageId = doc.dataset.erTriage;
-    if (!triageId) { HIS.toast('Select a patient from the triage board first'); return; }
+    if (!triageId) { HIS.toast('Click "Dispose" on a triage row first to select a patient'); return; }
     const disp = val(doc, 'erDisp');
+    const admits = disp === 'AdmitICU' || disp === 'AdmitWard';
+    if (admits && !val(doc, 'erBed')) { HIS.toast('Pick a free bed (F3) for ' + disp); return; }
+    if (admits && !doc.dataset.erUhid) { HIS.toast('Unidentified patient — register them first, or choose Discharge/Refer'); return; }
     const cmd = { triageId: parseInt(triageId, 10), disposition: disp,
       patientUhid: doc.dataset.erUhid || null, bedLabel: val(doc, 'erBed') || null, consultantCode: val(doc, 'erDispDoctor') || null };
     try {
