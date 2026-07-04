@@ -18,6 +18,10 @@ public sealed class OtController : ControllerBase
     [HttpPost("schedule")]
     public Task<ScheduleSurgeryResult> Schedule([FromBody] ScheduleSurgeryCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 
+    /// <summary>Wheel-in: move a scheduled case to In Progress.</summary>
+    [HttpPost("start")]
+    public Task<bool> Start([FromBody] StartSurgeryCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
     [HttpPost("complete")]
     public Task<bool> Complete([FromBody] CompleteSurgeryCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }

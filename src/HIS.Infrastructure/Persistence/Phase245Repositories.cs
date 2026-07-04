@@ -196,6 +196,14 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
               FROM clinical.OtSchedule WHERE OtId = @otId", new { otId }, cancellationToken: ct));
     }
 
+    public async Task SetStatusAsync(long otId, string status, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE clinical.OtSchedule SET Status = @status WHERE OtId = @otId",
+            new { otId, status }, cancellationToken: ct));
+    }
+
     public async Task CompleteAsync(long otId, string? postOpNotes, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

@@ -94,6 +94,10 @@ HIS.api = (function () {
     registerTriage:  (cmd) => post('/api/emergency/triage', cmd),
     disposeTriage:   (cmd) => post('/api/emergency/triage/dispose', cmd),
     icuAdmissions:   () => get('/api/icu/admissions'),
+    otBoard:         () => get('/api/ot/board'),
+    scheduleSurgery: (cmd) => post('/api/ot/schedule', cmd),
+    startSurgery:    (otId) => post('/api/ot/start', { otId }),
+    completeSurgery: (otId, postOpNotes) => post('/api/ot/complete', { otId, postOpNotes }),
     icuFlowsheet:    (admissionId) => get(`/api/icu/admissions/${admissionId}/observations`),
     recordIcuObs:    (admissionId, cmd) => post(`/api/icu/admissions/${admissionId}/observations`, cmd),
     // Phase 3 — Diagnostics

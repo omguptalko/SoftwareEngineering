@@ -59,6 +59,29 @@ public sealed class ScheduleSurgeryHandler : MediatR.IRequestHandler<ScheduleSur
     }
 }
 
+// ============================ Start surgery (wheel-in / In Progress) (§3.12) ============================
+public sealed record StartSurgeryCommand(long OtId) : ICommand<bool>, IAuditable
+{
+    public string AuditEntity => "OtSchedule";
+    public string? AuditEntityId => OtId.ToString();
+}
+
+public sealed class StartSurgeryHandler : MediatR.IRequestHandler<StartSurgeryCommand, bool>
+{
+    private readonly IOtRepository _ot;
+    public StartSurgeryHandler(IOtRepository ot) => _ot = ot;
+
+    public async Task<bool> Handle(StartSurgeryCommand c, CancellationToken ct)
+    {
+        var sched = await _ot.GetScheduleAsync(c.OtId, ct)
+            ?? throw new InvalidOperationException("OT schedule not found.");
+        if (!string.Equals(sched.Status, "Scheduled", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Cannot start a surgery in status '{sched.Status}'.");
+        await _ot.SetStatusAsync(c.OtId, "InProgress", ct);
+        return true;
+    }
+}
+
 // ============================ Complete surgery / post-op (§3.12) ============================
 public sealed record CompleteSurgeryCommand(long OtId, string? PostOpNotes)
     : ICommand<bool>, IAuditable

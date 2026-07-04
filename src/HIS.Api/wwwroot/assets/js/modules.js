@@ -977,8 +977,36 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== OPERATION THEATRE (SRS §3.12) ========= */
+  function ot() {
+    return `<div class="screen">
+      ${head('bi-scissors', 'Operation Theatre (OT)', 'Schedule surgery · theatre board · post-op', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-calendar2-week"></i> OT Board <span class="ph-right muted" id="otCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Scheduled</th><th>Patient</th><th>Procedure</th><th>Surgeon</th><th>Theatre</th><th>Status</th><th></th></tr></thead>
+          <tbody id="otBoard">${emptyRow(7, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-plus-square"></i> Schedule Surgery</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="otPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
+            <div class="f"><label>Surgeon</label><div class="field with-btn"><input class="ctl" id="otSurgeon" data-lookup="doctor" placeholder="F3 surgeon…"><button class="lk" data-lookup="doctor">F3</button></div></div>
+            <div class="f"><label>Theatre</label><div class="field"><select class="ctl" id="otTheatre"><option>OT-1</option><option>OT-2</option><option>OT-3</option><option>Emergency OT</option></select></div></div>
+            <div class="f"><label>Date &amp; Time <span class="req">*</span></label><div class="field"><input class="ctl" id="otWhen" type="datetime-local"></div></div>
+            <div class="f wide"><label>Procedure</label><div class="field"><input class="ctl" id="otProcedure" placeholder="e.g. Laparoscopic appendectomy"></div></div>
+          </div>
+          <button class="btn btn--primary mt8" style="width:100%" data-act="save"><i class="bi bi-calendar-plus"></i> Schedule Surgery <span class="fk">F9</span></button>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-check"></i> Post-op / Complete <span class="ph-right muted" id="otPostWho">select a case</span></div><div class="panel__body">
+          <div class="f wide"><label>Post-op Notes</label><div class="field"><textarea class="ctl" id="otPostNotes" placeholder="Findings, complications, recovery plan…"></textarea></div></div>
+          <button class="btn mt8" style="width:100%" id="otCompleteBtn"><i class="bi bi-check2-circle"></i> Complete Surgery</button>
+        </div></div>
+      </div>
+    </div>`;
+  }
+
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1145,6 +1173,7 @@ window.HIS = window.HIS || {};
     if (id === 'dashboard') loadDashboard(doc);
     if (id === 'registration') { initRegistration(doc); HIS.saveHandlers.registration = () => doRegister(doc); }
     if (id === 'vitals') { initVitals(doc); }
+    if (id === 'ot') { initOt(doc); HIS.saveHandlers.ot = () => doScheduleSurgery(doc); }
     if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
     if (id === 'icu') { initIcu(doc); }
     if (id === 'ipd') {
@@ -1865,6 +1894,69 @@ window.HIS = window.HIS || {};
       const eb = doc.querySelector('#erBed'); if (eb) eb.value = '';
       loadTriageBoard(doc);
     } catch (e) { HIS.toast('Disposition failed: ' + e.message); }
+  }
+
+  /* ---- Operation Theatre: schedule -> start -> complete (SRS §3.12) ---- */
+  function initOt(doc) {
+    loadOtBoard(doc);
+    const w = doc.querySelector('#otWhen'); if (w) w.value = new Date(Date.now() + 3600000).toISOString().slice(0, 16);
+    const b = doc.querySelector('#otCompleteBtn'); if (b) b.addEventListener('click', () => doCompleteSurgery(doc));
+  }
+  async function loadOtBoard(doc) {
+    const tb = doc.querySelector('#otBoard'); if (!tb) return;
+    try {
+      const rows = await HIS.api.otBoard();
+      const cnt = doc.querySelector('#otCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' cases' : '';
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const when = (r.scheduledUtc || '').replace('T', ' ').slice(0, 16);
+        const cls = r.status === 'Completed' ? 'pill--muted' : r.status === 'InProgress' ? 'pill--warn' : 'pill--ok';
+        const label = r.status === 'InProgress' ? 'In progress' : r.status;
+        let act = '';
+        if (r.status === 'Scheduled') act = `<button class="btn btn--sm btn--primary" data-otstart="${r.otId}" data-patient="${r.patient}"><i class="bi bi-play-fill"></i> Start</button>`;
+        else if (r.status === 'InProgress') act = `<button class="btn btn--sm" data-otcomplete="${r.otId}" data-patient="${r.patient}"><i class="bi bi-check2-circle"></i> Complete</button>`;
+        return `<tr><td>${when}</td><td>${r.patient}</td><td>${r.procedure || ''}</td><td>${r.surgeon || '—'}</td><td>${r.theatre || ''}</td><td><span class="pill ${cls}">${label}</span></td><td>${act}</td></tr>`;
+      }).join('') : emptyRow(7, 'No cases scheduled');
+      tb.querySelectorAll('[data-otstart]').forEach(b => b.addEventListener('click', () => doStartSurgery(doc, b.dataset.otstart, b.dataset.patient)));
+      tb.querySelectorAll('[data-otcomplete]').forEach(b => b.addEventListener('click', () => {
+        doc.dataset.otId = b.dataset.otcomplete;
+        const who = doc.querySelector('#otPostWho'); if (who) who.textContent = b.dataset.patient;
+        const cb = doc.querySelector('#otCompleteBtn'); if (cb && cb.closest('.panel')) cb.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        HIS.toast('Selected ' + b.dataset.patient + ' — add post-op notes, then Complete', 'bi-clipboard2-check');
+      }));
+    } catch (e) { tb.innerHTML = emptyRow(7, 'OT board API unavailable'); }
+  }
+  async function doScheduleSurgery(doc) {
+    const uhid = val(doc, 'otPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3) to schedule'); return; }
+    const when = val(doc, 'otWhen');
+    if (!when) { HIS.toast('Pick a date & time'); return; }
+    const cmd = { patientUhid: uhid, surgeonCode: val(doc, 'otSurgeon') || null, theatre: val(doc, 'otTheatre') || null,
+      scheduledUtc: new Date(when).toISOString(), procedure: val(doc, 'otProcedure') || null };
+    try {
+      const r = await HIS.api.scheduleSurgery(cmd);
+      HIS.toast('Surgery scheduled · OT #' + r.otId, 'bi-calendar-plus');
+      ['otPatient', 'otSurgeon', 'otProcedure'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      loadOtBoard(doc);
+    } catch (e) { HIS.toast('Schedule failed: ' + e.message); }
+  }
+  async function doStartSurgery(doc, otId, patient) {
+    try {
+      await HIS.api.startSurgery(parseInt(otId, 10));
+      HIS.toast('Surgery started · ' + patient + ' (In progress)', 'bi-play-fill');
+      loadOtBoard(doc);
+    } catch (e) { HIS.toast('Start failed: ' + e.message); }
+  }
+  async function doCompleteSurgery(doc) {
+    const otId = doc.dataset.otId;
+    if (!otId) { HIS.toast('Pick an in-progress case (Complete button) first'); return; }
+    try {
+      await HIS.api.completeSurgery(parseInt(otId, 10), val(doc, 'otPostNotes') || null);
+      HIS.toast('Surgery completed · post-op saved', 'bi-check2-circle');
+      delete doc.dataset.otId;
+      const el = doc.querySelector('#otPostNotes'); if (el) el.value = '';
+      const who = doc.querySelector('#otPostWho'); if (who) who.textContent = 'select a case';
+      loadOtBoard(doc);
+    } catch (e) { HIS.toast('Complete failed: ' + e.message); }
   }
 
   function initIcu(doc) {

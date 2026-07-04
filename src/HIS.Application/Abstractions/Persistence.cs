@@ -158,6 +158,7 @@ public interface IOtRepository
     Task<int?> GetDoctorIdByCodeAsync(string code, CancellationToken ct = default);
     Task<long> InsertScheduleAsync(OtSchedule s, CancellationToken ct = default);
     Task<OtSchedule?> GetScheduleAsync(long otId, CancellationToken ct = default);
+    Task SetStatusAsync(long otId, string status, CancellationToken ct = default);
     Task CompleteAsync(long otId, string? postOpNotes, CancellationToken ct = default);
     Task<IReadOnlyList<(long OtId, string Patient, string? Surgeon, string? Theatre, string? Procedure, DateTime ScheduledUtc, string Status)>> GetBoardAsync(int branchId, CancellationToken ct = default);
 }

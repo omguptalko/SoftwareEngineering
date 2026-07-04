@@ -21,4 +21,7 @@ IF NOT EXISTS (SELECT 1 FROM master.Module WHERE ModuleId = 'emergency')
 
 /* Promote the wireframe ICU row to the built ICU Monitoring module. */
 UPDATE master.Module SET Label = 'ICU Monitoring', Icon = 'bi-activity', Built = 1 WHERE ModuleId = 'icu';
+
+/* Operation Theatre is now a built module (schedule -> start -> complete). */
+UPDATE master.Module SET Built = 1 WHERE ModuleId = 'ot';
 GO
