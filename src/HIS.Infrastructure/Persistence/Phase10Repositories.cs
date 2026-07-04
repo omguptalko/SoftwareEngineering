@@ -207,7 +207,7 @@ public sealed class ExperienceRepository : IExperienceRepository
     {
         using var c = await _f.OpenDataAsync(ct);
         await c.ExecuteAsync(new CommandDefinition(
-            "UPDATE support.IssuedCertificate SET ApprovedByDoctorId = @doctorId, Status = 'Issued', PdfUrl = CONCAT('certs/', CertId, '.pdf') WHERE CertId = @certId",
+            "UPDATE support.IssuedCertificate SET ApprovedByDoctorId = @doctorId, Status = 'Approved', PdfUrl = CONCAT('certs/', CertId, '.pdf') WHERE CertId = @certId",
             new { certId, doctorId }, cancellationToken: ct));
     }
     public async Task<IReadOnlyList<(long, string, string, string)>> GetCertificatesAsync(int branchId, CancellationToken ct = default)

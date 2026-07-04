@@ -1061,8 +1061,33 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== CERTIFICATES & DOCUMENTS (SRS §3.16) ========= */
+  function certificates() {
+    return `<div class="screen">
+      ${head('bi-file-earmark-text', 'Certificates &amp; Documents', 'Issue medical certificates · doctor approval', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-card-checklist"></i> Issued Certificates <span class="ph-right muted" id="certCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Cert #</th><th>Type</th><th>Patient</th><th>Status</th><th></th></tr></thead>
+          <tbody id="certList">${emptyRow(5, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-file-earmark-plus"></i> Issue Certificate</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Certificate Type <span class="req">*</span></label><div class="field"><select class="ctl" id="certTemplate"><option value="">— select —</option></select></div></div>
+            <div class="f"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="certPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
+          </div>
+          <button class="btn btn--primary mt8" style="width:100%" data-act="save"><i class="bi bi-file-earmark-plus"></i> Issue Certificate <span class="fk">F9</span></button>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-patch-check"></i> Approve (doctor sign) <span class="ph-right muted" id="certApWho">select a certificate</span></div><div class="panel__body">
+          <div class="f"><label>Approving Doctor</label><div class="field with-btn"><input class="ctl" id="certDoctor" data-lookup="doctor" placeholder="F3 doctor…"><button class="lk" data-lookup="doctor">F3</button></div></div>
+          <button class="btn mt8" style="width:100%" id="certApproveBtn"><i class="bi bi-check2-circle"></i> Approve Certificate</button>
+        </div></div>
+      </div>
+    </div>`;
+  }
+
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1232,6 +1257,7 @@ window.HIS = window.HIS || {};
     if (id === 'ot') { initOt(doc); HIS.saveHandlers.ot = () => doScheduleSurgery(doc); }
     if (id === 'nursing') { initNursing(doc); }
     if (id === 'radiology') { initRadiology(doc); HIS.saveHandlers.radiology = () => doOrderStudy(doc); }
+    if (id === 'certificates') { initCertificates(doc); HIS.saveHandlers.certificates = () => doIssueCertificate(doc); }
     if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
     if (id === 'icu') { initIcu(doc); }
     if (id === 'ipd') {
@@ -2113,6 +2139,64 @@ window.HIS = window.HIS || {};
       const who = doc.querySelector('#radRepWho'); if (who) who.textContent = 'select an order';
       loadRadWorklist(doc);
     } catch (e) { HIS.toast('Report failed: ' + e.message); }
+  }
+
+  /* ---- Certificates & Documents: issue -> approve (SRS §3.16) ---- */
+  function initCertificates(doc) {
+    loadCertificates(doc);
+    loadCertTemplates(doc);
+    const b = doc.querySelector('#certApproveBtn'); if (b) b.addEventListener('click', () => doApproveCertificate(doc));
+  }
+  async function loadCertTemplates(doc) {
+    const sel = doc.querySelector('#certTemplate'); if (!sel) return;
+    try {
+      const t = await HIS.api.certTemplates();
+      sel.innerHTML = '<option value="">— select —</option>' + t.map(x => `<option value="${x.templateId}">${x.certType} · ${x.title}</option>`).join('');
+    } catch (e) {}
+  }
+  async function loadCertificates(doc) {
+    const tb = doc.querySelector('#certList'); if (!tb) return;
+    try {
+      const rows = await HIS.api.certificates();
+      const cnt = doc.querySelector('#certCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' certificates' : '';
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const cls = r.status === 'Approved' ? 'pill--ok' : 'pill--warn';
+        const act = r.status !== 'Approved' ? `<button class="btn btn--sm" data-certap="${r.certId}" data-type="${r.certType}" data-patient="${r.patient}"><i class="bi bi-patch-check"></i> Approve</button>` : '';
+        return `<tr><td>#${r.certId}</td><td>${r.certType}</td><td>${r.patient}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${act}</td></tr>`;
+      }).join('') : emptyRow(5, 'No certificates issued');
+      tb.querySelectorAll('[data-certap]').forEach(b => b.addEventListener('click', () => {
+        doc.dataset.certId = b.dataset.certap;
+        const who = doc.querySelector('#certApWho'); if (who) who.textContent = '#' + b.dataset.certap + ' · ' + b.dataset.type + ' · ' + b.dataset.patient;
+        const ab = doc.querySelector('#certApproveBtn'); if (ab && ab.closest('.panel')) ab.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        HIS.toast('Selected cert #' + b.dataset.certap + ' — pick a doctor, then Approve', 'bi-patch-check');
+      }));
+    } catch (e) { tb.innerHTML = emptyRow(5, 'Certificates API unavailable'); }
+  }
+  async function doIssueCertificate(doc) {
+    const tid = val(doc, 'certTemplate');
+    if (!tid) { HIS.toast('Select a certificate type'); return; }
+    const uhid = val(doc, 'certPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3)'); return; }
+    try {
+      const id = await HIS.api.issueCertificate({ templateId: parseInt(tid, 10), patientUhid: uhid });
+      HIS.toast('Certificate issued · #' + id, 'bi-file-earmark-plus');
+      const el = doc.querySelector('#certPatient'); if (el) el.value = '';
+      loadCertificates(doc);
+    } catch (e) { HIS.toast('Issue failed: ' + e.message); }
+  }
+  async function doApproveCertificate(doc) {
+    const cid = doc.dataset.certId;
+    if (!cid) { HIS.toast('Pick a certificate (Approve button) from the list first'); return; }
+    const docCode = val(doc, 'certDoctor');
+    if (!docCode) { HIS.toast('Pick the approving doctor (F3)'); return; }
+    try {
+      await HIS.api.approveCertificate(parseInt(cid, 10), docCode);
+      HIS.toast('Certificate #' + cid + ' approved', 'bi-check2-circle');
+      delete doc.dataset.certId;
+      const who = doc.querySelector('#certApWho'); if (who) who.textContent = 'select a certificate';
+      const cd = doc.querySelector('#certDoctor'); if (cd) cd.value = '';
+      loadCertificates(doc);
+    } catch (e) { HIS.toast('Approve failed: ' + e.message); }
   }
 
   function initIcu(doc) {

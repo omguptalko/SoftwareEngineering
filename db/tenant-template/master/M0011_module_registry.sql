@@ -30,4 +30,7 @@ UPDATE master.Module SET Built = 1 WHERE ModuleId = 'nursing';
 
 /* Radiology & Imaging is now a built module (order -> report). */
 UPDATE master.Module SET Built = 1 WHERE ModuleId = 'radiology';
+
+/* Certificates & Documents is now a built module (issue -> approve). */
+UPDATE master.Module SET Built = 1 WHERE ModuleId = 'certificates';
 GO
