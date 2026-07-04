@@ -107,6 +107,9 @@ HIS.api = (function () {
     createLabOrder:  (cmd) => post('/api/lab/orders', cmd),
     enterLabResults: (cmd) => post('/api/lab/results', cmd),
     bloodStock:      () => get('/api/bloodbank/stock'),
+    radWorklist:     () => get('/api/radiology/worklist'),
+    createRadOrder:  (cmd) => post('/api/radiology/orders', cmd),
+    reportRadiology: (radOrderId, reportUrl) => post('/api/radiology/report', { radOrderId, reportUrl }),
     // Phase 4 — Pharmacy / Inventory / Assets
     pharmacyQueue:   () => get('/api/pharmacy/queue'),
     drugBatches:     (drugCode) => get(`/api/pharmacy/batches?drugCode=${encodeURIComponent(drugCode)}`),

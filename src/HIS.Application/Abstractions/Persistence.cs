@@ -176,7 +176,8 @@ public interface ILisRepository
 public interface IRadiologyRepository
 {
     Task<long> CreateOrderAsync(RadiologyOrder o, CancellationToken ct = default);
-    Task<IReadOnlyList<(string Modality, string? Study, string Patient, string Status)>> GetWorklistAsync(int branchId, CancellationToken ct = default);
+    Task SetReportAsync(long radOrderId, string status, string? reportUrl, CancellationToken ct = default);
+    Task<IReadOnlyList<(long RadOrderId, string Modality, string? Study, string Patient, string Status)>> GetWorklistAsync(int branchId, CancellationToken ct = default);
 }
 
 public interface IBloodBankRepository

@@ -1034,8 +1034,35 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== RADIOLOGY & IMAGING (SRS §3.9) ========= */
+  function radiology() {
+    return `<div class="screen">
+      ${head('bi-radioactive', 'Radiology &amp; Imaging', 'Order studies · worklist · report', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-card-list"></i> Radiology Worklist <span class="ph-right muted" id="radCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Order</th><th>Patient</th><th>Modality</th><th>Study</th><th>Status</th><th></th></tr></thead>
+          <tbody id="radWorklist">${emptyRow(6, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-plus-square"></i> Order Study</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="radPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
+            <div class="f"><label>Modality <span class="req">*</span></label><div class="field"><select class="ctl" id="radModality"><option>X-Ray</option><option>CT</option><option>MRI</option><option>USG</option><option>ECG</option><option>Mammography</option></select></div></div>
+            <div class="f wide"><label>Study</label><div class="field"><input class="ctl" id="radStudy" placeholder="e.g. Chest PA · CT Brain plain"></div></div>
+            <div class="f"><label style="display:flex;align-items:center;gap:6px;height:34px"><input type="checkbox" id="radPcpndt"> PC-PNDT regulated (USG)</label></div>
+          </div>
+          <button class="btn btn--primary mt8" style="width:100%" data-act="save"><i class="bi bi-plus-lg"></i> Order Study <span class="fk">F9</span></button>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-file-earmark-medical"></i> File Report <span class="ph-right muted" id="radRepWho">select an order</span></div><div class="panel__body">
+          <div class="f wide"><label>Report / findings</label><div class="field"><textarea class="ctl" id="radReport" placeholder="Impression / findings, or a link to the PACS/DICOM report…"></textarea></div></div>
+          <button class="btn mt8" style="width:100%" id="radReportBtn"><i class="bi bi-check2-circle"></i> File Report</button>
+        </div></div>
+      </div>
+    </div>`;
+  }
+
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1204,6 +1231,7 @@ window.HIS = window.HIS || {};
     if (id === 'vitals') { initVitals(doc); }
     if (id === 'ot') { initOt(doc); HIS.saveHandlers.ot = () => doScheduleSurgery(doc); }
     if (id === 'nursing') { initNursing(doc); }
+    if (id === 'radiology') { initRadiology(doc); HIS.saveHandlers.radiology = () => doOrderStudy(doc); }
     if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
     if (id === 'icu') { initIcu(doc); }
     if (id === 'ipd') {
@@ -2036,6 +2064,55 @@ window.HIS = window.HIS || {};
       const el = doc.querySelector('#nrNote'); if (el) el.value = '';
       loadNrNotes(doc, admId);
     } catch (e) { HIS.toast('Save failed: ' + e.message); }
+  }
+
+  /* ---- Radiology & Imaging: order -> report (SRS §3.9) ---- */
+  function initRadiology(doc) {
+    loadRadWorklist(doc);
+    const b = doc.querySelector('#radReportBtn'); if (b) b.addEventListener('click', () => doReportRadiology(doc));
+  }
+  async function loadRadWorklist(doc) {
+    const tb = doc.querySelector('#radWorklist'); if (!tb) return;
+    try {
+      const rows = await HIS.api.radWorklist();
+      const cnt = doc.querySelector('#radCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' orders' : '';
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const cls = r.status === 'Reported' ? 'pill--ok' : 'pill--warn';
+        const act = r.status !== 'Reported' ? `<button class="btn btn--sm" data-radrep="${r.radOrderId}" data-patient="${r.patient}" data-study="${r.modality}${r.study ? ' ' + r.study : ''}"><i class="bi bi-file-earmark-medical"></i> Report</button>` : '';
+        return `<tr><td>#${r.radOrderId}</td><td>${r.patient}</td><td>${r.modality}</td><td>${r.study || ''}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${act}</td></tr>`;
+      }).join('') : emptyRow(6, 'No radiology orders');
+      tb.querySelectorAll('[data-radrep]').forEach(b => b.addEventListener('click', () => {
+        doc.dataset.radOrder = b.dataset.radrep;
+        const who = doc.querySelector('#radRepWho'); if (who) who.textContent = '#' + b.dataset.radrep + ' · ' + b.dataset.study + ' · ' + b.dataset.patient;
+        const rb = doc.querySelector('#radReportBtn'); if (rb && rb.closest('.panel')) rb.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        HIS.toast('Selected order #' + b.dataset.radrep + ' — enter report, then File', 'bi-file-earmark-medical');
+      }));
+    } catch (e) { tb.innerHTML = emptyRow(6, 'Worklist API unavailable'); }
+  }
+  async function doOrderStudy(doc) {
+    const uhid = val(doc, 'radPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3) to order'); return; }
+    const cmd = { patientUhid: uhid, modality: val(doc, 'radModality'), studyName: val(doc, 'radStudy') || null,
+      isPcPndtRegulated: !!(doc.querySelector('#radPcpndt') && doc.querySelector('#radPcpndt').checked) };
+    try {
+      const id = await HIS.api.createRadOrder(cmd);
+      HIS.toast('Study ordered · #' + id, 'bi-radioactive');
+      ['radPatient', 'radStudy'].forEach(x => { const el = doc.querySelector('#' + x); if (el) el.value = ''; });
+      const pc = doc.querySelector('#radPcpndt'); if (pc) pc.checked = false;
+      loadRadWorklist(doc);
+    } catch (e) { HIS.toast('Order failed: ' + e.message); }
+  }
+  async function doReportRadiology(doc) {
+    const oid = doc.dataset.radOrder;
+    if (!oid) { HIS.toast('Pick an order (Report button) from the worklist first'); return; }
+    try {
+      await HIS.api.reportRadiology(parseInt(oid, 10), val(doc, 'radReport') || null);
+      HIS.toast('Report filed · order #' + oid + ' Reported', 'bi-check2-circle');
+      delete doc.dataset.radOrder;
+      const el = doc.querySelector('#radReport'); if (el) el.value = '';
+      const who = doc.querySelector('#radRepWho'); if (who) who.textContent = 'select an order';
+      loadRadWorklist(doc);
+    } catch (e) { HIS.toast('Report failed: ' + e.message); }
   }
 
   function initIcu(doc) {

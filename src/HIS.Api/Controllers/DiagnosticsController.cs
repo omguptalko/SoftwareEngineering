@@ -33,6 +33,10 @@ public sealed class RadiologyController : ControllerBase
 
     [HttpPost("orders")]
     public Task<long> CreateOrder([FromBody] CreateRadiologyOrderCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>File a report against a radiology order (Scheduled -> Reported).</summary>
+    [HttpPost("report")]
+    public Task<bool> Report([FromBody] ReportRadiologyCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }
 
 [ApiController]

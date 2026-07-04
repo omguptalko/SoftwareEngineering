@@ -41,8 +41,28 @@ public sealed class CreateRadiologyOrderHandler : MediatR.IRequestHandler<Create
     }
 }
 
-public sealed record RadWorklistItemDto(string Modality, string? Study, string Patient, string Status);
+public sealed record RadWorklistItemDto(long RadOrderId, string Modality, string? Study, string Patient, string Status);
 public sealed record GetRadiologyWorklistQuery : IQuery<IReadOnlyList<RadWorklistItemDto>>;
+
+/// <summary>File a radiology report against an order (Scheduled -> Reported). SRS §3.9.</summary>
+public sealed record ReportRadiologyCommand(long RadOrderId, string? ReportUrl)
+    : ICommand<bool>, IAuditable
+{
+    public string AuditEntity => "RadiologyOrder";
+    public string? AuditEntityId => RadOrderId.ToString();
+}
+
+public sealed class ReportRadiologyHandler : MediatR.IRequestHandler<ReportRadiologyCommand, bool>
+{
+    private readonly IRadiologyRepository _rad;
+    public ReportRadiologyHandler(IRadiologyRepository rad) => _rad = rad;
+
+    public async Task<bool> Handle(ReportRadiologyCommand c, CancellationToken ct)
+    {
+        await _rad.SetReportAsync(c.RadOrderId, "Reported", c.ReportUrl, ct);
+        return true;
+    }
+}
 
 public sealed class GetRadiologyWorklistHandler : MediatR.IRequestHandler<GetRadiologyWorklistQuery, IReadOnlyList<RadWorklistItemDto>>
 {
@@ -53,7 +73,7 @@ public sealed class GetRadiologyWorklistHandler : MediatR.IRequestHandler<GetRad
     public async Task<IReadOnlyList<RadWorklistItemDto>> Handle(GetRadiologyWorklistQuery q, CancellationToken ct)
     {
         var rows = await _rad.GetWorklistAsync(_ctx.BranchId ?? 0, ct);
-        return rows.Select(r => new RadWorklistItemDto(r.Modality, r.Study, r.Patient, r.Status)).ToList();
+        return rows.Select(r => new RadWorklistItemDto(r.RadOrderId, r.Modality, r.Study, r.Patient, r.Status)).ToList();
     }
 }
 

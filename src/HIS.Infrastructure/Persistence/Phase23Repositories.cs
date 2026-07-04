@@ -249,14 +249,22 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return await c.QuerySingleAsync<long>(new CommandDefinition(sql, o, cancellationToken: ct));
     }
 
-    public async Task<IReadOnlyList<(string, string?, string, string)>> GetWorklistAsync(int branchId, CancellationToken ct = default)
+    public async Task SetReportAsync(long radOrderId, string status, string? reportUrl, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenDataAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE diagnostics.RadiologyOrder SET Status = @status, ReportUrl = @reportUrl WHERE RadOrderId = @radOrderId",
+            new { radOrderId, status, reportUrl }, cancellationToken: ct));
+    }
+
+    public async Task<IReadOnlyList<(long, string, string?, string, string)>> GetWorklistAsync(int branchId, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);
         var orders = (await c.QueryAsync<(long RadOrderId, string Modality, string? StudyName, long PatientId, string Status)>(new CommandDefinition(
             @"SELECT TOP 100 RadOrderId, Modality, StudyName, PatientId, Status
               FROM diagnostics.RadiologyOrder ORDER BY RadOrderId DESC", cancellationToken: ct))).ToList();
         var names = await MasterLookup.PatientNamesAsync(_f, orders.Select(o => o.PatientId), ct);
-        return orders.Select(o => (o.Modality, o.StudyName, names.GetValueOrDefault(o.PatientId, ""), o.Status)).ToList();
+        return orders.Select(o => (o.RadOrderId, o.Modality, o.StudyName, names.GetValueOrDefault(o.PatientId, ""), o.Status)).ToList();
     }
 }
 
