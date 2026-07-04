@@ -502,7 +502,10 @@ window.HIS = window.HIS || {};
               <thead><tr><th>Parameter</th><th>Result</th><th>Unit</th><th>Reference</th><th>Flag</th><th></th></tr></thead>
               <tbody id="labResultsBody"><tr>${TPL.labResultBody}</tr></tbody>
             </table></div>
-            <p class="hintline" style="padding:8px 12px">Select an order in the worklist, enter results, then <b>F9</b> to validate &amp; release.</p>
+            <div class="flex gap6 mt8" style="padding:8px 12px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn--primary" data-act="save"><i class="bi bi-check2-all"></i> Validate &amp; Release <span class="fk">F9</span></button>
+              <span class="hintline">1) click an order in the worklist · 2) enter parameters · 3) Validate &amp; Release to save.</span>
+            </div>
             </div></div>
         </div>
         <div class="panel"><div class="panel__head"><i class="bi bi-upc"></i> Sample Tracking</div>
