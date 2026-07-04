@@ -24,4 +24,7 @@ UPDATE master.Module SET Label = 'ICU Monitoring', Icon = 'bi-activity', Built =
 
 /* Operation Theatre is now a built module (schedule -> start -> complete). */
 UPDATE master.Module SET Built = 1 WHERE ModuleId = 'ot';
+
+/* Nursing & Patient Care is now a built module (notes against admissions). */
+UPDATE master.Module SET Built = 1 WHERE ModuleId = 'nursing';
 GO

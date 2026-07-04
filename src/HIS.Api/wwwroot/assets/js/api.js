@@ -98,6 +98,8 @@ HIS.api = (function () {
     scheduleSurgery: (cmd) => post('/api/ot/schedule', cmd),
     startSurgery:    (otId) => post('/api/ot/start', { otId }),
     completeSurgery: (otId, postOpNotes) => post('/api/ot/complete', { otId, postOpNotes }),
+    nursingNotes:    (admissionId) => get(`/api/nursing/admissions/${admissionId}/notes`),
+    addNursingNote:  (cmd) => post('/api/nursing/notes', cmd),
     icuFlowsheet:    (admissionId) => get(`/api/icu/admissions/${admissionId}/observations`),
     recordIcuObs:    (admissionId, cmd) => post(`/api/icu/admissions/${admissionId}/observations`, cmd),
     // Phase 3 — Diagnostics

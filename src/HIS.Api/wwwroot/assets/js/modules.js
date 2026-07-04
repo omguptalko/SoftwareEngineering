@@ -1005,8 +1005,37 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== NURSING & PATIENT CARE (SRS §3.13) ========= */
+  function nursing() {
+    return `<div class="screen">
+      ${head('bi-clipboard2-heart', 'Nursing &amp; Patient Care', 'Admitted patients · nursing notes (vitals / MAR / handover / care-plan)', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-people"></i> Admitted Patients <span class="ph-right muted" id="nrCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Patient</th><th>UHID</th><th>Ward</th><th>Bed</th><th>Consultant</th><th></th></tr></thead>
+          <tbody id="nrCensus">${emptyRow(6, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div id="nrBanner"><div class="pbanner selectable"><div class="av">—</div>
+        <div><div class="nm">No patient selected</div>
+        <div class="meta"><span>Pick an admitted patient above to record nursing notes</span></div></div></div></div>
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-journal-plus"></i> Add Nursing Note</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Note Type</label><div class="field"><select class="ctl" id="nrType"><option>Vitals</option><option>MAR</option><option>Handover</option><option>CarePlan</option></select></div></div>
+            <div class="f wide"><label>Note</label><div class="field"><textarea class="ctl" id="nrNote" placeholder="e.g. BP 120/80, PR 78, comfortable · Inj Ceftriaxone 1g IV given 10:00"></textarea></div></div>
+          </div>
+          <button class="btn btn--primary mt8" style="width:100%" id="nrSaveBtn"><i class="bi bi-check2-circle"></i> Save Note</button>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-clock-history"></i> Notes Timeline</div>
+          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>Time</th><th>Type</th><th>Note</th></tr></thead>
+            <tbody id="nrNotes">${emptyRow(3, 'Select an admitted patient above')}</tbody>
+          </table></div></div></div>
+      </div>
+    </div>`;
+  }
+
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1174,6 +1203,7 @@ window.HIS = window.HIS || {};
     if (id === 'registration') { initRegistration(doc); HIS.saveHandlers.registration = () => doRegister(doc); }
     if (id === 'vitals') { initVitals(doc); }
     if (id === 'ot') { initOt(doc); HIS.saveHandlers.ot = () => doScheduleSurgery(doc); }
+    if (id === 'nursing') { initNursing(doc); }
     if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
     if (id === 'icu') { initIcu(doc); }
     if (id === 'ipd') {
@@ -1957,6 +1987,55 @@ window.HIS = window.HIS || {};
       const who = doc.querySelector('#otPostWho'); if (who) who.textContent = 'select a case';
       loadOtBoard(doc);
     } catch (e) { HIS.toast('Complete failed: ' + e.message); }
+  }
+
+  /* ---- Nursing & Patient Care: notes against an admission (SRS §3.13) ---- */
+  function initNursing(doc) {
+    loadNrCensus(doc);
+    const b = doc.querySelector('#nrSaveBtn'); if (b) b.addEventListener('click', () => doAddNursingNote(doc));
+  }
+  async function loadNrCensus(doc) {
+    const tb = doc.querySelector('#nrCensus'); if (!tb) return;
+    try {
+      const rows = await HIS.api.admittedPatients();
+      const cnt = doc.querySelector('#nrCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' admitted' : '';
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const active = doc.dataset.nrAdm === String(r.admissionId);
+        return `<tr${active ? ' style="background:#eef6ff"' : ''}><td>${r.patient}</td><td>${r.uhid}</td><td>${r.ward || ''}</td><td><span class="pill pill--warn">${r.bedNo || ''}</span></td><td>${r.consultant || '—'}</td>`
+          + `<td><button class="btn btn--sm ${active ? '' : 'btn--primary'}" data-nr="${r.admissionId}" data-patient="${r.patient}" data-uhid="${r.uhid}" data-bed="${r.ward} ${r.bedNo}"><i class="bi bi-clipboard2-heart"></i> ${active ? 'Selected' : 'Care'}</button></td></tr>`;
+      }).join('') : emptyRow(6, 'No patients currently admitted');
+      tb.querySelectorAll('[data-nr]').forEach(b => b.addEventListener('click', () => selectNrPatient(doc, b.dataset)));
+      if (rows.length && !doc.dataset.nrAdm) {
+        const r0 = rows[0];
+        selectNrPatient(doc, { nr: String(r0.admissionId), patient: r0.patient, uhid: r0.uhid, bed: r0.ward + ' ' + r0.bedNo });
+      }
+    } catch (e) { tb.innerHTML = emptyRow(6, 'Census API unavailable'); }
+  }
+  function selectNrPatient(doc, ds) {
+    doc.dataset.nrAdm = ds.nr;
+    const b = doc.querySelector('#nrBanner');
+    if (b) b.innerHTML = `<div class="pbanner selectable"><div class="av">${initials(ds.patient)}</div><div><div class="nm">${ds.patient}</div><div class="meta"><span>UHID <b>${ds.uhid}</b></span><span>Bed <b>${ds.bed}</b></span></div></div></div>`;
+    loadNrNotes(doc, ds.nr);
+  }
+  async function loadNrNotes(doc, admId) {
+    const tb = doc.querySelector('#nrNotes'); if (!tb) return;
+    try {
+      const rows = await HIS.api.nursingNotes(admId);
+      tb.innerHTML = rows.length ? rows.map(n => {
+        const t = (n.recordedUtc || '').replace('T', ' ').slice(0, 16);
+        return `<tr><td>${t}</td><td><span class="pill pill--info">${n.noteType || ''}</span></td><td>${n.note || ''}</td></tr>`;
+      }).join('') : emptyRow(3, 'No notes recorded yet');
+    } catch (e) { tb.innerHTML = emptyRow(3, 'Notes API unavailable'); }
+  }
+  async function doAddNursingNote(doc) {
+    const admId = doc.dataset.nrAdm;
+    if (!admId) { HIS.toast('Pick an admitted patient from the census first'); return; }
+    try {
+      await HIS.api.addNursingNote({ admissionId: parseInt(admId, 10), noteType: val(doc, 'nrType'), note: val(doc, 'nrNote') || null });
+      HIS.toast('Nursing note saved', 'bi-check2-circle');
+      const el = doc.querySelector('#nrNote'); if (el) el.value = '';
+      loadNrNotes(doc, admId);
+    } catch (e) { HIS.toast('Save failed: ' + e.message); }
   }
 
   function initIcu(doc) {
