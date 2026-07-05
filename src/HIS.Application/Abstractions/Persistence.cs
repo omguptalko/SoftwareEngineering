@@ -38,6 +38,12 @@ public interface ILookupRepository
 {
     Task<IReadOnlyList<Doctor>> GetDoctorsAsync(string? q, CancellationToken ct = default);
     Task<IReadOnlyList<Drug>> GetDrugsAsync(string? q, CancellationToken ct = default);
+    // ---- Drug master admin (CRUD) ----
+    Task<IReadOnlyList<Drug>> GetAllDrugsAsync(CancellationToken ct = default);   // includes inactive
+    Task<bool> DrugCodeExistsAsync(string code, int? excludeDrugId, CancellationToken ct = default);
+    Task<int> InsertDrugAsync(Drug d, CancellationToken ct = default);
+    Task<bool> UpdateDrugAsync(Drug d, CancellationToken ct = default);
+    Task SetDrugActiveAsync(int drugId, bool isActive, CancellationToken ct = default);
     Task<IReadOnlyList<Icd10Code>> GetIcd10Async(string? q, CancellationToken ct = default);
     Task<IReadOnlyList<Payer>> GetPayersAsync(string? q, CancellationToken ct = default);
     Task<IReadOnlyList<HbpPackage>> GetPackagesAsync(string? q, CancellationToken ct = default);

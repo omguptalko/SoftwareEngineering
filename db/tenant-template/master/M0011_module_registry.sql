@@ -34,3 +34,10 @@ UPDATE master.Module SET Built = 1 WHERE ModuleId = 'radiology';
 /* Certificates & Documents is now a built module (issue -> approve). */
 UPDATE master.Module SET Built = 1 WHERE ModuleId = 'certificates';
 GO
+
+/* Drug Master - pharmacy catalogue admin (diagnostics & pharmacy group). */
+IF NOT EXISTS (SELECT 1 FROM master.Module WHERE ModuleId = 'drugmaster')
+   AND EXISTS (SELECT 1 FROM master.ModuleGroup WHERE GroupId = 'diag')
+    INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, SortOrder, SrsRef)
+    VALUES ('drugmaster', 'diag', 'bi-capsule-pill', 'Drug Master', 1, (SELECT ISNULL(MAX(SortOrder),50)+1 FROM master.Module), '3.8');
+GO

@@ -115,6 +115,9 @@ HIS.api = (function () {
     drugBatches:     (drugCode) => get(`/api/pharmacy/batches?drugCode=${encodeURIComponent(drugCode)}`),
     dispense:        (cmd) => post('/api/pharmacy/dispense', cmd),
     lowStock:        () => get('/api/inventory/lowstock'),
+    drugMaster:      () => get('/api/masters/drugs'),
+    saveDrug:        (cmd) => post('/api/masters/drugs', cmd),
+    setDrugActive:   (drugId, isActive) => post('/api/masters/drugs/set-active', { drugId, isActive }),
     assets:          () => get('/api/assets'),
     // Phase 6 — Billing & Payments
     createBill:      (cmd) => post('/api/billing/bills', cmd),

@@ -1092,8 +1092,29 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== DRUG MASTER (pharmacy catalogue) ========= */
+  function drugmaster() {
+    return `<div class="screen">
+      ${head('bi-capsule-pill', 'Drug Master', 'Manage the pharmacy drug catalogue', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-card-list"></i> Drugs <span class="ph-right muted" id="dmCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Code</th><th>Name</th><th>Form</th><th class="num">Stock</th><th class="num">Reorder</th><th>Status</th><th></th></tr></thead>
+          <tbody id="dmList">${emptyRow(7, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-capsule"></i> <span id="dmFormTitle">Add Drug</span></div><div class="panel__body">
+        <div class="form-grid three">
+          <div class="f"><label>Code <span class="req">*</span></label><div class="field"><input class="ctl code" id="dmCode" placeholder="e.g. PARA"></div></div>
+          <div class="f"><label>Name <span class="req">*</span></label><div class="field"><input class="ctl" id="dmName" placeholder="e.g. Paracetamol 500mg"></div></div>
+          <div class="f"><label>Form <span class="req">*</span></label><div class="field"><select class="ctl" id="dmForm"><option>TAB</option><option>CAP</option><option>INJ</option><option>IVF</option><option>SYP</option><option>OINT</option><option>DROP</option></select></div></div>
+          <div class="f"><label>Reorder Level</label><div class="field"><input class="ctl num" id="dmReorder" placeholder="0"></div></div>
+        </div>
+        <div class="flex gap6 mt8"><button class="btn btn--primary" data-act="save"><i class="bi bi-check2-circle"></i> Save Drug <span class="fk">F9</span></button><button class="btn" id="dmReset"><i class="bi bi-arrow-counterclockwise"></i> New / Reset</button></div>
+      </div></div>
+    </div>`;
+  }
+
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1264,6 +1285,7 @@ window.HIS = window.HIS || {};
     if (id === 'nursing') { initNursing(doc); }
     if (id === 'radiology') { initRadiology(doc); HIS.saveHandlers.radiology = () => doOrderStudy(doc); }
     if (id === 'certificates') { initCertificates(doc); HIS.saveHandlers.certificates = () => doIssueCertificate(doc); }
+    if (id === 'drugmaster') { initDrugMaster(doc); HIS.saveHandlers.drugmaster = () => doSaveDrug(doc); }
     if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
     if (id === 'icu') { initIcu(doc); }
     if (id === 'ipd') {
@@ -2226,6 +2248,57 @@ window.HIS = window.HIS || {};
       const cd = doc.querySelector('#certDoctor'); if (cd) cd.value = '';
       loadCertificates(doc);
     } catch (e) { HIS.toast('Approve failed: ' + e.message); }
+  }
+
+  /* ---- Drug Master: CRUD over master.Drug ---- */
+  function initDrugMaster(doc) {
+    loadDrugMaster(doc);
+    const r = doc.querySelector('#dmReset'); if (r) r.addEventListener('click', () => resetDrugForm(doc));
+  }
+  async function loadDrugMaster(doc) {
+    const tb = doc.querySelector('#dmList'); if (!tb) return;
+    try {
+      const rows = await HIS.api.drugMaster();
+      const cnt = doc.querySelector('#dmCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' drugs' : '';
+      tb.innerHTML = rows.length ? rows.map(d => {
+        const st = d.isActive ? '<span class="pill pill--ok">Active</span>' : '<span class="pill pill--muted">Inactive</span>';
+        const nm = (d.name || '').replace(/"/g, '&quot;');
+        const toggle = d.isActive ? `<button class="btn btn--sm" data-dmoff="${d.drugId}">Deactivate</button>` : `<button class="btn btn--sm" data-dmon="${d.drugId}">Restore</button>`;
+        return `<tr><td><b>${d.code}</b></td><td>${d.name}</td><td>${d.form}</td><td class="num">${d.stockQty}</td><td class="num">${d.reorderLevel}</td><td>${st}</td>`
+          + `<td class="flex gap6"><button class="btn btn--sm" data-dmedit="${d.drugId}" data-code="${d.code}" data-name="${nm}" data-form="${d.form}" data-reorder="${d.reorderLevel}"><i class="bi bi-pencil"></i> Edit</button>${toggle}</td></tr>`;
+      }).join('') : emptyRow(7, 'No drugs — add one below');
+      tb.querySelectorAll('[data-dmedit]').forEach(b => b.addEventListener('click', () => editDrug(doc, b.dataset)));
+      tb.querySelectorAll('[data-dmoff]').forEach(b => b.addEventListener('click', () => toggleDrug(doc, b.dataset.dmoff, false)));
+      tb.querySelectorAll('[data-dmon]').forEach(b => b.addEventListener('click', () => toggleDrug(doc, b.dataset.dmon, true)));
+    } catch (e) { tb.innerHTML = emptyRow(7, 'Drug master API unavailable'); }
+  }
+  function editDrug(doc, ds) {
+    doc.dataset.dmEditId = ds.dmedit;
+    const set = (id, v) => { const el = doc.querySelector('#' + id); if (el) el.value = v; };
+    set('dmCode', ds.code); set('dmName', ds.name); set('dmForm', ds.form); set('dmReorder', ds.reorder);
+    const code = doc.querySelector('#dmCode'); if (code) code.disabled = true;   // code immutable on edit
+    const t = doc.querySelector('#dmFormTitle'); if (t) t.textContent = 'Edit Drug · ' + ds.code;
+    const nm = doc.querySelector('#dmName'); if (nm) nm.focus();
+  }
+  function resetDrugForm(doc) {
+    delete doc.dataset.dmEditId;
+    ['dmCode', 'dmName', 'dmReorder'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+    const code = doc.querySelector('#dmCode'); if (code) code.disabled = false;
+    const t = doc.querySelector('#dmFormTitle'); if (t) t.textContent = 'Add Drug';
+  }
+  async function doSaveDrug(doc) {
+    const code = val(doc, 'dmCode'), name = val(doc, 'dmName'), form = val(doc, 'dmForm');
+    if (!code || !name) { HIS.toast('Code and Name are required'); return; }
+    const cmd = { drugId: doc.dataset.dmEditId ? parseInt(doc.dataset.dmEditId, 10) : null, code, name, form, reorderLevel: intOrNull(val(doc, 'dmReorder')) || 0 };
+    try {
+      await HIS.api.saveDrug(cmd);
+      HIS.toast(doc.dataset.dmEditId ? 'Drug updated · ' + code : 'Drug added · ' + code, 'bi-capsule');
+      resetDrugForm(doc); loadDrugMaster(doc);
+    } catch (e) { HIS.toast('Save failed: ' + e.message); }
+  }
+  async function toggleDrug(doc, id, active) {
+    try { await HIS.api.setDrugActive(parseInt(id, 10), active); HIS.toast(active ? 'Drug restored' : 'Drug deactivated'); loadDrugMaster(doc); }
+    catch (e) { HIS.toast('Failed: ' + e.message); }
   }
 
   function initIcu(doc) {
