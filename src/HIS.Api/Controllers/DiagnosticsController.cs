@@ -55,4 +55,12 @@ public sealed class BloodBankController : ControllerBase
 
     [HttpPost("requests")]
     public Task<RaiseBloodRequestResult> RaiseRequest([FromBody] RaiseBloodRequestCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Add units to stock (donation / receipt).</summary>
+    [HttpPost("stock/add")]
+    public Task<bool> AddStock([FromBody] AddBloodStockCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Issue blood against a request — deducts stock and marks it Fulfilled.</summary>
+    [HttpPost("requests/{id:long}/issue")]
+    public Task<bool> Issue(long id, CancellationToken ct) => _mediator.Send(new IssueBloodCommand(id), ct);
 }

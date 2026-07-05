@@ -94,6 +94,62 @@ public sealed class GetBloodStockHandler : MediatR.IRequestHandler<GetBloodStock
     }
 }
 
+// ---- Add stock (donation / receipt) ----
+public sealed record AddBloodStockCommand(string BloodGroup, int Units) : ICommand<bool>, IAuditable
+{
+    public string AuditEntity => "BloodStock";
+    public string? AuditEntityId => BloodGroup;
+}
+public sealed class AddBloodStockValidator : AbstractValidator<AddBloodStockCommand>
+{
+    public AddBloodStockValidator()
+    {
+        RuleFor(x => x.BloodGroup).NotEmpty();
+        RuleFor(x => x.Units).GreaterThan(0);
+    }
+}
+public sealed class AddBloodStockHandler : MediatR.IRequestHandler<AddBloodStockCommand, bool>
+{
+    private readonly IBloodBankRepository _bb;
+    private readonly IBranchContext _ctx;
+    public AddBloodStockHandler(IBloodBankRepository bb, IBranchContext ctx) { _bb = bb; _ctx = ctx; }
+    public async Task<bool> Handle(AddBloodStockCommand c, CancellationToken ct)
+    {
+        var branchId = _ctx.BranchId ?? throw new InvalidOperationException("Branch context required.");
+        await _bb.AddStockAsync(branchId, c.BloodGroup, c.Units, ct);
+        return true;
+    }
+}
+
+// ---- Issue against a request (deduct stock + mark Fulfilled) ----
+public sealed record IssueBloodCommand(long RequestId) : ICommand<bool>, IAuditable
+{
+    public string AuditEntity => "BloodRequest";
+    public string? AuditEntityId => RequestId.ToString();
+}
+public sealed class IssueBloodHandler : MediatR.IRequestHandler<IssueBloodCommand, bool>
+{
+    private readonly IBloodBankRepository _bb;
+    private readonly IBranchContext _ctx;
+    public IssueBloodHandler(IBloodBankRepository bb, IBranchContext ctx) { _bb = bb; _ctx = ctx; }
+    public async Task<bool> Handle(IssueBloodCommand c, CancellationToken ct)
+    {
+        var branchId = _ctx.BranchId ?? throw new InvalidOperationException("Branch context required.");
+        var req = await _bb.GetRequestAsync(c.RequestId, ct)
+            ?? throw new InvalidOperationException("Blood request not found.");
+        if (string.Equals(req.Status, "Fulfilled", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Request already fulfilled.");
+
+        var available = await _bb.GetAvailableUnitsAsync(branchId, req.BloodGroup, ct);
+        if (available < req.Units)
+            throw new InvalidOperationException($"Only {available} unit(s) of {req.BloodGroup} in stock; {req.Units} requested.");
+
+        await _bb.AddStockAsync(branchId, req.BloodGroup, -req.Units, ct);   // deduct
+        await _bb.SetRequestStatusAsync(c.RequestId, "Fulfilled", ct);
+        return true;
+    }
+}
+
 public sealed record BloodRequestRowDto(long RequestId, string? Patient, string BloodGroup, int Units, bool IsEmergency, string Status, DateTime RequestedUtc);
 public sealed record GetBloodRequestsQuery : IQuery<IReadOnlyList<BloodRequestRowDto>>;
 

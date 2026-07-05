@@ -1154,11 +1154,18 @@ window.HIS = window.HIS || {};
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>Blood Group</th><th class="num">Units</th><th class="num">Safety Threshold</th><th>Status</th></tr></thead>
           <tbody id="bbStock">${emptyRow(4, 'Loading…')}</tbody>
-        </table></div></div></div>
+        </table></div>
+          <div class="flex gap6 mt8" style="padding:8px 12px;align-items:center;flex-wrap:wrap">
+            <span class="muted"><i class="bi bi-plus-circle"></i> Add stock (donation / receipt):</span>
+            <select class="ctl" id="bbAddGroup" style="width:74px;display:inline-block"><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select>
+            <input class="ctl num" id="bbAddUnits" placeholder="units" style="width:72px;display:inline-block">
+            <button class="btn btn--sm btn--primary" id="bbAddBtn"><i class="bi bi-plus-lg"></i> Add Units</button>
+          </div>
+        </div></div>
       <div class="panel"><div class="panel__head"><i class="bi bi-receipt"></i> Blood Requests <span class="ph-right muted" id="bbReqCount"></span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
-          <thead><tr><th>Req #</th><th>Patient</th><th>Group</th><th class="num">Units</th><th>Priority</th><th>Status</th><th>Raised</th></tr></thead>
-          <tbody id="bbReqList">${emptyRow(7, 'Loading…')}</tbody>
+          <thead><tr><th>Req #</th><th>Patient</th><th>Group</th><th class="num">Units</th><th>Priority</th><th>Status</th><th>Raised</th><th></th></tr></thead>
+          <tbody id="bbReqList">${emptyRow(8, 'Loading…')}</tbody>
         </table></div></div></div>
       <div class="panel"><div class="panel__head"><i class="bi bi-clipboard-plus"></i> Raise Blood Request</div><div class="panel__body">
         <div class="form-grid">
@@ -2455,6 +2462,24 @@ window.HIS = window.HIS || {};
   function initBloodBank(doc) {
     loadBloodStock(doc);
     loadBloodRequests(doc);
+    const a = doc.querySelector('#bbAddBtn'); if (a) a.addEventListener('click', () => doAddBloodStock(doc));
+  }
+  async function doAddBloodStock(doc) {
+    const group = val(doc, 'bbAddGroup'), units = intOrNull(val(doc, 'bbAddUnits'));
+    if (!units || units < 1) { HIS.toast('Enter units to add (>= 1)'); return; }
+    try {
+      await HIS.api.addBloodStock({ bloodGroup: group, units });
+      HIS.toast('Added ' + units + ' unit(s) of ' + group + ' to stock', 'bi-plus-circle');
+      const u = doc.querySelector('#bbAddUnits'); if (u) u.value = '';
+      loadBloodStock(doc);
+    } catch (e) { HIS.toast('Add stock failed: ' + e.message); }
+  }
+  async function doIssueBlood(doc, id) {
+    try {
+      await HIS.api.issueBlood(parseInt(id, 10));
+      HIS.toast('Blood issued · request #' + id + ' fulfilled — stock deducted', 'bi-droplet-half');
+      loadBloodStock(doc); loadBloodRequests(doc);
+    } catch (e) { HIS.toast('Issue failed: ' + e.message); }
   }
   async function loadBloodRequests(doc) {
     const tb = doc.querySelector('#bbReqList'); if (!tb) return;
@@ -2465,9 +2490,11 @@ window.HIS = window.HIS || {};
         const when = (r.requestedUtc || '').replace('T', ' ').slice(0, 16);
         const pr = r.isEmergency ? '<span class="pill pill--warn">Emergency</span>' : '<span class="pill pill--muted">Routine</span>';
         const cls = r.status === 'Fulfilled' ? 'pill--ok' : 'pill--warn';
-        return `<tr><td><b>#${r.requestId}</b></td><td>${r.patient || '—'}</td><td><b>${r.bloodGroup}</b></td><td class="num">${r.units}</td><td>${pr}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${when}</td></tr>`;
-      }).join('') : emptyRow(7, 'No blood requests yet');
-    } catch (e) { tb.innerHTML = emptyRow(7, 'Requests API unavailable'); }
+        const act = r.status === 'Fulfilled' ? '' : `<button class="btn btn--sm btn--primary" data-issue="${r.requestId}"><i class="bi bi-droplet-half"></i> Issue</button>`;
+        return `<tr><td><b>#${r.requestId}</b></td><td>${r.patient || '—'}</td><td><b>${r.bloodGroup}</b></td><td class="num">${r.units}</td><td>${pr}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${when}</td><td>${act}</td></tr>`;
+      }).join('') : emptyRow(8, 'No blood requests yet');
+      tb.querySelectorAll('[data-issue]').forEach(b => b.addEventListener('click', () => doIssueBlood(doc, b.dataset.issue)));
+    } catch (e) { tb.innerHTML = emptyRow(8, 'Requests API unavailable'); }
   }
   async function loadBloodStock(doc) {
     const tb = doc.querySelector('#bbStock'); if (!tb) return;

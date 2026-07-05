@@ -302,6 +302,35 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return reqs.Select(r => (r.RequestId, r.PatientId is long pid ? names.GetValueOrDefault(pid) : null, r.BloodGroup, r.Units, r.IsEmergency, r.Status, r.RequestedUtc)).ToList();
     }
 
+    public async Task AddStockAsync(int branchId, string bloodGroup, int deltaUnits, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenDataAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            @"UPDATE diagnostics.BloodStock SET Units = CASE WHEN Units + @deltaUnits < 0 THEN 0 ELSE Units + @deltaUnits END
+              WHERE BranchId = @branchId AND BloodGroup = @bloodGroup;
+              IF @@ROWCOUNT = 0
+                  INSERT INTO diagnostics.BloodStock (BranchId, BloodGroup, Units, SafetyThreshold)
+                  VALUES (@branchId, @bloodGroup, CASE WHEN @deltaUnits < 0 THEN 0 ELSE @deltaUnits END, 2);",
+            new { branchId, bloodGroup, deltaUnits }, cancellationToken: ct));
+    }
+
+    public async Task<(string BloodGroup, int Units, string Status)?> GetRequestAsync(long requestId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenDataAsync(ct);
+        var rows = (await c.QueryAsync<(string BloodGroup, int Units, string Status)>(new CommandDefinition(
+            "SELECT BloodGroup, Units, Status FROM diagnostics.BloodRequest WHERE RequestId = @requestId",
+            new { requestId }, cancellationToken: ct))).ToList();
+        return rows.Count == 0 ? null : rows[0];
+    }
+
+    public async Task SetRequestStatusAsync(long requestId, string status, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenDataAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE diagnostics.BloodRequest SET Status = @status WHERE RequestId = @requestId",
+            new { requestId, status }, cancellationToken: ct));
+    }
+
     public async Task<int> GetAvailableUnitsAsync(int branchId, string bloodGroup, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);

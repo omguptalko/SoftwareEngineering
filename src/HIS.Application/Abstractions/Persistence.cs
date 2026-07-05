@@ -192,6 +192,10 @@ public interface IBloodBankRepository
     Task<long> CreateRequestAsync(BloodRequest r, CancellationToken ct = default);
     Task<int> GetAvailableUnitsAsync(int branchId, string bloodGroup, CancellationToken ct = default);
     Task<IReadOnlyList<(long RequestId, string? Patient, string BloodGroup, int Units, bool IsEmergency, string Status, DateTime RequestedUtc)>> GetRequestsAsync(int branchId, CancellationToken ct = default);
+    /// <summary>Change stock for a group by a signed delta (+ donation/receipt, - issue). Floors at 0; inserts the group if new.</summary>
+    Task AddStockAsync(int branchId, string bloodGroup, int deltaUnits, CancellationToken ct = default);
+    Task<(string BloodGroup, int Units, string Status)?> GetRequestAsync(long requestId, CancellationToken ct = default);
+    Task SetRequestStatusAsync(long requestId, string status, CancellationToken ct = default);
 }
 
 /// <summary>Line to dispense: drug code, batch, quantity. Price comes from the batch MRP.</summary>
