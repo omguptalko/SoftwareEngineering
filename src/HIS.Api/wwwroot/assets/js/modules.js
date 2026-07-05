@@ -1869,7 +1869,12 @@ window.HIS = window.HIS || {};
       const r = await HIS.api.dispense({ prescriptionId: rx, isNdps: false, lines });
       HIS.toast('Dispensed · ₹' + r.total + ' · #' + r.dispenseId, 'bi-bag-check');
       loadPharmaQueue(doc); loadPharmaAlerts(doc);
-    } catch (e) { HIS.toast('Dispense failed: ' + e.message); }
+    } catch (e) {
+      const m = e.message || '';
+      if (/Unknown drug/i.test(m)) HIS.toast('That drug is not in the Drug Master — pick a drug via F3, or add it in Drug Master first', 'bi-exclamation-triangle');
+      else if (/batch|stock|Insufficient/i.test(m)) HIS.toast('Batch/stock issue: ' + m + ' — pick a drug via F3 so the batch auto-fills', 'bi-exclamation-triangle');
+      else HIS.toast('Dispense failed: ' + m);
+    }
   }
 
   /* ---- Phase 2.3: admit patient (POST /api/ipd/admit) ----------------- */
