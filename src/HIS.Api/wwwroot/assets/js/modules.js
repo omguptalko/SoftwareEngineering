@@ -1823,10 +1823,20 @@ window.HIS = window.HIS || {};
     const raw = i[0] ? i[0].value.trim() : '';
     if (!raw) return;
     let k = raw.indexOf('—'); if (k < 0) k = raw.indexOf(' - ');
-    const code = (k > 0 ? raw.slice(0, k) : raw).trim();
+    let code = (k > 0 ? raw.slice(0, k) : raw).trim();
     try {
-      const batches = await HIS.api.drugBatches(code);
-      if (!batches || !batches.length) { HIS.toast('No stock batches for ' + code); return; }
+      let batches = await HIS.api.drugBatches(code);
+      // Smart resolve: if a name/partial was typed (not an F3 pick), match a drug in the master.
+      if ((!batches || !batches.length) && k < 0) {
+        const found = await HIS.api.lookup('drug', raw);
+        if (found && found.rows && found.rows.length) {
+          const row = found.rows[0];          // [Code, Name, Form, Stock]
+          code = row[0];
+          if (i[0]) i[0].value = row[0] + ' — ' + row[1];   // auto-correct to "CODE — Name"
+          batches = await HIS.api.drugBatches(code);
+        }
+      }
+      if (!batches || !batches.length) { HIS.toast('"' + raw + '" not found in Drug Master — pick via F3 or add it in Drug Master'); return; }
       const b = batches.find(x => (x.qtyOnHand || 0) > 0) || batches[0];   // FEFO: first in-stock batch
       if (i[1] && !i[1].value) i[1].value = b.batchNo || '';
       if (i[2] && !i[2].value) i[2].value = b.expiry || '';
