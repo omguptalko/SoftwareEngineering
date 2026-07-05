@@ -33,6 +33,9 @@ UPDATE master.Module SET Built = 1 WHERE ModuleId = 'radiology';
 
 /* Certificates & Documents is now a built module (issue -> approve). */
 UPDATE master.Module SET Built = 1 WHERE ModuleId = 'certificates';
+
+/* Inventory & Store is now a built module (stock levels + purchase orders). */
+UPDATE master.Module SET Built = 1 WHERE ModuleId = 'inventory';
 GO
 
 /* Drug Master - pharmacy catalogue admin (diagnostics & pharmacy group). */

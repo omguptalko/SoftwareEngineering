@@ -32,6 +32,14 @@ public sealed class InventoryController : ControllerBase
     [HttpGet("lowstock")]
     public Task<IReadOnlyList<LowStockItemDto>> LowStock(CancellationToken ct) => _mediator.Send(new GetLowStockQuery(), ct);
 
+    /// <summary>Full stock levels for all active items (with a below-reorder flag).</summary>
+    [HttpGet("stock")]
+    public Task<IReadOnlyList<StockItemDto>> Stock(CancellationToken ct) => _mediator.Send(new GetStockLevelsQuery(), ct);
+
+    /// <summary>Suppliers for the purchase-order form.</summary>
+    [HttpGet("suppliers")]
+    public Task<IReadOnlyList<SupplierDto>> Suppliers(CancellationToken ct) => _mediator.Send(new GetSuppliersQuery(), ct);
+
     [HttpPost("purchase-orders")]
     public Task<CreatePurchaseOrderResult> CreatePo([FromBody] CreatePurchaseOrderCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }

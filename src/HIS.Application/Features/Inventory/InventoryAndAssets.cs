@@ -21,6 +21,38 @@ public sealed class GetLowStockHandler : MediatR.IRequestHandler<GetLowStockQuer
     }
 }
 
+// ---- Full stock levels (all active items) ----
+public sealed record StockItemDto(string Code, string Name, int Stock, int ReorderLevel, bool BelowReorder);
+public sealed record GetStockLevelsQuery : IQuery<IReadOnlyList<StockItemDto>>;
+
+public sealed class GetStockLevelsHandler : MediatR.IRequestHandler<GetStockLevelsQuery, IReadOnlyList<StockItemDto>>
+{
+    private readonly IInventoryRepository _inv;
+    public GetStockLevelsHandler(IInventoryRepository inv) { _inv = inv; }
+
+    public async Task<IReadOnlyList<StockItemDto>> Handle(GetStockLevelsQuery q, CancellationToken ct)
+    {
+        var rows = await _inv.GetStockLevelsAsync(ct);
+        return rows.Select(r => new StockItemDto(r.Code, r.Name, r.Stock, r.ReorderLevel, r.Stock <= r.ReorderLevel)).ToList();
+    }
+}
+
+// ---- Suppliers (for the PO form) ----
+public sealed record SupplierDto(int SupplierId, string Name, string? Gstin);
+public sealed record GetSuppliersQuery : IQuery<IReadOnlyList<SupplierDto>>;
+
+public sealed class GetSuppliersHandler : MediatR.IRequestHandler<GetSuppliersQuery, IReadOnlyList<SupplierDto>>
+{
+    private readonly IInventoryRepository _inv;
+    public GetSuppliersHandler(IInventoryRepository inv) { _inv = inv; }
+
+    public async Task<IReadOnlyList<SupplierDto>> Handle(GetSuppliersQuery q, CancellationToken ct)
+    {
+        var rows = await _inv.GetSuppliersAsync(ct);
+        return rows.Select(s => new SupplierDto(s.SupplierId, s.Name, s.Gstin)).ToList();
+    }
+}
+
 public sealed record PoLineDto(string ItemName, int Qty, decimal? UnitPrice);
 
 public sealed record CreatePurchaseOrderCommand(int SupplierId, IReadOnlyList<PoLineDto> Lines)

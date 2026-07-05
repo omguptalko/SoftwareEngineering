@@ -80,6 +80,11 @@ window.HIS = window.HIS || {};
       <td><input class="gi" placeholder="Reference" style="width:90px"></td>
       <td><select class="gi"><option value="">—</option><option>Normal</option><option>Low</option><option>High</option></select></td>
       <td class="center"><button class="btn btn--sm btn--danger row-del" title="Remove"><i class="bi bi-x"></i></button></td>`,
+    poBody: `
+      <td><input class="gi" placeholder="Item name / drug"></td>
+      <td class="num"><input class="gi num" placeholder="qty" style="width:56px"></td>
+      <td class="num"><input class="gi num" placeholder="0.00" style="width:80px"></td>
+      <td class="center"><button class="btn btn--sm btn--danger row-del" title="Remove"><i class="bi bi-x"></i></button></td>`,
   };
 
   /* ============================ DASHBOARD ============================== */
@@ -1114,8 +1119,30 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== INVENTORY & STORE (SRS §3.11) ========= */
+  function inventory() {
+    return `<div class="screen">
+      ${head('bi-boxes', 'Inventory &amp; Store', 'Stock levels · reorder · purchase orders', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-box-seam"></i> Stock Levels <span class="ph-right muted" id="invCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Code</th><th>Item</th><th class="num">Stock</th><th class="num">Reorder</th><th>Status</th></tr></thead>
+          <tbody id="invStock">${emptyRow(5, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-cart-plus"></i> Create Purchase Order
+        <span class="ph-right"><button class="btn btn--sm" data-addrow="poGrid"><i class="bi bi-plus-lg"></i> Add Line</button></span></div>
+        <div class="panel__body">
+          <div class="form-grid"><div class="f"><label>Supplier <span class="req">*</span></label><div class="field"><select class="ctl" id="poSupplier"><option value="">— select —</option></select></div></div></div>
+          <div class="grid-wrap grid--editable" style="border:0;margin-top:8px"><table class="grid" id="poGrid">
+            <thead><tr><th style="width:55%">Item</th><th class="num">Qty</th><th class="num">Unit Price ₹</th><th></th></tr></thead>
+            <tbody id="poBody"><tr>${TPL.poBody}</tr></tbody>
+          </table></div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-cart-check"></i> Create PO <span class="fk">F9</span></button><span class="hintline">Pick a supplier · add items + qty · Create PO (Draft).</span></div>
+        </div></div>
+    </div>`;
+  }
+
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1273,7 +1300,7 @@ window.HIS = window.HIS || {};
 
   /* ============================ afterRender ========================= */
   HIS.afterRender = function (id, doc) {
-    const map = { rxBody: TPL.rxBody, chargeBody: TPL.chargeBody, dispBody: TPL.dispBody, labResultsBody: TPL.labResultBody };
+    const map = { rxBody: TPL.rxBody, chargeBody: TPL.chargeBody, dispBody: TPL.dispBody, labResultsBody: TPL.labResultBody, poBody: TPL.poBody };
     Object.keys(map).forEach(tb => { const el = doc.querySelector('#' + tb); if (el) el.dataset.tpl = map[tb]; });
 
     if (id === 'billing') { wireBilling(doc); HIS.saveHandlers.billing = () => doCreateBill(doc);
@@ -1287,6 +1314,7 @@ window.HIS = window.HIS || {};
     if (id === 'radiology') { initRadiology(doc); HIS.saveHandlers.radiology = () => doOrderStudy(doc); }
     if (id === 'certificates') { initCertificates(doc); HIS.saveHandlers.certificates = () => doIssueCertificate(doc); }
     if (id === 'drugmaster') { initDrugMaster(doc); HIS.saveHandlers.drugmaster = () => doSaveDrug(doc); }
+    if (id === 'inventory') { initInventory(doc); HIS.saveHandlers.inventory = () => doCreatePo(doc); }
     if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
     if (id === 'icu') { initIcu(doc); }
     if (id === 'ipd') {
@@ -2334,6 +2362,45 @@ window.HIS = window.HIS || {};
   async function toggleDrug(doc, id, active) {
     try { await HIS.api.setDrugActive(parseInt(id, 10), active); HIS.toast(active ? 'Drug restored' : 'Drug deactivated'); loadDrugMaster(doc); }
     catch (e) { HIS.toast('Failed: ' + e.message); }
+  }
+
+  /* ---- Inventory & Store: stock levels + purchase orders (SRS §3.11) ---- */
+  function initInventory(doc) {
+    loadInvStock(doc);
+    loadPoSuppliers(doc);
+  }
+  async function loadInvStock(doc) {
+    const tb = doc.querySelector('#invStock'); if (!tb) return;
+    try {
+      const rows = await HIS.api.inventoryStock();
+      const cnt = doc.querySelector('#invCount');
+      if (cnt) { const low = rows.filter(r => r.belowReorder).length; cnt.textContent = rows.length + ' items' + (low ? ' · ' + low + ' below reorder' : ''); }
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const st = r.belowReorder ? '<span class="pill pill--warn">Reorder</span>' : '<span class="pill pill--ok">OK</span>';
+        return `<tr${r.belowReorder ? ' style="background:#fdf3f2"' : ''}><td><b>${r.code}</b></td><td>${r.name}</td><td class="num">${r.stock}</td><td class="num">${r.reorderLevel}</td><td>${st}</td></tr>`;
+      }).join('') : emptyRow(5, 'No stock items');
+    } catch (e) { tb.innerHTML = emptyRow(5, 'Stock API unavailable'); }
+  }
+  async function loadPoSuppliers(doc) {
+    const sel = doc.querySelector('#poSupplier'); if (!sel) return;
+    try {
+      const s = await HIS.api.inventorySuppliers();
+      sel.innerHTML = '<option value="">— select —</option>' + s.map(x => `<option value="${x.supplierId}">${x.name}${x.gstin ? ' · ' + x.gstin : ''}</option>`).join('');
+    } catch (e) {}
+  }
+  async function doCreatePo(doc) {
+    const sid = val(doc, 'poSupplier');
+    if (!sid) { HIS.toast('Select a supplier'); return; }
+    const lines = Array.from(doc.querySelectorAll('#poBody tr')).map(tr => {
+      const i = tr.querySelectorAll('input');
+      return { itemName: i[0] ? i[0].value.trim() : '', qty: i[1] ? intOrNull(i[1].value) : null, unitPrice: i[2] ? numOrNull(i[2].value) : null };
+    }).filter(l => l.itemName && l.qty);
+    if (!lines.length) { HIS.toast('Add at least one item + qty'); return; }
+    try {
+      const r = await HIS.api.createPurchaseOrder({ supplierId: parseInt(sid, 10), lines });
+      HIS.toast('Purchase Order created · ' + r.poNo, 'bi-cart-check');
+      loadInvStock(doc);
+    } catch (e) { HIS.toast('Create PO failed: ' + e.message); }
   }
 
   function initIcu(doc) {
