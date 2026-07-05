@@ -528,12 +528,11 @@ window.HIS = window.HIS || {};
 
   /* ============================ CASHLESS / TPA ====================== */
   function cashless() {
-    const p = HIS.mock.currentPatient;
     return `<div class="screen">
       ${head('bi-credit-card-2-front', 'Cashless / TPA Claims', 'Pre-auth → query → enhancement → final bill → settlement',
         `<button class="btn btn--ghost btn--sm"><i class="bi bi-cpu"></i> AI Pre-Scrub</button>
          <button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-send"></i> Submit Pre-Auth <span class="fk">F9</span></button>`)}
-      ${banner(p)}
+      <div id="caBanner">${banner(null)}</div>
       <div class="panel"><div class="panel__body">
         <div class="pipeline">
           <div class="pstep"><div class="b">1</div><div class="t">Eligibility</div></div>
@@ -547,6 +546,7 @@ window.HIS = window.HIS || {};
       <div class="cols-side">
         <div class="panel"><div class="panel__head"><i class="bi bi-shield-check"></i> Payer &amp; Eligibility <span class="ph-right"><button class="btn btn--sm" id="btnCapturePolicy"><i class="bi bi-save"></i> Capture Policy</button></span></div><div class="panel__body">
           <div class="form-grid">
+            <div class="f"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="caPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
             <div class="f"><label>Payer / TPA <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="caPayer" data-lookup="payer" placeholder="F3 payer…"><button class="lk" data-lookup="payer">F3</button></div></div>
             <div class="f"><label>Policy / Member ID</label><div class="field"><input class="ctl code" id="caPolicy" placeholder="Policy / member no."></div></div>
             <div class="f"><label>Sum Insured</label><div class="field with-unit"><input class="ctl num" id="caSumInsured" placeholder="—"><span class="unit">₹</span></div></div>
@@ -1770,12 +1770,27 @@ window.HIS = window.HIS || {};
   function initCashless(doc) {
     loadClaimsMis(doc);
     const cp = doc.querySelector('#btnCapturePolicy'); if (cp) cp.addEventListener('click', () => doCapturePolicy(doc));
-    loadEligibility(doc);
+    const pf = doc.querySelector('#caPatient');
+    if (pf) { pf.addEventListener('change', () => showCaPatient(doc)); pf.addEventListener('blur', () => showCaPatient(doc)); }
+  }
+  // Resolve the F3-picked patient for the claim, show them in the banner, and load their policies.
+  async function showCaPatient(doc) {
+    const raw = val(doc, 'caPatient'); const b = doc.querySelector('#caBanner');
+    if (!raw) { delete doc.dataset.caUhid; if (b) b.innerHTML = banner(null); return; }
+    let i = raw.indexOf('—'); if (i < 0) i = raw.indexOf(' - ');
+    const uhid = (i > 0 ? raw.slice(0, i) : raw).trim();
+    try {
+      const p = await HIS.api.patientByUhid(uhid);
+      if (!p) { HIS.toast('Patient not found: ' + uhid); return; }
+      doc.dataset.caUhid = p.uhid;
+      if (b) b.innerHTML = banner(p);
+      loadEligibility(doc);
+    } catch (e) {}
   }
   async function loadEligibility(doc) {
-    const p = HIS.mock.currentPatient; if (!p || !p.uhid) return;
+    const uhid = doc.dataset.caUhid; if (!uhid) return;
     try {
-      const pols = await HIS.api.eligibility(p.uhid);
+      const pols = await HIS.api.eligibility(uhid);
       const note = doc.querySelector('#caEligNote');
       if (pols.length) {
         const pol = pols[0];
@@ -1787,13 +1802,13 @@ window.HIS = window.HIS || {};
     } catch (e) { /* ignore */ }
   }
   async function doCapturePolicy(doc) {
-    const p = HIS.mock.currentPatient;
-    if (!p || !p.uhid) { HIS.toast('No patient loaded'); return; }
+    const uhid = doc.dataset.caUhid;
+    if (!uhid) { HIS.toast('Select a patient (F3) first'); return; }
     const payer = val(doc, 'caPayer');
     if (!payer) { HIS.toast('Select a payer (F3)'); return; }
     try {
       await HIS.api.capturePolicy({
-        patientUhid: p.uhid, payerCode: payer, policyNo: val(doc, 'caPolicy') || null,
+        patientUhid: uhid, payerCode: payer, policyNo: val(doc, 'caPolicy') || null,
         sumInsured: numOrNull(val(doc, 'caSumInsured')), coPayPct: numOrNull(val(doc, 'caCopay'))
       });
       HIS.toast('Policy captured', 'bi-shield-check');
@@ -1801,14 +1816,14 @@ window.HIS = window.HIS || {};
     } catch (e) { HIS.toast('Capture failed: ' + e.message); }
   }
   async function doSubmitPreAuth(doc) {
-    const p = HIS.mock.currentPatient;
-    if (!p || !p.uhid) { HIS.toast('No patient loaded'); return; }
+    const uhid = doc.dataset.caUhid;
+    if (!uhid) { HIS.toast('Select a patient (F3) first'); return; }
     const payer = val(doc, 'caPayer'), cost = numOrNull(val(doc, 'caCost'));
     if (!payer) { HIS.toast('Select a payer'); return; }
     if (!cost || cost <= 0) { HIS.toast('Enter estimated cost'); return; }
     try {
       const r = await HIS.api.createPreAuth({
-        patientUhid: p.uhid, payerCode: payer, provisionalIcd10: val(doc, 'caDx') || null,
+        patientUhid: uhid, payerCode: payer, provisionalIcd10: val(doc, 'caDx') || null,
         preAuthAmount: cost, channel: 'NHCX', mandatoryDocs: ['Aadhaar', 'Insurance e-Card', 'Pre-Auth Form']
       });
       HIS.toast('Pre-Auth submitted · ' + r.claimNo, 'bi-send');
