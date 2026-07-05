@@ -290,6 +290,18 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return await c.QuerySingleAsync<long>(new CommandDefinition(sql, r, cancellationToken: ct));
     }
 
+    public async Task<IReadOnlyList<(long, string?, string, int, bool, string, DateTime)>> GetRequestsAsync(int branchId, CancellationToken ct = default)
+    {
+        // Requests live in the FY (data) DB; patient names in master (D8 two-step).
+        List<(long RequestId, long? PatientId, string BloodGroup, int Units, bool IsEmergency, string Status, DateTime RequestedUtc)> reqs;
+        using (var c = await _f.OpenDataAsync(ct))
+            reqs = (await c.QueryAsync<(long, long?, string, int, bool, string, DateTime)>(new CommandDefinition(
+                "SELECT TOP 100 RequestId, PatientId, BloodGroup, Units, IsEmergency, Status, RequestedUtc FROM diagnostics.BloodRequest WHERE BranchId = @branchId ORDER BY RequestId DESC",
+                new { branchId }, cancellationToken: ct))).ToList();
+        var names = await MasterLookup.PatientNamesAsync(_f, reqs.Where(r => r.PatientId.HasValue).Select(r => r.PatientId!.Value), ct);
+        return reqs.Select(r => (r.RequestId, r.PatientId is long pid ? names.GetValueOrDefault(pid) : null, r.BloodGroup, r.Units, r.IsEmergency, r.Status, r.RequestedUtc)).ToList();
+    }
+
     public async Task<int> GetAvailableUnitsAsync(int branchId, string bloodGroup, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);

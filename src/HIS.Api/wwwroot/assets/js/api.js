@@ -108,6 +108,7 @@ HIS.api = (function () {
     enterLabResults: (cmd) => post('/api/lab/results', cmd),
     bloodStock:      () => get('/api/bloodbank/stock'),
     raiseBloodRequest:(cmd) => post('/api/bloodbank/requests', cmd),
+    bloodRequests:   () => get('/api/bloodbank/requests'),
     radWorklist:     () => get('/api/radiology/worklist'),
     createRadOrder:  (cmd) => post('/api/radiology/orders', cmd),
     reportRadiology: (radOrderId, reportUrl) => post('/api/radiology/report', { radOrderId, reportUrl }),

@@ -191,6 +191,7 @@ public interface IBloodBankRepository
     Task<IReadOnlyList<BloodStock>> GetStockAsync(int branchId, CancellationToken ct = default);
     Task<long> CreateRequestAsync(BloodRequest r, CancellationToken ct = default);
     Task<int> GetAvailableUnitsAsync(int branchId, string bloodGroup, CancellationToken ct = default);
+    Task<IReadOnlyList<(long RequestId, string? Patient, string BloodGroup, int Units, bool IsEmergency, string Status, DateTime RequestedUtc)>> GetRequestsAsync(int branchId, CancellationToken ct = default);
 }
 
 /// <summary>Line to dispense: drug code, batch, quantity. Price comes from the batch MRP.</summary>

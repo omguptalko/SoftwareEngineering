@@ -94,6 +94,22 @@ public sealed class GetBloodStockHandler : MediatR.IRequestHandler<GetBloodStock
     }
 }
 
+public sealed record BloodRequestRowDto(long RequestId, string? Patient, string BloodGroup, int Units, bool IsEmergency, string Status, DateTime RequestedUtc);
+public sealed record GetBloodRequestsQuery : IQuery<IReadOnlyList<BloodRequestRowDto>>;
+
+public sealed class GetBloodRequestsHandler : MediatR.IRequestHandler<GetBloodRequestsQuery, IReadOnlyList<BloodRequestRowDto>>
+{
+    private readonly IBloodBankRepository _bb;
+    private readonly IBranchContext _ctx;
+    public GetBloodRequestsHandler(IBloodBankRepository bb, IBranchContext ctx) { _bb = bb; _ctx = ctx; }
+
+    public async Task<IReadOnlyList<BloodRequestRowDto>> Handle(GetBloodRequestsQuery q, CancellationToken ct)
+    {
+        var rows = await _bb.GetRequestsAsync(_ctx.BranchId ?? 0, ct);
+        return rows.Select(r => new BloodRequestRowDto(r.RequestId, r.Patient, r.BloodGroup, r.Units, r.IsEmergency, r.Status, r.RequestedUtc)).ToList();
+    }
+}
+
 public sealed record RaiseBloodRequestCommand(string? PatientUhid, string BloodGroup, int Units, bool IsEmergency)
     : ICommand<RaiseBloodRequestResult>, IAuditable
 {

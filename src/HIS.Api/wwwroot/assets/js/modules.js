@@ -1155,6 +1155,11 @@ window.HIS = window.HIS || {};
           <thead><tr><th>Blood Group</th><th class="num">Units</th><th class="num">Safety Threshold</th><th>Status</th></tr></thead>
           <tbody id="bbStock">${emptyRow(4, 'Loading…')}</tbody>
         </table></div></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-receipt"></i> Blood Requests <span class="ph-right muted" id="bbReqCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Req #</th><th>Patient</th><th>Group</th><th class="num">Units</th><th>Priority</th><th>Status</th><th>Raised</th></tr></thead>
+          <tbody id="bbReqList">${emptyRow(7, 'Loading…')}</tbody>
+        </table></div></div></div>
       <div class="panel"><div class="panel__head"><i class="bi bi-clipboard-plus"></i> Raise Blood Request</div><div class="panel__body">
         <div class="form-grid">
           <div class="f"><label>Patient</label><div class="field with-btn"><input class="ctl" id="bbPatient" data-lookup="patient" placeholder="F3 patient (optional)…"><button class="lk" data-lookup="patient">F3</button></div></div>
@@ -2449,6 +2454,20 @@ window.HIS = window.HIS || {};
   /* ---- Blood Bank: stock + raise request (SRS §3.7) ---- */
   function initBloodBank(doc) {
     loadBloodStock(doc);
+    loadBloodRequests(doc);
+  }
+  async function loadBloodRequests(doc) {
+    const tb = doc.querySelector('#bbReqList'); if (!tb) return;
+    try {
+      const rows = await HIS.api.bloodRequests();
+      const cnt = doc.querySelector('#bbReqCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' requests' : '';
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const when = (r.requestedUtc || '').replace('T', ' ').slice(0, 16);
+        const pr = r.isEmergency ? '<span class="pill pill--warn">Emergency</span>' : '<span class="pill pill--muted">Routine</span>';
+        const cls = r.status === 'Fulfilled' ? 'pill--ok' : 'pill--warn';
+        return `<tr><td><b>#${r.requestId}</b></td><td>${r.patient || '—'}</td><td><b>${r.bloodGroup}</b></td><td class="num">${r.units}</td><td>${pr}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${when}</td></tr>`;
+      }).join('') : emptyRow(7, 'No blood requests yet');
+    } catch (e) { tb.innerHTML = emptyRow(7, 'Requests API unavailable'); }
   }
   async function loadBloodStock(doc) {
     const tb = doc.querySelector('#bbStock'); if (!tb) return;
@@ -2469,10 +2488,10 @@ window.HIS = window.HIS || {};
       isEmergency: !!(doc.querySelector('#bbEmergency') && doc.querySelector('#bbEmergency').checked) };
     try {
       const r = await HIS.api.raiseBloodRequest(cmd);
-      HIS.toast('Blood request raised · #' + r.requestId + (r.donorAlert ? ' · donor alert — short stock' : ''), r.donorAlert ? 'bi-exclamation-triangle' : 'bi-droplet-half');
+      HIS.toast('Blood request raised · #' + r.requestId + (r.donorAlert ? ' · donor alert — short stock' : '') + ' — see the Blood Requests list', r.donorAlert ? 'bi-exclamation-triangle' : 'bi-droplet-half');
       ['bbUnits', 'bbPatient'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
       const em = doc.querySelector('#bbEmergency'); if (em) em.checked = false;
-      loadBloodStock(doc);
+      loadBloodStock(doc); loadBloodRequests(doc);
     } catch (e) { HIS.toast('Request failed: ' + e.message); }
   }
 

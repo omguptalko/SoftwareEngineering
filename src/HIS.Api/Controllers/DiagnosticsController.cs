@@ -49,6 +49,10 @@ public sealed class BloodBankController : ControllerBase
     [HttpGet("stock")]
     public Task<IReadOnlyList<BloodStockDto>> Stock(CancellationToken ct) => _mediator.Send(new GetBloodStockQuery(), ct);
 
+    /// <summary>Blood requests raised (newest first).</summary>
+    [HttpGet("requests")]
+    public Task<IReadOnlyList<BloodRequestRowDto>> Requests(CancellationToken ct) => _mediator.Send(new GetBloodRequestsQuery(), ct);
+
     [HttpPost("requests")]
     public Task<RaiseBloodRequestResult> RaiseRequest([FromBody] RaiseBloodRequestCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }
