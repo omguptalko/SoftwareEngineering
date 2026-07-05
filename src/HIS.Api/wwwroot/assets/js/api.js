@@ -118,6 +118,7 @@ HIS.api = (function () {
     inventoryStock:  () => get('/api/inventory/stock'),
     inventorySuppliers:() => get('/api/inventory/suppliers'),
     createPurchaseOrder:(cmd) => post('/api/inventory/purchase-orders', cmd),
+    purchaseOrders:  () => get('/api/inventory/purchase-orders'),
     drugMaster:      () => get('/api/masters/drugs'),
     saveDrug:        (cmd) => post('/api/masters/drugs', cmd),
     setDrugActive:   (drugId, isActive) => post('/api/masters/drugs/set-active', { drugId, isActive }),

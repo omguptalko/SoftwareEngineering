@@ -53,6 +53,23 @@ public sealed class GetSuppliersHandler : MediatR.IRequestHandler<GetSuppliersQu
     }
 }
 
+// ---- Purchase-order list ----
+public sealed record PurchaseOrderRowDto(long PoId, string PoNo, string? Supplier, int Lines, decimal Total, string Status, DateTime CreatedUtc);
+public sealed record GetPurchaseOrdersQuery : IQuery<IReadOnlyList<PurchaseOrderRowDto>>;
+
+public sealed class GetPurchaseOrdersHandler : MediatR.IRequestHandler<GetPurchaseOrdersQuery, IReadOnlyList<PurchaseOrderRowDto>>
+{
+    private readonly IInventoryRepository _inv;
+    private readonly IBranchContext _ctx;
+    public GetPurchaseOrdersHandler(IInventoryRepository inv, IBranchContext ctx) { _inv = inv; _ctx = ctx; }
+
+    public async Task<IReadOnlyList<PurchaseOrderRowDto>> Handle(GetPurchaseOrdersQuery q, CancellationToken ct)
+    {
+        var rows = await _inv.GetPurchaseOrdersAsync(_ctx.BranchId ?? 0, ct);
+        return rows.Select(r => new PurchaseOrderRowDto(r.PoId, r.PoNo, r.Supplier, r.Lines, r.Total, r.Status, r.CreatedUtc)).ToList();
+    }
+}
+
 public sealed record PoLineDto(string ItemName, int Qty, decimal? UnitPrice);
 
 public sealed record CreatePurchaseOrderCommand(int SupplierId, IReadOnlyList<PoLineDto> Lines)

@@ -1128,6 +1128,11 @@ window.HIS = window.HIS || {};
           <thead><tr><th>Code</th><th>Item</th><th class="num">Stock</th><th class="num">Reorder</th><th>Status</th></tr></thead>
           <tbody id="invStock">${emptyRow(5, 'Loading…')}</tbody>
         </table></div></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-receipt"></i> Purchase Orders <span class="ph-right muted" id="poCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>PO No.</th><th>Supplier</th><th class="num">Items</th><th class="num">Total ₹</th><th>Status</th><th>Raised</th></tr></thead>
+          <tbody id="poList">${emptyRow(6, 'Loading…')}</tbody>
+        </table></div></div></div>
       <div class="panel"><div class="panel__head"><i class="bi bi-cart-plus"></i> Create Purchase Order
         <span class="ph-right"><button class="btn btn--sm" data-addrow="poGrid"><i class="bi bi-plus-lg"></i> Add Line</button></span></div>
         <div class="panel__body">
@@ -2368,6 +2373,19 @@ window.HIS = window.HIS || {};
   function initInventory(doc) {
     loadInvStock(doc);
     loadPoSuppliers(doc);
+    loadPurchaseOrders(doc);
+  }
+  async function loadPurchaseOrders(doc) {
+    const tb = doc.querySelector('#poList'); if (!tb) return;
+    try {
+      const rows = await HIS.api.purchaseOrders();
+      const cnt = doc.querySelector('#poCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' orders' : '';
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const when = (r.createdUtc || '').replace('T', ' ').slice(0, 16);
+        const cls = r.status === 'Received' ? 'pill--ok' : r.status === 'Cancelled' ? 'pill--muted' : 'pill--warn';
+        return `<tr><td><b>${r.poNo}</b></td><td>${r.supplier || '—'}</td><td class="num">${r.lines}</td><td class="num">${(r.total || 0).toFixed(2)}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${when}</td></tr>`;
+      }).join('') : emptyRow(6, 'No purchase orders yet');
+    } catch (e) { tb.innerHTML = emptyRow(6, 'PO list API unavailable'); }
   }
   async function loadInvStock(doc) {
     const tb = doc.querySelector('#invStock'); if (!tb) return;
@@ -2398,8 +2416,11 @@ window.HIS = window.HIS || {};
     if (!lines.length) { HIS.toast('Add at least one item + qty'); return; }
     try {
       const r = await HIS.api.createPurchaseOrder({ supplierId: parseInt(sid, 10), lines });
-      HIS.toast('Purchase Order created · ' + r.poNo, 'bi-cart-check');
-      loadInvStock(doc);
+      HIS.toast('Purchase Order created · ' + r.poNo + ' — see the Purchase Orders list', 'bi-cart-check');
+      // reset the line grid to a single empty row
+      const body = doc.querySelector('#poBody'); if (body) body.innerHTML = '<tr>' + (body.dataset.tpl || TPL.poBody) + '</tr>';
+      if (HIS.wireScreenFragment) HIS.wireScreenFragment(doc.querySelector('#poGrid'));
+      loadPurchaseOrders(doc); loadInvStock(doc);
     } catch (e) { HIS.toast('Create PO failed: ' + e.message); }
   }
 

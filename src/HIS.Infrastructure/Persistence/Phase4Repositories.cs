@@ -181,6 +181,34 @@ public sealed class InventoryRepository : IInventoryRepository
         }
         catch { tx.Rollback(); throw; }
     }
+
+    public async Task<IReadOnlyList<(long, string, string?, int, decimal, string, DateTime)>> GetPurchaseOrdersAsync(int branchId, CancellationToken ct = default)
+    {
+        // POs + line aggregates live in the FY (data) DB; supplier names in master (D8 two-step).
+        List<(long PoId, string PoNo, int SupplierId, string Status, DateTime CreatedUtc)> pos;
+        Dictionary<long, (int Cnt, decimal Total)> agg;
+        using (var c = await _f.OpenDataAsync(ct))
+        {
+            pos = (await c.QueryAsync<(long, string, int, string, DateTime)>(new CommandDefinition(
+                "SELECT TOP 100 PoId, PoNo, SupplierId, Status, CreatedUtc FROM inventory.PurchaseOrder WHERE BranchId = @branchId ORDER BY PoId DESC",
+                new { branchId }, cancellationToken: ct))).ToList();
+            agg = (await c.QueryAsync<(long PoId, int Cnt, decimal Total)>(new CommandDefinition(
+                "SELECT PoId, COUNT(*) AS Cnt, SUM(Qty * ISNULL(UnitPrice, 0)) AS Total FROM inventory.PurchaseOrderLine GROUP BY PoId",
+                cancellationToken: ct))).ToDictionary(x => x.PoId, x => (x.Cnt, x.Total));
+        }
+        var ids = pos.Select(p => p.SupplierId).Distinct().ToArray();
+        var names = new Dictionary<int, string>();
+        if (ids.Length > 0)
+            using (var m = await _f.OpenMasterAsync(ct))
+                names = (await m.QueryAsync<(int SupplierId, string Name)>(new CommandDefinition(
+                    "SELECT SupplierId, Name FROM master.Supplier WHERE SupplierId IN @ids", new { ids }, cancellationToken: ct)))
+                    .ToDictionary(x => x.SupplierId, x => x.Name);
+        return pos.Select(p =>
+        {
+            var a = agg.GetValueOrDefault(p.PoId);
+            return (p.PoId, p.PoNo, (string?)names.GetValueOrDefault(p.SupplierId), a.Cnt, a.Total, p.Status, p.CreatedUtc);
+        }).ToList();
+    }
 }
 
 public sealed class AssetRepository : IAssetRepository

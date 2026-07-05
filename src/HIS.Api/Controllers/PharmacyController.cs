@@ -40,6 +40,10 @@ public sealed class InventoryController : ControllerBase
     [HttpGet("suppliers")]
     public Task<IReadOnlyList<SupplierDto>> Suppliers(CancellationToken ct) => _mediator.Send(new GetSuppliersQuery(), ct);
 
+    /// <summary>Purchase orders raised (newest first).</summary>
+    [HttpGet("purchase-orders")]
+    public Task<IReadOnlyList<PurchaseOrderRowDto>> PurchaseOrders(CancellationToken ct) => _mediator.Send(new GetPurchaseOrdersQuery(), ct);
+
     [HttpPost("purchase-orders")]
     public Task<CreatePurchaseOrderResult> CreatePo([FromBody] CreatePurchaseOrderCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }

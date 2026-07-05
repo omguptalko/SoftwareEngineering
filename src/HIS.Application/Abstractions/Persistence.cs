@@ -213,6 +213,7 @@ public interface IInventoryRepository
     Task<IReadOnlyList<Supplier>> GetSuppliersAsync(CancellationToken ct = default);
     Task<string> NextPoNoAsync(int branchId, CancellationToken ct = default);
     Task<long> CreatePoAsync(PurchaseOrder po, IReadOnlyList<PurchaseOrderLine> lines, CancellationToken ct = default);
+    Task<IReadOnlyList<(long PoId, string PoNo, string? Supplier, int Lines, decimal Total, string Status, DateTime CreatedUtc)>> GetPurchaseOrdersAsync(int branchId, CancellationToken ct = default);
 }
 
 public interface IAssetRepository
