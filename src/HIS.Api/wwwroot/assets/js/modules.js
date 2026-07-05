@@ -1146,8 +1146,29 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== BLOOD BANK (SRS §3.7) ========= */
+  function bloodbank() {
+    return `<div class="screen">
+      ${head('bi-droplet-half', 'Blood Bank', 'Stock by group · requests · donor alerts', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-droplet"></i> Blood Stock <span class="ph-right muted" id="bbCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Blood Group</th><th class="num">Units</th><th class="num">Safety Threshold</th><th>Status</th></tr></thead>
+          <tbody id="bbStock">${emptyRow(4, 'Loading…')}</tbody>
+        </table></div></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-clipboard-plus"></i> Raise Blood Request</div><div class="panel__body">
+        <div class="form-grid">
+          <div class="f"><label>Patient</label><div class="field with-btn"><input class="ctl" id="bbPatient" data-lookup="patient" placeholder="F3 patient (optional)…"><button class="lk" data-lookup="patient">F3</button></div></div>
+          <div class="f"><label>Blood Group <span class="req">*</span></label><div class="field"><select class="ctl" id="bbGroup"><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div></div>
+          <div class="f"><label>Units <span class="req">*</span></label><div class="field"><input class="ctl num" id="bbUnits" placeholder="1"></div></div>
+          <div class="f"><label style="display:flex;align-items:center;gap:6px;height:34px"><input type="checkbox" id="bbEmergency"> Emergency</label></div>
+        </div>
+        <button class="btn btn--primary mt8" style="width:100%" data-act="save"><i class="bi bi-droplet-half"></i> Raise Request <span class="fk">F9</span></button>
+      </div></div>
+    </div>`;
+  }
+
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1320,6 +1341,7 @@ window.HIS = window.HIS || {};
     if (id === 'certificates') { initCertificates(doc); HIS.saveHandlers.certificates = () => doIssueCertificate(doc); }
     if (id === 'drugmaster') { initDrugMaster(doc); HIS.saveHandlers.drugmaster = () => doSaveDrug(doc); }
     if (id === 'inventory') { initInventory(doc); HIS.saveHandlers.inventory = () => doCreatePo(doc); }
+    if (id === 'bloodbank') { initBloodBank(doc); HIS.saveHandlers.bloodbank = () => doRaiseBloodRequest(doc); }
     if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
     if (id === 'icu') { initIcu(doc); }
     if (id === 'ipd') {
@@ -2422,6 +2444,36 @@ window.HIS = window.HIS || {};
       if (HIS.wireScreenFragment) HIS.wireScreenFragment(doc.querySelector('#poGrid'));
       loadPurchaseOrders(doc); loadInvStock(doc);
     } catch (e) { HIS.toast('Create PO failed: ' + e.message); }
+  }
+
+  /* ---- Blood Bank: stock + raise request (SRS §3.7) ---- */
+  function initBloodBank(doc) {
+    loadBloodStock(doc);
+  }
+  async function loadBloodStock(doc) {
+    const tb = doc.querySelector('#bbStock'); if (!tb) return;
+    try {
+      const rows = await HIS.api.bloodStock();
+      const cnt = doc.querySelector('#bbCount');
+      if (cnt) { const low = rows.filter(r => r.belowThreshold).length; cnt.textContent = low ? low + ' group(s) below safety' : 'all groups OK'; }
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const st = r.belowThreshold ? '<span class="pill pill--warn">Low</span>' : '<span class="pill pill--ok">OK</span>';
+        return `<tr${r.belowThreshold ? ' style="background:#fdf3f2"' : ''}><td><b>${r.bloodGroup}</b></td><td class="num">${r.units}</td><td class="num">${r.safetyThreshold}</td><td>${st}</td></tr>`;
+      }).join('') : emptyRow(4, 'No stock data');
+    } catch (e) { tb.innerHTML = emptyRow(4, 'Stock API unavailable'); }
+  }
+  async function doRaiseBloodRequest(doc) {
+    const units = intOrNull(val(doc, 'bbUnits'));
+    if (!units || units < 1) { HIS.toast('Enter units (>= 1)'); return; }
+    const cmd = { patientUhid: val(doc, 'bbPatient') || null, bloodGroup: val(doc, 'bbGroup'), units,
+      isEmergency: !!(doc.querySelector('#bbEmergency') && doc.querySelector('#bbEmergency').checked) };
+    try {
+      const r = await HIS.api.raiseBloodRequest(cmd);
+      HIS.toast('Blood request raised · #' + r.requestId + (r.donorAlert ? ' · donor alert — short stock' : ''), r.donorAlert ? 'bi-exclamation-triangle' : 'bi-droplet-half');
+      ['bbUnits', 'bbPatient'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      const em = doc.querySelector('#bbEmergency'); if (em) em.checked = false;
+      loadBloodStock(doc);
+    } catch (e) { HIS.toast('Request failed: ' + e.message); }
   }
 
   function initIcu(doc) {
