@@ -465,7 +465,8 @@ window.HIS = window.HIS || {};
               <tbody id="dispBody"><tr>${TPL.dispBody}</tr></tbody></table></div>
               <div class="flex gap6 mt8" style="padding:8px 12px;align-items:center;flex-wrap:wrap">
                 <button class="btn btn--primary" data-act="save"><i class="bi bi-bag-check"></i> Dispense &amp; Bill <span class="fk">F9</span></button>
-                <span class="hintline">Pick a drug (F3) — batch/expiry/MRP auto-fill (FEFO) · enter qty · Dispense. Stock auto-deducts.</span>
+                <span style="font-weight:600">Total: <span id="dispTotal">₹0.00</span></span>
+                <span class="hintline">Pick a drug (F3) — batch/expiry/MRP auto-fill (FEFO) · enter qty · Amount = Qty × MRP live.</span>
               </div>
             </div></div>
         </div>
@@ -1796,6 +1797,24 @@ window.HIS = window.HIS || {};
     if (grid) {
       const onDrug = (e) => { const el = e.target; if (el && el.matches && el.matches('[data-lookup="drug"]')) fillDrugBatch(doc, el.closest('tr')); };
       grid.addEventListener('change', onDrug); grid.addEventListener('blur', onDrug, true);
+      // Live line Amount = Qty x MRP as either is typed.
+      grid.addEventListener('input', (e) => { const el = e.target; if (el && el.classList && el.classList.contains('num')) recalcDispRow(el.closest('tr'), doc); });
+    }
+  }
+  function recalcDispRow(tr, doc) {
+    if (!tr) return;
+    const i = tr.querySelectorAll('input');
+    const qty = parseFloat(i[3] ? i[3].value : '') || 0;
+    const mrp = parseFloat(i[4] ? i[4].value : '') || 0;
+    const cell = tr.children[5]; if (cell) cell.textContent = (qty * mrp).toFixed(2);
+    // Grand total across all lines.
+    if (doc) {
+      let tot = 0;
+      doc.querySelectorAll('#dispBody tr').forEach(r => {
+        const x = r.querySelectorAll('input');
+        tot += (parseFloat(x[3] ? x[3].value : '') || 0) * (parseFloat(x[4] ? x[4].value : '') || 0);
+      });
+      const t = doc.querySelector('#dispTotal'); if (t) t.textContent = '₹' + tot.toFixed(2);
     }
   }
   async function fillDrugBatch(doc, tr) {
@@ -1812,6 +1831,7 @@ window.HIS = window.HIS || {};
       if (i[1] && !i[1].value) i[1].value = b.batchNo || '';
       if (i[2] && !i[2].value) i[2].value = b.expiry || '';
       if (i[4] && !i[4].value && b.mrp != null) i[4].value = b.mrp;
+      recalcDispRow(tr, doc);
       HIS.toast('Batch ' + (b.batchNo || '') + ' (exp ' + (b.expiry || '') + ', ' + (b.qtyOnHand || 0) + ' in stock) — enter qty', 'bi-box-seam');
     } catch (e) {}
   }
