@@ -581,6 +581,7 @@ window.HIS = window.HIS || {};
         <div>
           <div class="panel"><div class="panel__head"><i class="bi bi-search"></i> BIS Beneficiary Search</div><div class="panel__body">
             <div class="form-grid">
+              <div class="f"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="pmPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
               <div class="f"><label>Search By</label><div class="field"><select class="ctl"><option>Aadhaar e-KYC</option><option>PM-JAY ID</option><option>Ration Card</option><option>Mobile</option></select></div></div>
               <div class="f"><label>ID Value</label><div class="field with-btn"><input class="ctl code" id="pmId" placeholder="PM-JAY ID / Aadhaar e-KYC"><button class="btn btn--sm" id="btnPmVerify" style="border-radius:0 3px 3px 0"><i class="bi bi-search"></i></button></div></div>
             </div>
@@ -1845,25 +1846,31 @@ window.HIS = window.HIS || {};
   function initPmjay(doc) {
     const b = doc.querySelector('#btnPmVerify'); if (b) b.addEventListener('click', () => doVerifyBeneficiary(doc));
   }
+  // Extract the UHID from an F3-filled "UHID — Name" field (split on em-dash only; UHIDs have hyphens).
+  function pickedUhid(doc, id) {
+    const raw = val(doc, id); if (!raw) return '';
+    let i = raw.indexOf('—'); if (i < 0) i = raw.indexOf(' - ');
+    return (i > 0 ? raw.slice(0, i) : raw).trim();
+  }
   async function doVerifyBeneficiary(doc) {
-    const p = HIS.mock.currentPatient;
-    if (!p || !p.uhid) { HIS.toast('No patient loaded'); return; }
+    const uhid = pickedUhid(doc, 'pmPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3) first'); return; }
     const pmId = val(doc, 'pmId');
     if (!pmId) { HIS.toast('Enter PM-JAY ID'); return; }
     try {
-      const r = await HIS.api.pmjayVerify({ patientUhid: p.uhid, pmjayId: pmId, familyFloater: 500000 });
+      const r = await HIS.api.pmjayVerify({ patientUhid: uhid, pmjayId: pmId, familyFloater: 500000 });
       const note = doc.querySelector('#pmVerifyNote');
       if (note) note.innerHTML = '<span class="pill pill--ok"><i class="bi bi-check-circle-fill"></i> Beneficiary verified (BIS)</span>';
       HIS.toast('Beneficiary verified (BIS)', 'bi-fingerprint');
     } catch (e) { HIS.toast('Verify failed: ' + e.message); }
   }
   async function doSubmitTms(doc) {
-    const p = HIS.mock.currentPatient;
-    if (!p || !p.uhid) { HIS.toast('No patient loaded'); return; }
+    const uhid = pickedUhid(doc, 'pmPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3) first'); return; }
     const pkg = val(doc, 'pmPackage');
     if (!pkg) { HIS.toast('Select an HBP package (F3)'); return; }
     try {
-      const r = await HIS.api.pmjayClaim({ patientUhid: p.uhid, packageCode: pkg, ayushmanMitra: val(doc, 'pmMitra') || null });
+      const r = await HIS.api.pmjayClaim({ patientUhid: uhid, packageCode: pkg, ayushmanMitra: val(doc, 'pmMitra') || null });
       const tms = doc.querySelector('#pmTms'); if (tms) tms.textContent = r.tmsCaseNo;
       const stage = doc.querySelector('#pmStage'); if (stage) { stage.textContent = 'Pre-Auth submitted'; stage.className = 'pill pill--info'; }
       HIS.toast('Submitted to TMS · ' + r.tmsCaseNo + ' · ₹' + r.packageRate, 'bi-send');
