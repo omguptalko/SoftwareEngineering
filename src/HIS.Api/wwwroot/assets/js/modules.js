@@ -463,7 +463,10 @@ window.HIS = window.HIS || {};
             <div class="panel__body tight"><div class="grid-wrap grid--editable" style="border:0"><table class="grid" id="dispGrid">
               <thead><tr><th style="width:28%">Drug</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th><th class="num">MRP ₹</th><th class="num">Amount ₹</th><th></th></tr></thead>
               <tbody id="dispBody"><tr>${TPL.dispBody}</tr></tbody></table></div>
-              <p class="hintline" style="padding:8px 12px">Stock auto-deducts on dispense · expiry &amp; batch validated against inventory.</p>
+              <div class="flex gap6 mt8" style="padding:8px 12px;align-items:center;flex-wrap:wrap">
+                <button class="btn btn--primary" data-act="save"><i class="bi bi-bag-check"></i> Dispense &amp; Bill <span class="fk">F9</span></button>
+                <span class="hintline">Pick a drug (F3) — batch/expiry/MRP auto-fill (FEFO) · enter qty · Dispense. Stock auto-deducts.</span>
+              </div>
             </div></div>
         </div>
         <div class="panel"><div class="panel__head"><i class="bi bi-exclamation-triangle"></i> Stock Alerts</div>
@@ -1766,6 +1769,29 @@ window.HIS = window.HIS || {};
   function initPharmacy(doc) {
     loadPharmaQueue(doc);
     loadPharmaAlerts(doc);
+    // When a drug is picked (F3) in a dispense row, auto-fill batch/expiry/MRP (FEFO).
+    const grid = doc.querySelector('#dispBody');
+    if (grid) {
+      const onDrug = (e) => { const el = e.target; if (el && el.matches && el.matches('[data-lookup="drug"]')) fillDrugBatch(doc, el.closest('tr')); };
+      grid.addEventListener('change', onDrug); grid.addEventListener('blur', onDrug, true);
+    }
+  }
+  async function fillDrugBatch(doc, tr) {
+    if (!tr) return;
+    const i = tr.querySelectorAll('input');
+    const raw = i[0] ? i[0].value.trim() : '';
+    if (!raw) return;
+    let k = raw.indexOf('—'); if (k < 0) k = raw.indexOf(' - ');
+    const code = (k > 0 ? raw.slice(0, k) : raw).trim();
+    try {
+      const batches = await HIS.api.drugBatches(code);
+      if (!batches || !batches.length) { HIS.toast('No stock batches for ' + code); return; }
+      const b = batches.find(x => (x.qtyOnHand || 0) > 0) || batches[0];   // FEFO: first in-stock batch
+      if (i[1] && !i[1].value) i[1].value = b.batchNo || '';
+      if (i[2] && !i[2].value) i[2].value = b.expiry || '';
+      if (i[4] && !i[4].value && b.mrp != null) i[4].value = b.mrp;
+      HIS.toast('Batch ' + (b.batchNo || '') + ' (exp ' + (b.expiry || '') + ', ' + (b.qtyOnHand || 0) + ' in stock) — enter qty', 'bi-box-seam');
+    } catch (e) {}
   }
   async function loadPharmaQueue(doc) {
     const tb = doc.querySelector('#pharmaQueue'); if (!tb) return;
