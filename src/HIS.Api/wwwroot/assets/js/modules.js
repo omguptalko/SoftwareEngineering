@@ -616,6 +616,12 @@ window.HIS = window.HIS || {};
           </div></div>
         </div>
       </div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-list-check"></i> Submitted TMS Claims <span class="ph-right hintline" id="pmCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>TMS Case #</th><th>Claim #</th><th>Date</th><th>Patient</th><th>Package</th><th class="num">Amount ₹</th><th>Status</th></tr></thead>
+          <tbody id="pmCases">${emptyRow(7, 'Loading…')}</tbody>
+        </table></div></div>
+      </div>
     </div>`;
   }
 
@@ -1897,6 +1903,18 @@ window.HIS = window.HIS || {};
   /* ---- Phase 7: PM-JAY verify + TMS submit --------------------------- */
   function initPmjay(doc) {
     const b = doc.querySelector('#btnPmVerify'); if (b) b.addEventListener('click', () => doVerifyBeneficiary(doc));
+    loadPmjayCases(doc);
+  }
+  async function loadPmjayCases(doc) {
+    const tb = doc.querySelector('#pmCases'); if (!tb) return;
+    try {
+      const rows = await HIS.api.pmjayCases();
+      const pill = s => ({ Settled: 'pill--purple', Approved: 'pill--ok', Denied: 'pill--danger', Query: 'pill--warn' }[s] || 'pill--info');
+      tb.innerHTML = rows.length ? rows.map(r =>
+        `<tr><td class="code">${r.tmsCaseNo || '—'}</td><td>${r.claimNo}</td><td>${r.submittedUtc ?? '—'}</td><td>${r.patient}</td><td>${r.package || '—'}</td><td class="num">${r.amount ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td></tr>`
+      ).join('') : emptyRow(7, 'No TMS claims submitted yet');
+      const cnt = doc.querySelector('#pmCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} claim(s)` : '';
+    } catch (e) { tb.innerHTML = emptyRow(7, 'TMS claims API unavailable'); }
   }
   // Extract the UHID from an F3-filled "UHID — Name" field (split on em-dash only; UHIDs have hyphens).
   function pickedUhid(doc, id) {
@@ -1926,6 +1944,7 @@ window.HIS = window.HIS || {};
       const tms = doc.querySelector('#pmTms'); if (tms) tms.textContent = r.tmsCaseNo;
       const stage = doc.querySelector('#pmStage'); if (stage) { stage.textContent = 'Pre-Auth submitted'; stage.className = 'pill pill--info'; }
       HIS.toast('Submitted to TMS · ' + r.tmsCaseNo + ' · ₹' + r.packageRate, 'bi-send');
+      loadPmjayCases(doc);
     } catch (e) { HIS.toast('TMS submit failed: ' + e.message); }
   }
 

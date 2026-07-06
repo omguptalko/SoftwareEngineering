@@ -139,6 +139,7 @@ HIS.api = (function () {
     claimsMis:       () => get('/api/claims/mis'),
     pmjayVerify:     (cmd) => post('/api/pmjay/verify', cmd),
     pmjayClaim:      (cmd) => post('/api/pmjay/claim', cmd),
+    pmjayCases:      () => get('/api/pmjay/cases'),
     // Phase 8 — HR & Payroll
     hrStaff:         () => get('/api/hr/staff'),
     addStaff:        (cmd) => post('/api/hr/staff', cmd),

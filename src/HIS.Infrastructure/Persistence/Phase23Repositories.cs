@@ -153,6 +153,17 @@ internal static class MasterLookup
         return rows.ToDictionary(r => r.PayerId, r => r.Name);
     }
 
+    public static async Task<Dictionary<int, string>> PackageNamesAsync(
+        ITenantConnectionFactory f, IEnumerable<int?> packageIds, CancellationToken ct)
+    {
+        var ids = packageIds.Where(i => i.HasValue).Select(i => i!.Value).Distinct().ToArray();
+        if (ids.Length == 0) return new();
+        using var c = await f.OpenMasterAsync(ct);
+        var rows = await c.QueryAsync<(int PackageId, string Name)>(new CommandDefinition(
+            "SELECT PackageId, Name FROM master.HbpPackage WHERE PackageId IN @ids", new { ids }, cancellationToken: ct));
+        return rows.ToDictionary(r => r.PackageId, r => r.Name);
+    }
+
     public static async Task<Dictionary<int, string>> DoctorNamesAsync(
         ITenantConnectionFactory f, IEnumerable<int?> doctorIds, CancellationToken ct)
     {

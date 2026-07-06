@@ -52,6 +52,10 @@ public sealed class PmjayController : ControllerBase
 
     [HttpPost("claim")]
     public Task<CreatePmjayClaimResult> Claim([FromBody] CreatePmjayClaimCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Submitted TMS claims (newest first) for the branch.</summary>
+    [HttpGet("cases")]
+    public Task<IReadOnlyList<PmjayCaseRowDto>> Cases(CancellationToken ct) => _mediator.Send(new GetPmjayCasesQuery(), ct);
 }
 
 [ApiController]

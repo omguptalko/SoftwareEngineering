@@ -337,6 +337,7 @@ public interface IPmjayRepository
     Task<long> UpsertBeneficiaryAsync(PmjayBeneficiary b, CancellationToken ct = default);
     Task<long> InsertCaseAsync(PmjayCase c, CancellationToken ct = default);
     Task<string> NextTmsNoAsync(int branchId, CancellationToken ct = default);
+    Task<IReadOnlyList<(string TmsCaseNo, string ClaimNo, string Patient, string Package, decimal? Amount, string Status, DateTime? SubmittedUtc)>> GetCasesAsync(int branchId, CancellationToken ct = default);
 }
 
 public interface ISchemeRepository

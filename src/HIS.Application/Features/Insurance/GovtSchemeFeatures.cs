@@ -100,6 +100,25 @@ public sealed class CreatePmjayClaimHandler : MediatR.IRequestHandler<CreatePmja
     }
 }
 
+// ---- Submitted TMS claims list (PM-JAY page) ----
+public sealed record PmjayCaseRowDto(string TmsCaseNo, string ClaimNo, string Patient, string Package, decimal? Amount, string Status, string? SubmittedUtc);
+public sealed record GetPmjayCasesQuery : IQuery<IReadOnlyList<PmjayCaseRowDto>>;
+
+public sealed class GetPmjayCasesHandler : MediatR.IRequestHandler<GetPmjayCasesQuery, IReadOnlyList<PmjayCaseRowDto>>
+{
+    private readonly IPmjayRepository _pmjay;
+    private readonly IBranchContext _ctx;
+    public GetPmjayCasesHandler(IPmjayRepository pmjay, IBranchContext ctx) { _pmjay = pmjay; _ctx = ctx; }
+
+    public async Task<IReadOnlyList<PmjayCaseRowDto>> Handle(GetPmjayCasesQuery q, CancellationToken ct)
+    {
+        var rows = await _pmjay.GetCasesAsync(_ctx.BranchId ?? 0, ct);
+        return rows.Select(r => new PmjayCaseRowDto(
+            r.TmsCaseNo, r.ClaimNo, r.Patient, r.Package, r.Amount, r.Status,
+            r.SubmittedUtc?.ToString("yyyy-MM-dd"))).ToList();
+    }
+}
+
 // ============================ ESIC/CGHS/ECHS/State (SRS §7.4–§7.7) ============================
 public sealed record VerifySchemeMembershipCommand(string PatientUhid, string SchemeType, string MemberNo, string? SecondaryRef)
     : ICommand<long>, IAuditable
