@@ -25,6 +25,19 @@ public sealed class AmbulanceRepository : IAmbulanceRepository
         return await c.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
             "SELECT TOP 1 AmbulanceId FROM master.Ambulance WHERE BranchId = @branchId AND Status = 'Available' ORDER BY AmbulanceId", new { branchId }, cancellationToken: ct));
     }
+    public async Task<int> InsertAmbulanceAsync(int branchId, string vehicleNo, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.QuerySingleAsync<int>(new CommandDefinition(
+            @"INSERT INTO master.Ambulance (BranchId, VehicleNo, Status) VALUES (@branchId, @vehicleNo, 'Available');
+              SELECT CAST(SCOPE_IDENTITY() AS INT);", new { branchId, vehicleNo }, cancellationToken: ct));
+    }
+    public async Task<bool> VehicleExistsAsync(int branchId, string vehicleNo, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
+            "SELECT TOP 1 AmbulanceId FROM master.Ambulance WHERE BranchId = @branchId AND VehicleNo = @vehicleNo", new { branchId, vehicleNo }, cancellationToken: ct)) is not null;
+    }
     public async Task<long> InsertDispatchAsync(AmbulanceDispatch d, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);

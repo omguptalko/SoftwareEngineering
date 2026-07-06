@@ -1,3 +1,4 @@
+using FluentValidation;
 using HIS.Application.Abstractions;
 using HIS.Domain.Entities;
 using HIS.Shared.Context;
@@ -6,6 +7,31 @@ namespace HIS.Application.Features.Support;
 
 public sealed record AmbulanceDto(int AmbulanceId, string VehicleNo, string Status);
 public sealed record GetAmbulancesQuery : IQuery<IReadOnlyList<AmbulanceDto>>;
+
+/// <summary>Add a vehicle to the fleet (starts 'Available'). SRS §3.6.</summary>
+public sealed record AddAmbulanceCommand(string VehicleNo) : ICommand<AmbulanceDto>, IAuditable
+{
+    public string AuditEntity => "Ambulance";
+    public string? AuditEntityId => VehicleNo;
+}
+public sealed class AddAmbulanceValidator : AbstractValidator<AddAmbulanceCommand>
+{
+    public AddAmbulanceValidator() => RuleFor(x => x.VehicleNo).NotEmpty().MaximumLength(20);
+}
+public sealed class AddAmbulanceHandler : MediatR.IRequestHandler<AddAmbulanceCommand, AmbulanceDto>
+{
+    private readonly IAmbulanceRepository _amb; private readonly IBranchContext _ctx;
+    public AddAmbulanceHandler(IAmbulanceRepository amb, IBranchContext ctx) { _amb = amb; _ctx = ctx; }
+    public async Task<AmbulanceDto> Handle(AddAmbulanceCommand c, CancellationToken ct)
+    {
+        var branchId = _ctx.BranchId ?? throw new InvalidOperationException("Branch context required.");
+        var vehicleNo = c.VehicleNo.Trim();
+        if (await _amb.VehicleExistsAsync(branchId, vehicleNo, ct))
+            throw new InvalidOperationException($"Vehicle '{vehicleNo}' already exists in the fleet.");
+        var id = await _amb.InsertAmbulanceAsync(branchId, vehicleNo, ct);
+        return new AmbulanceDto(id, vehicleNo, "Available");
+    }
+}
 
 public sealed class GetAmbulancesHandler : MediatR.IRequestHandler<GetAmbulancesQuery, IReadOnlyList<AmbulanceDto>>
 {

@@ -19,6 +19,7 @@ public sealed class AmbulanceController : ControllerBase
     public AmbulanceController(IMediator m, IHubContext<GpsHub> gps, IConfiguration config, ITenantContext tenant) { _m = m; _gps = gps; _config = config; _tenant = tenant; }
 
     [HttpGet] public Task<IReadOnlyList<AmbulanceDto>> List(CancellationToken ct) => _m.Send(new GetAmbulancesQuery(), ct);
+    [HttpPost] public Task<AmbulanceDto> Add([FromBody] AddAmbulanceCommand cmd, CancellationToken ct) => _m.Send(cmd, ct);
     [HttpGet("dispatches")] public Task<IReadOnlyList<DispatchRowDto>> Dispatches(CancellationToken ct) => _m.Send(new GetDispatchesQuery(), ct);
     [HttpPost("dispatch")] public Task<DispatchAmbulanceResult> Dispatch([FromBody] DispatchAmbulanceCommand cmd, CancellationToken ct) => _m.Send(cmd, ct);
     [HttpPost("dispatches/{id:long}/arrive")] public Task<bool> Arrive(long id, [FromBody] ArriveBody? b, CancellationToken ct) => _m.Send(new ArriveDispatchCommand(id, b?.Lat, b?.Lng), ct);

@@ -231,6 +231,8 @@ public interface IAmbulanceRepository
 {
     Task<IReadOnlyList<(int AmbulanceId, string VehicleNo, string Status)>> GetAmbulancesAsync(int branchId, CancellationToken ct = default);
     Task<int?> GetFirstAvailableAsync(int branchId, CancellationToken ct = default);
+    Task<int> InsertAmbulanceAsync(int branchId, string vehicleNo, CancellationToken ct = default);
+    Task<bool> VehicleExistsAsync(int branchId, string vehicleNo, CancellationToken ct = default);
     Task<long> InsertDispatchAsync(AmbulanceDispatch d, CancellationToken ct = default);
     Task SetAmbulanceStatusAsync(int ambulanceId, string status, CancellationToken ct = default);
     Task ArriveAsync(long dispatchId, decimal? lat, decimal? lng, CancellationToken ct = default);

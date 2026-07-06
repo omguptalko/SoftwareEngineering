@@ -1008,7 +1008,9 @@ window.HIS = window.HIS || {};
       ${head('bi-truck-front', 'Ambulance &amp; GPS', 'Emergency call logging · nearest dispatch',
         `<button class="btn btn--danger btn--sm" id="btnDispatch"><i class="bi bi-broadcast"></i> Dispatch Nearest</button>`)}
       <div class="cols-side">
-        <div class="panel"><div class="panel__head"><i class="bi bi-truck-front"></i> Fleet</div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-truck-front"></i> Fleet
+          <span class="ph-right"><input class="ctl code" id="ambNewVeh" placeholder="e.g. UP32-AB-1200" style="max-width:150px">
+          <button class="btn btn--sm btn--primary" id="btnAddAmb"><i class="bi bi-plus-lg"></i> Add</button></span></div>
           <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
             <thead><tr><th>Vehicle</th><th>Status</th></tr></thead><tbody id="ambFleet">${emptyRow(2, 'Loading…')}</tbody>
           </table></div></div></div>
@@ -1657,6 +1659,18 @@ window.HIS = window.HIS || {};
   function initAmbulance(doc) {
     loadFleet(doc); loadDispatches(doc); initGps(doc);
     const b = doc.querySelector('#btnDispatch'); if (b) b.addEventListener('click', () => doDispatch(doc));
+    const ab = doc.querySelector('#btnAddAmb'); if (ab) ab.addEventListener('click', () => doAddAmbulance(doc));
+    const nv = doc.querySelector('#ambNewVeh'); if (nv) nv.addEventListener('keydown', e => { if (e.key === 'Enter') doAddAmbulance(doc); });
+  }
+  async function doAddAmbulance(doc) {
+    const veh = val(doc, 'ambNewVeh');
+    if (!veh) { HIS.toast('Enter a vehicle number'); return; }
+    try {
+      const a = await HIS.api.addAmbulance({ vehicleNo: veh });
+      HIS.toast('Ambulance added · ' + a.vehicleNo, 'bi-truck-front');
+      const nv = doc.querySelector('#ambNewVeh'); if (nv) nv.value = '';
+      loadFleet(doc); initGps(doc);   // refresh fleet + GPS label map
+    } catch (e) { HIS.toast('Add failed: ' + e.message); }
   }
 
   /* ---- Ambulance live GPS tracking over SignalR (task 0.9) ---- */
