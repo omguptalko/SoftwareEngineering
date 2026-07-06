@@ -230,4 +230,14 @@ public sealed class SchemeRepository : ISchemeRepository
               WHERE SchemeType = @schemeType AND IsActive = 1 AND (@like = '%%' OR Code LIKE @like OR Name LIKE @like)
               ORDER BY Name", new { schemeType, like }, cancellationToken: ct))).ToList();
     }
+
+    public async Task<IReadOnlyList<(string, string, string?, bool, DateTime?)>> GetMembershipsAsync(string schemeType, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenDataAsync(ct);
+        var rows = (await c.QueryAsync<(long PatientId, string MemberNo, string? SecondaryRef, bool Verified, DateTime? ValidTo)>(new CommandDefinition(
+            @"SELECT PatientId, MemberNo, SecondaryRef, Verified, ValidTo FROM scheme.SchemeMembership
+              WHERE SchemeType = @schemeType ORDER BY MembershipId DESC", new { schemeType }, cancellationToken: ct))).ToList();
+        var pats = await MasterLookup.PatientNamesAsync(_f, rows.Select(r => r.PatientId), ct);
+        return rows.Select(r => (pats.GetValueOrDefault(r.PatientId, ""), r.MemberNo, r.SecondaryRef, r.Verified, r.ValidTo)).ToList();
+    }
 }

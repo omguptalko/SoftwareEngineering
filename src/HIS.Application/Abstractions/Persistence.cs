@@ -344,6 +344,7 @@ public interface ISchemeRepository
 {
     Task<long> UpsertMembershipAsync(SchemeMembership m, CancellationToken ct = default);
     Task<IReadOnlyList<SchemePackage>> GetPackagesAsync(string schemeType, string? q, CancellationToken ct = default);
+    Task<IReadOnlyList<(string Patient, string MemberNo, string? SecondaryRef, bool Verified, DateTime? ValidTo)>> GetMembershipsAsync(string schemeType, CancellationToken ct = default);
 }
 
 public interface IBillingRepository

@@ -625,6 +625,99 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ============ ESIC / CGHS / ECHS / State schemes (SRS §7.4–7.7) ==== */
+  const SCHEMES = {
+    esic:        { type: 'ESIC',  title: 'ESIC',                icon: 'bi-hospital',  full: 'Employees’ State Insurance Corporation', ref: 'IP Number' },
+    cghs:        { type: 'CGHS',  title: 'CGHS',                icon: 'bi-bank2',     full: 'Central Government Health Scheme',        ref: 'CGHS Card No.' },
+    echs:        { type: 'ECHS',  title: 'ECHS',                icon: 'bi-shield-shaded', full: 'Ex-Servicemen Contributory Health Scheme', ref: 'ECHS Card No.' },
+    statescheme: { type: 'State', title: 'State Health Schemes', icon: 'bi-geo-alt', full: 'State government health scheme',           ref: 'Scheme Card No.' },
+  };
+  function schemeScreen(sid) {
+    const s = SCHEMES[sid];
+    return `<div class="screen">
+      ${head(s.icon, s.title, `${s.full} · membership verification · package tariff`,
+        `<button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-patch-check"></i> Verify Membership <span class="fk">F9</span></button>`)}
+      <div id="schBanner">${banner(null)}</div>
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-person-vcard"></i> Membership Verification</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="schPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
+            <div class="f"><label>${s.title} Member No <span class="req">*</span></label><div class="field"><input class="ctl code" id="schMember" placeholder="Member / card number"></div></div>
+            <div class="f"><label>${s.ref}</label><div class="field"><input class="ctl code" id="schRef" placeholder="Secondary reference"></div></div>
+          </div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-patch-check"></i> Verify Membership <span class="fk">F9</span></button><span class="hintline">Patient (F3) + Member No bharo → Verify → niche list me aayega.</span></div>
+          <div class="mt8" id="schVerifyNote"></div>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-card-list"></i> Package Tariff <span class="ph-right"><input class="ctl" id="schPkgSearch" placeholder="Search package…" style="max-width:180px"></span></div>
+          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>Code</th><th>Package</th><th class="num">Rate ₹</th></tr></thead>
+            <tbody id="schPkgs">${emptyRow(3, 'Loading…')}</tbody>
+          </table></div></div>
+        </div>
+      </div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-people"></i> Verified ${s.title} Memberships <span class="ph-right hintline" id="schCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Patient</th><th>Member No</th><th>${s.ref}</th><th>Status</th></tr></thead>
+          <tbody id="schMembers">${emptyRow(4, 'Loading…')}</tbody>
+        </table></div></div>
+      </div>
+    </div>`;
+  }
+  function esic()        { return schemeScreen('esic'); }
+  function cghs()        { return schemeScreen('cghs'); }
+  function echs()        { return schemeScreen('echs'); }
+  function statescheme() { return schemeScreen('statescheme'); }
+
+  function initScheme(doc, sid) {
+    const s = SCHEMES[sid];
+    doc.dataset.schemeType = s.type;
+    loadSchemePackages(doc, s.type);
+    loadSchemeMemberships(doc, s.type);
+    const pf = doc.querySelector('#schPatient');
+    if (pf) { pf.addEventListener('change', () => showSchPatient(doc)); pf.addEventListener('blur', () => showSchPatient(doc)); }
+    const sr = doc.querySelector('#schPkgSearch');
+    if (sr) sr.addEventListener('input', () => loadSchemePackages(doc, s.type));
+  }
+  async function showSchPatient(doc) {
+    const uhid = pickedUhid(doc, 'schPatient'); const b = doc.querySelector('#schBanner');
+    if (!uhid) { if (b) b.innerHTML = banner(null); return; }
+    try { const p = await HIS.api.patientByUhid(uhid); if (p && b) b.innerHTML = banner(p); } catch (e) {}
+  }
+  async function loadSchemePackages(doc, type) {
+    const tb = doc.querySelector('#schPkgs'); if (!tb) return;
+    try {
+      const rows = await HIS.api.schemePackages(type, val(doc, 'schPkgSearch'));
+      tb.innerHTML = rows.length ? rows.map(p =>
+        `<tr><td class="code">${p.code}</td><td>${p.name}</td><td class="num">${p.rate}</td></tr>`
+      ).join('') : emptyRow(3, 'No packages for this scheme');
+    } catch (e) { tb.innerHTML = emptyRow(3, 'Package API unavailable'); }
+  }
+  async function loadSchemeMemberships(doc, type) {
+    const tb = doc.querySelector('#schMembers'); if (!tb) return;
+    try {
+      const rows = await HIS.api.schemeMemberships(type);
+      tb.innerHTML = rows.length ? rows.map(m =>
+        `<tr><td>${m.patient || '—'}</td><td class="code">${m.memberNo || '—'}</td><td>${m.secondaryRef || '—'}</td>
+          <td><span class="pill ${m.verified ? 'pill--ok' : 'pill--muted'}">${m.verified ? 'Verified' : 'Pending'}</span></td></tr>`
+      ).join('') : emptyRow(4, 'No memberships yet');
+      const cnt = doc.querySelector('#schCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} member(s)` : '';
+    } catch (e) { tb.innerHTML = emptyRow(4, 'Membership API unavailable'); }
+  }
+  async function doVerifyScheme(doc) {
+    const type = doc.dataset.schemeType;
+    const uhid = pickedUhid(doc, 'schPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3) first'); return; }
+    const member = val(doc, 'schMember');
+    if (!member) { HIS.toast('Enter the member number'); return; }
+    try {
+      await HIS.api.schemeVerify({ patientUhid: uhid, schemeType: type, memberNo: member, secondaryRef: val(doc, 'schRef') || null });
+      const note = doc.querySelector('#schVerifyNote');
+      if (note) note.innerHTML = '<span class="pill pill--ok"><i class="bi bi-check-circle-fill"></i> Membership verified &amp; saved</span>';
+      HIS.toast('Membership verified · ' + member, 'bi-patch-check');
+      loadSchemeMemberships(doc, type);
+    } catch (e) { HIS.toast('Verify failed: ' + e.message); }
+  }
+
   /* ============================ HR (SRS §3.17) ====================== */
   function hr() {
     return `<div class="screen">
@@ -1200,7 +1293,7 @@ window.HIS = window.HIS || {};
   }
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1396,6 +1489,7 @@ window.HIS = window.HIS || {};
     if (id === 'pharmacy') { initPharmacy(doc); HIS.saveHandlers.pharmacy = () => doDispense(doc); }
     if (id === 'cashless') { initCashless(doc); HIS.saveHandlers.cashless = () => doSubmitPreAuth(doc); }
     if (id === 'pmjay') { initPmjay(doc); HIS.saveHandlers.pmjay = () => doSubmitTms(doc); }
+    if (id === 'esic' || id === 'cghs' || id === 'echs' || id === 'statescheme') { initScheme(doc, id); HIS.saveHandlers[id] = () => doVerifyScheme(doc); }
     if (id === 'hr') { initHr(doc); HIS.saveHandlers.hr = () => doAddStaff(doc); }
     if (id === 'payroll') { initPayroll(doc); HIS.saveHandlers.payroll = () => doRunPayroll(doc); }
     if (id === 'occhealth') { initOccHealth(doc); HIS.saveHandlers.occhealth = () => doConductExam(doc); }

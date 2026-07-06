@@ -71,4 +71,9 @@ public sealed class SchemesController : ControllerBase
     [HttpGet("packages")]
     public Task<IReadOnlyList<SchemePackageDto>> Packages([FromQuery] string schemeType, [FromQuery] string? q, CancellationToken ct)
         => _mediator.Send(new GetSchemePackagesQuery(schemeType, q), ct);
+
+    /// <summary>Verified memberships for a scheme type (newest first).</summary>
+    [HttpGet("memberships")]
+    public Task<IReadOnlyList<SchemeMembershipRowDto>> Memberships([FromQuery] string schemeType, CancellationToken ct)
+        => _mediator.Send(new GetSchemeMembershipsQuery(schemeType), ct);
 }

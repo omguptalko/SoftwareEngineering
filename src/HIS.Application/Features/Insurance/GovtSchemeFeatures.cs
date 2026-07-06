@@ -159,6 +159,23 @@ public sealed class VerifySchemeHandler : MediatR.IRequestHandler<VerifySchemeMe
 public sealed record SchemePackageDto(string Code, string Name, decimal Rate);
 public sealed record GetSchemePackagesQuery(string SchemeType, string? Q) : IQuery<IReadOnlyList<SchemePackageDto>>;
 
+// ---- Verified memberships list (ESIC/CGHS/ECHS/State page) ----
+public sealed record SchemeMembershipRowDto(string Patient, string MemberNo, string? SecondaryRef, bool Verified, string? ValidTo);
+public sealed record GetSchemeMembershipsQuery(string SchemeType) : IQuery<IReadOnlyList<SchemeMembershipRowDto>>;
+
+public sealed class GetSchemeMembershipsHandler : MediatR.IRequestHandler<GetSchemeMembershipsQuery, IReadOnlyList<SchemeMembershipRowDto>>
+{
+    private readonly ISchemeRepository _scheme;
+    public GetSchemeMembershipsHandler(ISchemeRepository scheme) { _scheme = scheme; }
+
+    public async Task<IReadOnlyList<SchemeMembershipRowDto>> Handle(GetSchemeMembershipsQuery q, CancellationToken ct)
+    {
+        var rows = await _scheme.GetMembershipsAsync(q.SchemeType, ct);
+        return rows.Select(r => new SchemeMembershipRowDto(
+            r.Patient, r.MemberNo, r.SecondaryRef, r.Verified, r.ValidTo?.ToString("yyyy-MM-dd"))).ToList();
+    }
+}
+
 public sealed class GetSchemePackagesHandler : MediatR.IRequestHandler<GetSchemePackagesQuery, IReadOnlyList<SchemePackageDto>>
 {
     private readonly ISchemeRepository _scheme;

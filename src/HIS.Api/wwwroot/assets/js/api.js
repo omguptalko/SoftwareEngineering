@@ -140,6 +140,10 @@ HIS.api = (function () {
     pmjayVerify:     (cmd) => post('/api/pmjay/verify', cmd),
     pmjayClaim:      (cmd) => post('/api/pmjay/claim', cmd),
     pmjayCases:      () => get('/api/pmjay/cases'),
+    // ESIC / CGHS / ECHS / State schemes
+    schemeVerify:    (cmd) => post('/api/schemes/verify', cmd),
+    schemePackages:  (type, q) => get(`/api/schemes/packages?schemeType=${encodeURIComponent(type)}&q=${encodeURIComponent(q || '')}`),
+    schemeMemberships: (type) => get(`/api/schemes/memberships?schemeType=${encodeURIComponent(type)}`),
     // Phase 8 — HR & Payroll
     hrStaff:         () => get('/api/hr/staff'),
     addStaff:        (cmd) => post('/api/hr/staff', cmd),
