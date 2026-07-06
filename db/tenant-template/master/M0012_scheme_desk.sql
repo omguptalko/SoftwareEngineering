@@ -23,8 +23,8 @@ BEGIN
 END
 GO
 
-/* ---- activate the four scheme sidebar modules -------------------- */
+/* ---- activate the scheme + claims-MIS sidebar modules ------------ */
 IF OBJECT_ID('master.Module') IS NOT NULL
     UPDATE master.Module SET Built = 1
-    WHERE ModuleId IN ('esic', 'cghs', 'echs', 'statescheme');
+    WHERE ModuleId IN ('esic', 'cghs', 'echs', 'statescheme', 'claimsmis');
 GO

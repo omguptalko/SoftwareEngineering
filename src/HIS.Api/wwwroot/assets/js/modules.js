@@ -718,6 +718,144 @@ window.HIS = window.HIS || {};
     } catch (e) { HIS.toast('Verify failed: ' + e.message); }
   }
 
+  /* ============ Claims MIS & Reconciliation (SRS §7.8) ============== */
+  function claimsmis() {
+    return `<div class="screen">
+      ${head('bi-clipboard-data', 'Claims MIS &amp; Reconciliation', 'Claim analytics · status workflow · bank settlement matching',
+        `<button class="btn btn--ghost btn--sm" id="cmRefresh"><i class="bi bi-arrow-clockwise"></i> Refresh</button>`)}
+      <div class="kpis" id="cmKpis"><div class="muted" style="padding:12px">Loading…</div></div>
+      <div class="panel mt12"><div class="panel__head"><i class="bi bi-kanban"></i> Claims <span class="ph-right hintline" id="cmCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:240px"><input class="ctl" id="cmqText" placeholder="Search claim # / patient / payer…"></div>
+            <select class="ctl" id="cmqStatus" style="max-width:160px"><option value="">All statuses</option></select>
+            <div class="field with-unit"><input class="ctl" id="cmqFrom" type="date"><span class="unit">from</span></div>
+            <div class="field with-unit"><input class="ctl" id="cmqTo" type="date"><span class="unit">to</span></div>
+            <button class="btn btn--sm" id="cmqClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Claim #</th><th>Date</th><th>Patient</th><th>Payer</th><th class="num">Pre-Auth ₹</th><th class="num">Approved ₹</th><th>Status</th></tr></thead>
+          <tbody id="cmClaims">${emptyRow(7, 'Loading…')}</tbody>
+        </table></div></div>
+      </div>
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-arrow-repeat"></i> Claim Workflow <span class="ph-right muted" id="cmSel">select a claim above</span></div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Action</label><div class="field"><select class="ctl" id="cmEvent">
+              <option>Approval</option><option>Query</option><option>Shortfall</option><option>Enhancement</option><option>FinalBill</option><option>Denial</option><option>Settlement</option><option>Appeal</option>
+            </select></div></div>
+            <div class="f"><label>Amount</label><div class="field with-unit"><input class="ctl num" id="cmAmt" placeholder="0"><span class="unit">₹</span></div></div>
+            <div class="f wide"><label>Notes</label><div class="field"><input class="ctl" id="cmNotes" placeholder="Remark (optional)"></div></div>
+          </div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-send"></i> Post Update <span class="fk">F9</span></button><span class="hintline">Approval/FinalBill/Settlement me amount bharo.</span></div>
+          <div class="mt8" id="cmEventNote"></div>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-bank"></i> Settlement Reconciliation</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Claim</label><div class="field"><input class="ctl code" id="cmReconClaim" placeholder="select a claim" readonly></div></div>
+            <div class="f"><label>Bank UTR <span class="req">*</span></label><div class="field"><input class="ctl code" id="cmUtr" placeholder="UTR / NEFT ref"></div></div>
+            <div class="f"><label>Bank Amount <span class="req">*</span></label><div class="field with-unit"><input class="ctl num" id="cmBank" placeholder="0"><span class="unit">₹</span></div></div>
+          </div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" id="cmReconBtn"><i class="bi bi-check2-square"></i> Reconcile</button><span class="hintline">Bank amount, claim ke settled amount se match hona chahiye.</span></div>
+          <div class="mt8" id="cmReconNote"></div>
+        </div></div>
+      </div>
+    </div>`;
+  }
+  function initClaimsMis(doc) {
+    loadClaimsMisFull(doc);
+    const rf = doc.querySelector('#cmRefresh'); if (rf) rf.addEventListener('click', () => loadClaimsMisFull(doc));
+    ['cmqText', 'cmqStatus', 'cmqFrom', 'cmqTo'].forEach(id => {
+      const el = doc.querySelector('#' + id); if (el) el.addEventListener('input', () => renderCmClaims(doc));
+    });
+    const clr = doc.querySelector('#cmqClear');
+    if (clr) clr.addEventListener('click', () => {
+      ['cmqText', 'cmqStatus', 'cmqFrom', 'cmqTo'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      renderCmClaims(doc);
+    });
+    // Row-click selects a claim for the workflow + reconciliation panels.
+    const tb = doc.querySelector('#cmClaims');
+    if (tb) tb.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr'); if (!tr || !tr.dataset.cid) return;
+      selectCmClaim(doc, tr.dataset.cid, tr.dataset.cno);
+      doc.querySelectorAll('#cmClaims tr').forEach(r => r.classList.remove('is-sel'));
+      tr.classList.add('is-sel');
+    });
+    const rb = doc.querySelector('#cmReconBtn'); if (rb) rb.addEventListener('click', () => doReconcile(doc));
+  }
+  function selectCmClaim(doc, cid, cno) {
+    doc.dataset.cmClaimId = cid;
+    const sel = doc.querySelector('#cmSel'); if (sel) sel.textContent = cno || ('#' + cid);
+    const rc = doc.querySelector('#cmReconClaim'); if (rc) rc.value = cno || ('#' + cid);
+  }
+  async function loadClaimsMisFull(doc) {
+    const tb = doc.querySelector('#cmClaims'); if (!tb) return;
+    try {
+      const mis = await HIS.api.claimsMis();
+      doc._cmClaims = mis.claims || [];
+      // KPI tiles from status counts
+      const kp = doc.querySelector('#cmKpis');
+      if (kp) {
+        const total = doc._cmClaims.length;
+        const tiles = (mis.counts || []).map(c => `<div class="kpi"><div class="v tnum">${c.count}</div><div class="l">${c.status}</div></div>`).join('');
+        kp.innerHTML = `<div class="kpi"><div class="v tnum">${total}</div><div class="l">Total claims</div></div>` + tiles;
+      }
+      // status filter options
+      const ssel = doc.querySelector('#cmqStatus');
+      if (ssel && ssel.options.length <= 1) {
+        [...new Set(doc._cmClaims.map(c => c.status))].sort().forEach(s => {
+          const o = document.createElement('option'); o.value = s; o.textContent = s; ssel.appendChild(o);
+        });
+      }
+      renderCmClaims(doc);
+    } catch (e) { doc._cmClaims = []; tb.innerHTML = emptyRow(7, 'Claims API unavailable'); }
+  }
+  function renderCmClaims(doc) {
+    const tb = doc.querySelector('#cmClaims'); if (!tb) return;
+    const all = doc._cmClaims || [];
+    const q = (val(doc, 'cmqText') || '').toLowerCase();
+    const st = val(doc, 'cmqStatus') || '';
+    const from = val(doc, 'cmqFrom') || '', to = val(doc, 'cmqTo') || '';
+    const rows = all.filter(r => {
+      if (q && !`${r.claimNo} ${r.patient} ${r.payer}`.toLowerCase().includes(q)) return false;
+      if (st && r.status !== st) return false;
+      const d = r.submittedUtc || '';
+      if (from && (!d || d < from)) return false;
+      if (to && (!d || d > to)) return false;
+      return true;
+    });
+    const pill = s => ({ Settled: 'pill--purple', Approved: 'pill--ok', Denied: 'pill--danger', Query: 'pill--warn', Shortfall: 'pill--danger' }[s] || 'pill--info');
+    tb.innerHTML = rows.length ? rows.map(r =>
+      `<tr data-cid="${r.claimId}" data-cno="${r.claimNo}" style="cursor:pointer"><td>${r.claimNo}</td><td>${r.submittedUtc ?? '—'}</td><td>${r.patient}</td><td>${r.payer}</td><td class="num">${r.preAuth ?? '—'}</td><td class="num">${r.approved ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td></tr>`
+    ).join('') : emptyRow(7, 'No matching claims');
+    const cnt = doc.querySelector('#cmCount'); if (cnt) cnt.textContent = `showing ${rows.length} of ${all.length} · click a row to action`;
+  }
+  async function doPostClaimEvent(doc) {
+    const cid = doc.dataset.cmClaimId;
+    if (!cid) { HIS.toast('Select a claim from the table first'); return; }
+    try {
+      await HIS.api.claimEvent(cid, { eventType: val(doc, 'cmEvent'), amount: numOrNull(val(doc, 'cmAmt')), notes: val(doc, 'cmNotes') || null });
+      const note = doc.querySelector('#cmEventNote');
+      if (note) note.innerHTML = `<span class="pill pill--ok"><i class="bi bi-check-circle-fill"></i> ${val(doc, 'cmEvent')} posted</span>`;
+      HIS.toast('Claim updated · ' + val(doc, 'cmEvent'), 'bi-send');
+      loadClaimsMisFull(doc);
+    } catch (e) { HIS.toast('Update failed: ' + e.message); }
+  }
+  async function doReconcile(doc) {
+    const cid = doc.dataset.cmClaimId;
+    if (!cid) { HIS.toast('Select a claim from the table first'); return; }
+    const utr = val(doc, 'cmUtr'); const bank = numOrNull(val(doc, 'cmBank'));
+    if (!utr) { HIS.toast('Enter the bank UTR'); return; }
+    if (!bank || bank <= 0) { HIS.toast('Enter the bank amount'); return; }
+    try {
+      const r = await HIS.api.reconcile({ claimId: Number(cid), utr, bankAmount: bank });
+      const note = doc.querySelector('#cmReconNote');
+      const ok = r.matched;
+      if (note) note.innerHTML = `<span class="pill ${ok ? 'pill--ok' : 'pill--danger'}"><i class="bi ${ok ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}"></i> ${r.status}${ok ? '' : ' — bank amount ≠ settled amount'}</span>`;
+      HIS.toast('Reconciliation: ' + r.status, ok ? 'bi-check2-square' : 'bi-exclamation-triangle');
+    } catch (e) { HIS.toast('Reconcile failed: ' + e.message); }
+  }
+
   /* ============================ HR (SRS §3.17) ====================== */
   function hr() {
     return `<div class="screen">
@@ -1293,7 +1431,7 @@ window.HIS = window.HIS || {};
   }
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1490,6 +1628,7 @@ window.HIS = window.HIS || {};
     if (id === 'cashless') { initCashless(doc); HIS.saveHandlers.cashless = () => doSubmitPreAuth(doc); }
     if (id === 'pmjay') { initPmjay(doc); HIS.saveHandlers.pmjay = () => doSubmitTms(doc); }
     if (id === 'esic' || id === 'cghs' || id === 'echs' || id === 'statescheme') { initScheme(doc, id); HIS.saveHandlers[id] = () => doVerifyScheme(doc); }
+    if (id === 'claimsmis') { initClaimsMis(doc); HIS.saveHandlers.claimsmis = () => doPostClaimEvent(doc); }
     if (id === 'hr') { initHr(doc); HIS.saveHandlers.hr = () => doAddStaff(doc); }
     if (id === 'payroll') { initPayroll(doc); HIS.saveHandlers.payroll = () => doRunPayroll(doc); }
     if (id === 'occhealth') { initOccHealth(doc); HIS.saveHandlers.occhealth = () => doConductExam(doc); }
