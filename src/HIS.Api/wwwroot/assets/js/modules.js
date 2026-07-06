@@ -1860,7 +1860,7 @@ window.HIS = window.HIS || {};
     } catch (e) { tb.innerHTML = emptyRow(5, 'Exams API unavailable'); }
   }
   async function doConductExam(doc) {
-    const uhid = val(doc, 'ohPatient');
+    const uhid = pickedUhid(doc, 'ohPatient');
     if (!uhid) { HIS.toast('Select a worker (F3)'); return; }
     const cid = val(doc, 'ohContract');
     try {
@@ -1883,7 +1883,7 @@ window.HIS = window.HIS || {};
     } catch (e) { tb.innerHTML = emptyRow(3, '—'); }
   }
   async function doRecordInjury(doc) {
-    const uhid = val(doc, 'injPatient');
+    const uhid = pickedUhid(doc, 'injPatient');
     if (!uhid) { HIS.toast('Select a worker (F3)'); return; }
     try {
       await HIS.api.recordInjury({
