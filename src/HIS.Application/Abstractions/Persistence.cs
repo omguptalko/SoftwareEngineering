@@ -326,7 +326,7 @@ public interface IClaimsRepository
     Task<Claim?> GetClaimAsync(long claimId, CancellationToken ct = default);
     Task UpdateClaimAsync(Claim c, CancellationToken ct = default);
     Task<IReadOnlyList<(long EventId, string EventType, decimal? Amount, string? Notes, DateTime OccurredUtc)>> GetEventsAsync(long claimId, CancellationToken ct = default);
-    Task<IReadOnlyList<(long ClaimId, string ClaimNo, string Patient, string Payer, decimal? PreAuth, decimal? Approved, string Status)>> GetClaimsAsync(int branchId, CancellationToken ct = default);
+    Task<IReadOnlyList<(long ClaimId, string ClaimNo, string Patient, string Payer, decimal? PreAuth, decimal? Approved, string Status, DateTime? SubmittedUtc)>> GetClaimsAsync(int branchId, CancellationToken ct = default);
     Task<IReadOnlyList<(string Status, int Count)>> GetStatusCountsAsync(int branchId, CancellationToken ct = default);
     Task<long> InsertReconciliationAsync(SettlementReconciliation r, CancellationToken ct = default);
 }

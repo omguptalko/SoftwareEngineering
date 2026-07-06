@@ -98,15 +98,15 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return rows.ToList();
     }
 
-    public async Task<IReadOnlyList<(long, string, string, string, decimal?, decimal?, string)>> GetClaimsAsync(int branchId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<(long, string, string, string, decimal?, decimal?, string, DateTime?)>> GetClaimsAsync(int branchId, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);
-        var claims = (await c.QueryAsync<(long ClaimId, string ClaimNo, long PatientId, int PayerId, decimal? PreAuth, decimal? Approved, string Status)>(new CommandDefinition(
-            @"SELECT ClaimId, ClaimNo, PatientId, PayerId, PreAuthAmount, ApprovedAmount, Status
+        var claims = (await c.QueryAsync<(long ClaimId, string ClaimNo, long PatientId, int PayerId, decimal? PreAuth, decimal? Approved, string Status, DateTime? SubmittedUtc)>(new CommandDefinition(
+            @"SELECT ClaimId, ClaimNo, PatientId, PayerId, PreAuthAmount, ApprovedAmount, Status, SubmittedUtc
               FROM insurance.Claim WHERE BranchId = @branchId ORDER BY ClaimId DESC", new { branchId }, cancellationToken: ct))).ToList();
         var pats = await MasterLookup.PatientNamesAsync(_f, claims.Select(c => c.PatientId), ct);
         var pays = await MasterLookup.PayerNamesAsync(_f, claims.Select(c => c.PayerId), ct);
-        return claims.Select(c => (c.ClaimId, c.ClaimNo, pats.GetValueOrDefault(c.PatientId, ""), pays.GetValueOrDefault(c.PayerId, ""), c.PreAuth, c.Approved, c.Status)).ToList();
+        return claims.Select(c => (c.ClaimId, c.ClaimNo, pats.GetValueOrDefault(c.PatientId, ""), pays.GetValueOrDefault(c.PayerId, ""), c.PreAuth, c.Approved, c.Status, c.SubmittedUtc)).ToList();
     }
 
     public async Task<IReadOnlyList<(string, int)>> GetStatusCountsAsync(int branchId, CancellationToken ct = default)

@@ -553,6 +553,10 @@ window.HIS = window.HIS || {};
             <div class="f"><label>Co-pay</label><div class="field with-unit"><input class="ctl num" id="caCopay" placeholder="—"><span class="unit">%</span></div></div>
           </div>
           <div class="mt8" id="caEligNote"></div>
+          <div class="grid-wrap mt8" style="border:0"><table class="grid">
+            <thead><tr><th>Payer / TPA</th><th>Policy No</th><th class="num">Sum Insured ₹</th><th class="num">Co-pay %</th><th class="num">Balance ₹</th></tr></thead>
+            <tbody id="caPolicies">${emptyRow(5, 'Pick a patient (F3) to see captured policies')}</tbody>
+          </table></div>
         </div></div>
         <div class="panel"><div class="panel__head"><i class="bi bi-file-medical"></i> Pre-Authorisation</div><div class="panel__body">
           <div class="form-grid">
@@ -560,12 +564,21 @@ window.HIS = window.HIS || {};
             <div class="f"><label>Est. Cost</label><div class="field with-unit"><input class="ctl num" id="caCost" placeholder="0"><span class="unit">₹</span></div></div>
             <div class="f wide"><label>Clinical Notes</label><div class="field"><textarea class="ctl" id="caNotes" placeholder="Clinical justification for admission…"></textarea></div></div>
           </div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-send"></i> Submit Pre-Auth <span class="fk">F9</span></button><span class="hintline">Patient + Payer + Est. Cost bharo → Submit → claim niche Dashboard me aayega.</span></div>
         </div></div>
       </div>
-      <div class="panel"><div class="panel__head"><i class="bi bi-kanban"></i> Claim Tracking Dashboard</div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
-          <thead><tr><th>Claim #</th><th>Patient</th><th>Payer</th><th class="num">Pre-Auth ₹</th><th class="num">Approved ₹</th><th>Status</th></tr></thead>
-          <tbody id="caClaims">${emptyRow(6, 'Loading…')}</tbody>
+      <div class="panel"><div class="panel__head"><i class="bi bi-kanban"></i> Claim Tracking Dashboard <span class="ph-right hintline" id="caCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:240px"><input class="ctl" id="caqText" placeholder="Search claim # / patient / payer…"></div>
+            <select class="ctl" id="caqStatus" style="max-width:160px"><option value="">All statuses</option></select>
+            <div class="field with-unit"><input class="ctl" id="caqFrom" type="date"><span class="unit">from</span></div>
+            <div class="field with-unit"><input class="ctl" id="caqTo" type="date"><span class="unit">to</span></div>
+            <button class="btn btn--sm" id="caqClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Claim #</th><th>Date</th><th>Patient</th><th>Payer</th><th class="num">Pre-Auth ₹</th><th class="num">Approved ₹</th><th>Status</th></tr></thead>
+          <tbody id="caClaims">${emptyRow(7, 'Loading…')}</tbody>
         </table></div></div>
       </div>
     </div>`;
@@ -1773,6 +1786,15 @@ window.HIS = window.HIS || {};
     const cp = doc.querySelector('#btnCapturePolicy'); if (cp) cp.addEventListener('click', () => doCapturePolicy(doc));
     const pf = doc.querySelector('#caPatient');
     if (pf) { pf.addEventListener('change', () => showCaPatient(doc)); pf.addEventListener('blur', () => showCaPatient(doc)); }
+    // Claim Tracking Dashboard filters — search text + status + date range (client-side)
+    ['caqText', 'caqStatus', 'caqFrom', 'caqTo'].forEach(id => {
+      const el = doc.querySelector('#' + id); if (el) el.addEventListener('input', () => renderCaClaims(doc));
+    });
+    const clr = doc.querySelector('#caqClear');
+    if (clr) clr.addEventListener('click', () => {
+      ['caqText', 'caqStatus', 'caqFrom', 'caqTo'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      renderCaClaims(doc);
+    });
   }
   // Resolve the F3-picked patient for the claim, show them in the banner, and load their policies.
   async function showCaPatient(doc) {
@@ -1793,6 +1815,10 @@ window.HIS = window.HIS || {};
     try {
       const pols = await HIS.api.eligibility(uhid);
       const note = doc.querySelector('#caEligNote');
+      const tb = doc.querySelector('#caPolicies');
+      if (tb) tb.innerHTML = pols.length ? pols.map(p =>
+        `<tr><td>${p.payer}</td><td class="code">${p.policyNo ?? '—'}</td><td class="num">${p.sumInsured ?? '—'}</td><td class="num">${p.coPayPct ?? '—'}</td><td class="num">${p.availableBalance ?? '—'}</td></tr>`
+      ).join('') : emptyRow(5, 'No policy on file — capture one above');
       if (pols.length) {
         const pol = pols[0];
         const si = doc.querySelector('#caSumInsured'); if (si) si.value = pol.sumInsured ?? '';
@@ -1835,11 +1861,37 @@ window.HIS = window.HIS || {};
     const tb = doc.querySelector('#caClaims'); if (!tb) return;
     try {
       const mis = await HIS.api.claimsMis();
-      const pill = s => ({ Settled: 'pill--purple', Approved: 'pill--ok', Denied: 'pill--danger', Query: 'pill--warn', Shortfall: 'pill--danger' }[s] || 'pill--info');
-      tb.innerHTML = mis.claims.length ? mis.claims.map(r =>
-        `<tr><td>${r.claimNo}</td><td>${r.patient}</td><td>${r.payer}</td><td class="num">${r.preAuth ?? '—'}</td><td class="num">${r.approved ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td></tr>`
-      ).join('') : emptyRow(6, 'No claims yet');
-    } catch (e) { tb.innerHTML = emptyRow(6, 'Claims API unavailable'); }
+      doc._caClaims = mis.claims || [];
+      // populate the status dropdown once from the data present
+      const sel = doc.querySelector('#caqStatus');
+      if (sel && sel.options.length <= 1) {
+        [...new Set(doc._caClaims.map(c => c.status))].sort().forEach(s => {
+          const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o);
+        });
+      }
+      renderCaClaims(doc);
+    } catch (e) { doc._caClaims = []; tb.innerHTML = emptyRow(7, 'Claims API unavailable'); }
+  }
+  // Apply search + status + date-range filters over the loaded claims (no reload).
+  function renderCaClaims(doc) {
+    const tb = doc.querySelector('#caClaims'); if (!tb) return;
+    const all = doc._caClaims || [];
+    const q = (val(doc, 'caqText') || '').toLowerCase();
+    const st = val(doc, 'caqStatus') || '';
+    const from = val(doc, 'caqFrom') || '', to = val(doc, 'caqTo') || '';
+    const rows = all.filter(r => {
+      if (q && !`${r.claimNo} ${r.patient} ${r.payer}`.toLowerCase().includes(q)) return false;
+      if (st && r.status !== st) return false;
+      const d = r.submittedUtc || '';
+      if (from && (!d || d < from)) return false;
+      if (to && (!d || d > to)) return false;
+      return true;
+    });
+    const pill = s => ({ Settled: 'pill--purple', Approved: 'pill--ok', Denied: 'pill--danger', Query: 'pill--warn', Shortfall: 'pill--danger' }[s] || 'pill--info');
+    tb.innerHTML = rows.length ? rows.map(r =>
+      `<tr><td>${r.claimNo}</td><td>${r.submittedUtc ?? '—'}</td><td>${r.patient}</td><td>${r.payer}</td><td class="num">${r.preAuth ?? '—'}</td><td class="num">${r.approved ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td></tr>`
+    ).join('') : emptyRow(7, 'No matching claims');
+    const cnt = doc.querySelector('#caCount'); if (cnt) cnt.textContent = `showing ${rows.length} of ${all.length}`;
   }
 
   /* ---- Phase 7: PM-JAY verify + TMS submit --------------------------- */

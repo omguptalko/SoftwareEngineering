@@ -199,7 +199,7 @@ public sealed class GetClaimHandler : MediatR.IRequestHandler<GetClaimQuery, Cla
     }
 }
 
-public sealed record ClaimRowDto(long ClaimId, string ClaimNo, string Patient, string Payer, decimal? PreAuth, decimal? Approved, string Status);
+public sealed record ClaimRowDto(long ClaimId, string ClaimNo, string Patient, string Payer, decimal? PreAuth, decimal? Approved, string Status, string? SubmittedUtc);
 public sealed record StatusCountDto(string Status, int Count);
 public sealed record ClaimsMisDto(IReadOnlyList<StatusCountDto> Counts, IReadOnlyList<ClaimRowDto> Claims);
 
@@ -218,7 +218,7 @@ public sealed class GetClaimsMisHandler : MediatR.IRequestHandler<GetClaimsMisQu
         var rows = await _claims.GetClaimsAsync(branchId, ct);
         return new ClaimsMisDto(
             counts.Select(x => new StatusCountDto(x.Status, x.Count)).ToList(),
-            rows.Select(r => new ClaimRowDto(r.ClaimId, r.ClaimNo, r.Patient, r.Payer, r.PreAuth, r.Approved, r.Status)).ToList());
+            rows.Select(r => new ClaimRowDto(r.ClaimId, r.ClaimNo, r.Patient, r.Payer, r.PreAuth, r.Approved, r.Status, r.SubmittedUtc?.ToString("yyyy-MM-dd"))).ToList());
     }
 }
 
