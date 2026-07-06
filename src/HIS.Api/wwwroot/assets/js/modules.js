@@ -617,7 +617,15 @@ window.HIS = window.HIS || {};
         </div>
       </div>
       <div class="panel"><div class="panel__head"><i class="bi bi-list-check"></i> Submitted TMS Claims <span class="ph-right hintline" id="pmCount"></span></div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:240px"><input class="ctl" id="pmqText" placeholder="Search TMS # / claim # / patient / package…"></div>
+            <select class="ctl" id="pmqStatus" style="max-width:160px"><option value="">All statuses</option></select>
+            <div class="field with-unit"><input class="ctl" id="pmqFrom" type="date"><span class="unit">from</span></div>
+            <div class="field with-unit"><input class="ctl" id="pmqTo" type="date"><span class="unit">to</span></div>
+            <button class="btn btn--sm" id="pmqClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>TMS Case #</th><th>Claim #</th><th>Date</th><th>Patient</th><th>Package</th><th class="num">Amount ₹</th><th>Status</th></tr></thead>
           <tbody id="pmCases">${emptyRow(7, 'Loading…')}</tbody>
         </table></div></div>
@@ -2137,17 +2145,48 @@ window.HIS = window.HIS || {};
   function initPmjay(doc) {
     const b = doc.querySelector('#btnPmVerify'); if (b) b.addEventListener('click', () => doVerifyBeneficiary(doc));
     loadPmjayCases(doc);
+    ['pmqText', 'pmqStatus', 'pmqFrom', 'pmqTo'].forEach(id => {
+      const el = doc.querySelector('#' + id); if (el) el.addEventListener('input', () => renderPmCases(doc));
+    });
+    const clr = doc.querySelector('#pmqClear');
+    if (clr) clr.addEventListener('click', () => {
+      ['pmqText', 'pmqStatus', 'pmqFrom', 'pmqTo'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      renderPmCases(doc);
+    });
   }
   async function loadPmjayCases(doc) {
     const tb = doc.querySelector('#pmCases'); if (!tb) return;
     try {
-      const rows = await HIS.api.pmjayCases();
-      const pill = s => ({ Settled: 'pill--purple', Approved: 'pill--ok', Denied: 'pill--danger', Query: 'pill--warn' }[s] || 'pill--info');
-      tb.innerHTML = rows.length ? rows.map(r =>
-        `<tr><td class="code">${r.tmsCaseNo || '—'}</td><td>${r.claimNo}</td><td>${r.submittedUtc ?? '—'}</td><td>${r.patient}</td><td>${r.package || '—'}</td><td class="num">${r.amount ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td></tr>`
-      ).join('') : emptyRow(7, 'No TMS claims submitted yet');
-      const cnt = doc.querySelector('#pmCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} claim(s)` : '';
-    } catch (e) { tb.innerHTML = emptyRow(7, 'TMS claims API unavailable'); }
+      doc._pmCases = await HIS.api.pmjayCases() || [];
+      const sel = doc.querySelector('#pmqStatus');
+      if (sel && sel.options.length <= 1) {
+        [...new Set(doc._pmCases.map(c => c.status))].sort().forEach(s => {
+          const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o);
+        });
+      }
+      renderPmCases(doc);
+    } catch (e) { doc._pmCases = []; tb.innerHTML = emptyRow(7, 'TMS claims API unavailable'); }
+  }
+  // Apply search + status + date-range filters over the loaded TMS claims.
+  function renderPmCases(doc) {
+    const tb = doc.querySelector('#pmCases'); if (!tb) return;
+    const all = doc._pmCases || [];
+    const q = (val(doc, 'pmqText') || '').toLowerCase();
+    const st = val(doc, 'pmqStatus') || '';
+    const from = val(doc, 'pmqFrom') || '', to = val(doc, 'pmqTo') || '';
+    const rows = all.filter(r => {
+      if (q && !`${r.tmsCaseNo || ''} ${r.claimNo} ${r.patient} ${r.package || ''}`.toLowerCase().includes(q)) return false;
+      if (st && r.status !== st) return false;
+      const d = r.submittedUtc || '';
+      if (from && (!d || d < from)) return false;
+      if (to && (!d || d > to)) return false;
+      return true;
+    });
+    const pill = s => ({ Settled: 'pill--purple', Approved: 'pill--ok', Denied: 'pill--danger', Query: 'pill--warn' }[s] || 'pill--info');
+    tb.innerHTML = rows.length ? rows.map(r =>
+      `<tr><td class="code">${r.tmsCaseNo || '—'}</td><td>${r.claimNo}</td><td>${r.submittedUtc ?? '—'}</td><td>${r.patient}</td><td>${r.package || '—'}</td><td class="num">${r.amount ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td></tr>`
+    ).join('') : emptyRow(7, 'No matching TMS claims');
+    const cnt = doc.querySelector('#pmCount'); if (cnt) cnt.textContent = all.length ? `showing ${rows.length} of ${all.length}` : '';
   }
   // Extract the UHID from an F3-filled "UHID — Name" field (split on em-dash only; UHIDs have hyphens).
   function pickedUhid(doc, id) {
