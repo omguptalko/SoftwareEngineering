@@ -1928,7 +1928,7 @@ window.HIS = window.HIS || {};
     } catch (e) { HIS.toast(action + ' failed: ' + e.message); }
   }
   async function doScheduleTele(doc) {
-    const uhid = val(doc, 'tmPatient'), docCode = val(doc, 'tmDoctor');
+    const uhid = pickedUhid(doc, 'tmPatient'), docCode = pickedUhid(doc, 'tmDoctor');
     if (!uhid || !docCode) { HIS.toast('Patient and doctor are required'); return; }
     try {
       await HIS.api.teleSchedule({ patientUhid: uhid, doctorCode: docCode, consultType: val(doc, 'tmType'),

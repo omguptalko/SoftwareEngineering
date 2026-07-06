@@ -23,8 +23,8 @@ BEGIN
 END
 GO
 
-/* ---- activate the scheme + claims-MIS + occ-health modules ------- */
+/* ---- activate scheme + claims-MIS + occ-health + telemedicine ---- */
 IF OBJECT_ID('master.Module') IS NOT NULL
     UPDATE master.Module SET Built = 1
-    WHERE ModuleId IN ('esic', 'cghs', 'echs', 'statescheme', 'claimsmis', 'occhealth');
+    WHERE ModuleId IN ('esic', 'cghs', 'echs', 'statescheme', 'claimsmis', 'occhealth', 'telemedicine');
 GO
