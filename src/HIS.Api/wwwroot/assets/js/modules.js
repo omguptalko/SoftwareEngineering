@@ -722,6 +722,9 @@ window.HIS = window.HIS || {};
       const note = doc.querySelector('#schVerifyNote');
       if (note) note.innerHTML = '<span class="pill pill--ok"><i class="bi bi-check-circle-fill"></i> Membership verified &amp; saved</span>';
       HIS.toast('Membership verified · ' + member, 'bi-patch-check');
+      // Clear the form for the next entry (data is now safe in the list below).
+      ['schPatient', 'schMember', 'schRef'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      const b = doc.querySelector('#schBanner'); if (b) b.innerHTML = banner(null);
       loadSchemeMemberships(doc, type);
     } catch (e) { HIS.toast('Verify failed: ' + e.message); }
   }
