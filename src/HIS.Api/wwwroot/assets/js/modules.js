@@ -1803,6 +1803,9 @@ window.HIS = window.HIS || {};
     try {
       await HIS.api.orderDiet({ admissionId: parseInt(adm, 10), dietType: val(doc, 'dtType'), cost: numOrNull(val(doc, 'dtCost')) });
       HIS.toast('Diet ordered', 'bi-egg-fried');
+      // Reset the form for the next order (data is now safe in the worklist).
+      const a = doc.querySelector('#dtAdmission'); if (a) a.value = '';
+      const t = doc.querySelector('#dtType'); if (t) t.selectedIndex = 0;
       const c = doc.querySelector('#dtCost'); if (c) c.value = '';
       loadDietOrders(doc);
     } catch (e) { HIS.toast('Order failed: ' + e.message); }
