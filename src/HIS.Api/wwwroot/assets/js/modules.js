@@ -1904,8 +1904,13 @@ window.HIS = window.HIS || {};
     } catch (e) { tb.innerHTML = emptyRow(6, 'API unavailable'); }
   }
   async function doCreateMlc(doc) {
-    try { const r = await HIS.api.mlcCreate({ patientUhid: val(doc, 'mlcPatient') || null, policeStation: val(doc, 'mlcPs') || null, injuryDetails: val(doc, 'mlcInjury') || null }); HIS.toast('MLC created · ' + r.mlcNo, 'bi-shield-fill-exclamation'); loadMlc(doc); }
-    catch (e) { HIS.toast('Create failed: ' + e.message); }
+    try {
+      const r = await HIS.api.mlcCreate({ patientUhid: pickedUhid(doc, 'mlcPatient') || null, policeStation: val(doc, 'mlcPs') || null, injuryDetails: val(doc, 'mlcInjury') || null });
+      HIS.toast('MLC created · ' + r.mlcNo, 'bi-shield-fill-exclamation');
+      // Clear the form for the next case (record is now in the MLC Register below).
+      ['mlcPatient', 'mlcPs', 'mlcInjury'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      loadMlc(doc);
+    } catch (e) { HIS.toast('Create failed: ' + e.message); }
   }
 
   /* ---- Phase 10: Queue — live board over SignalR (task 0.9) ----------- */
