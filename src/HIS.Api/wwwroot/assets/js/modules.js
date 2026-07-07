@@ -411,7 +411,7 @@ window.HIS = window.HIS || {};
   function billing() {
     return `<div class="screen">
       ${head('bi-receipt', 'Billing &amp; Revenue Cycle', 'OPD/IPD/Lab/Pharmacy consolidated invoice',
-        `<button class="btn btn--ghost btn--sm" data-act="print"><i class="bi bi-printer"></i> Print Bill <span class="fk">F12</span></button>
+        `<button class="btn btn--ghost btn--sm" id="btnNewBill"><i class="bi bi-arrow-counterclockwise"></i> New Bill</button>
          <button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-receipt"></i> Create Bill <span class="fk">F9</span></button>`)}
       <div id="billBanner">${banner(null)}</div>
       <div class="panel"><div class="panel__body" style="padding:8px 12px">
@@ -1701,7 +1701,8 @@ window.HIS = window.HIS || {};
       loadBills(doc);
       const pf = doc.querySelector('#billPatient'); if (pf) { pf.addEventListener('change', () => showBillPatient(doc)); pf.addEventListener('blur', () => showBillPatient(doc)); }
       const cb = doc.querySelector('#btnCreateBill'); if (cb) cb.addEventListener('click', () => doCreateBill(doc));
-      const cp = doc.querySelector('#btnCollectPay'); if (cp) cp.addEventListener('click', () => doCollectPayment(doc)); }
+      const cp = doc.querySelector('#btnCollectPay'); if (cp) cp.addEventListener('click', () => doCollectPayment(doc));
+      const nb = doc.querySelector('#btnNewBill'); if (nb) nb.addEventListener('click', () => resetBillingForm(doc)); }
     if (id === 'dashboard') loadDashboard(doc);
     if (id === 'registration') { initRegistration(doc); HIS.saveHandlers.registration = () => doRegister(doc); }
     if (id === 'vitals') { initVitals(doc); }
@@ -3916,6 +3917,19 @@ window.HIS = window.HIS || {};
     if (!uhid) { if (b) b.innerHTML = banner(null); return; }
     try { const p = await HIS.api.patientByUhid(uhid); if (p && b) b.innerHTML = banner(p); } catch (e) {}
   }
+  // Reset the billing form for a fresh bill (keeps the Recent Bills list).
+  function resetBillingForm(doc) {
+    delete doc.dataset.billId; delete doc.dataset.billUhid;
+    const pf = doc.querySelector('#billPatient'); if (pf) pf.value = '';
+    const bn = doc.querySelector('#billBanner'); if (bn) bn.innerHTML = banner(null);
+    const cb = doc.querySelector('#chargeBody'); if (cb) cb.innerHTML = '<tr>' + TPL.chargeBody + '</tr>';
+    ['billDiscount', 'billInsurance'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = '0'; });
+    const pa = doc.querySelector('#payAmount'); if (pa) pa.value = '0.00';
+    const ref = doc.querySelector('#payBillRef'); if (ref) ref.textContent = 'no bill';
+    const gt = doc.querySelector('#grossTot'); if (gt) gt.textContent = '0.00';
+    const sg = doc.querySelector('#sumGross'); if (sg) sg.value = '0.00';
+    const pb = doc.querySelector('#billPayable'); if (pb) pb.value = '0.00';
+  }
   async function loadBills(doc) {
     const tb = doc.querySelector('#billList'); if (!tb) return;
     try {
@@ -3952,8 +3966,9 @@ window.HIS = window.HIS || {};
     try {
       const r = await HIS.api.collectPayment({ billId, patientUhid: doc.dataset.billUhid || null, mode: val(doc, 'payMode'), amount });
       HIS.toast('Paid via ' + r.provider + ' · ' + r.reference + (r.billSettled ? ' · BILL SETTLED' : ''), 'bi-check2-circle');
-      if (r.billSettled) { const ref = doc.querySelector('#payBillRef'); if (ref) ref.textContent += ' · Paid'; }
       loadBills(doc);
+      // Bill cycle complete — auto-refresh the form for the next patient.
+      if (r.billSettled) resetBillingForm(doc);
     } catch (e) { HIS.toast('Payment failed: ' + e.message); }
   }
 
