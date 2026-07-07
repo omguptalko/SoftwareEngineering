@@ -1557,36 +1557,63 @@ window.HIS = window.HIS || {};
       <div class="kpis" id="cmpKpis"><div class="muted" style="padding:12px">Loading…</div></div>
       <div class="panel mt12"><div class="panel__head"><i class="bi bi-list-columns-reverse"></i> Audit Trail — most recent
         <span id="cmpCount" class="pill pill--warn" style="margin-left:auto">—</span></div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:260px"><input class="ctl" id="cmpqText" placeholder="Search user / action / entity / ref…"></div>
+            <select class="ctl" id="cmpqResult" style="max-width:150px"><option value="">All results</option><option value="ok">OK</option><option value="fail">Failed / denied</option></select>
+            <button class="btn btn--sm" id="cmpqClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>Time (UTC)</th><th>User</th><th>Action</th><th>Entity</th><th>Ref</th><th>Result</th></tr></thead>
           <tbody id="cmpTrail">${emptyRow(6, 'Loading…')}</tbody>
         </table></div></div></div>
     </div>`;
   }
+  function initCompliance(doc) {
+    loadCompliance(doc);
+    const rf = doc.querySelector('[data-act="refresh"]'); if (rf) rf.addEventListener('click', () => loadCompliance(doc));
+    ['cmpqText', 'cmpqResult'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.addEventListener('input', () => renderCmpRows(doc)); });
+    const clr = doc.querySelector('#cmpqClear');
+    if (clr) clr.addEventListener('click', () => { ['cmpqText', 'cmpqResult'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; }); renderCmpRows(doc); });
+  }
   async function loadCompliance(doc) {
     const tb = doc.querySelector('#cmpTrail'); if (!tb) return;
     try {
-      const rows = await HIS.api.auditTrail(100);
-      tb.innerHTML = rows.length ? rows.map(r => {
-        const t = new Date(r.occurredUtc);
-        const when = isNaN(t) ? r.occurredUtc : t.toISOString().slice(0, 19).replace('T', ' ');
-        const ok = r.succeeded;
-        return `<tr><td class="tnum">${when}</td><td>${r.user || '—'}</td><td>${r.action}</td><td>${r.entity}</td><td>${r.entityId || '—'}</td>
-          <td><span class="pill ${ok ? 'pill--ok' : 'pill--danger'}">${ok ? 'OK' : 'Failed'}</span></td></tr>`;
-      }).join('') : emptyRow(6, 'No audit entries yet');
-      doc.querySelector('#cmpCount').textContent = `${rows.length} shown`;
-      // Compliance summary KPIs derived from the trail.
-      const total = rows.length, failed = rows.filter(r => !r.succeeded).length;
-      const actors = new Set(rows.map(r => r.user).filter(Boolean)).size;
-      doc.querySelector('#cmpKpis').innerHTML =
-        `<div class="kpi"><div class="v tnum">${total}</div><div class="l">Entries shown</div></div>
+      doc._cmpRows = await HIS.api.auditTrail(200) || [];
+      // Compliance summary KPIs derived from the full trail.
+      const all = doc._cmpRows, total = all.length, failed = all.filter(r => !r.succeeded).length;
+      const actors = new Set(all.map(r => r.user).filter(Boolean)).size;
+      const kp = doc.querySelector('#cmpKpis');
+      if (kp) kp.innerHTML =
+        `<div class="kpi"><div class="v tnum">${total}</div><div class="l">Entries loaded</div></div>
          <div class="kpi"><div class="v tnum">${total - failed}</div><div class="l">Successful</div></div>
          <div class="kpi"><div class="v tnum">${failed}</div><div class="l">Failed / denied</div></div>
          <div class="kpi"><div class="v tnum">${actors}</div><div class="l">Distinct users</div></div>`;
+      renderCmpRows(doc);
     } catch (e) {
-      tb.innerHTML = emptyRow(6, 'Audit API unavailable');
-      doc.querySelector('#cmpKpis').innerHTML = '<div class="muted" style="padding:12px">Audit API unavailable</div>';
+      doc._cmpRows = []; tb.innerHTML = emptyRow(6, 'Audit API unavailable');
+      const kp = doc.querySelector('#cmpKpis'); if (kp) kp.innerHTML = '<div class="muted" style="padding:12px">Audit API unavailable</div>';
     }
+  }
+  function renderCmpRows(doc) {
+    const tb = doc.querySelector('#cmpTrail'); if (!tb) return;
+    const all = doc._cmpRows || [];
+    const q = (val(doc, 'cmpqText') || '').toLowerCase();
+    const res = val(doc, 'cmpqResult') || '';
+    const rows = all.filter(r => {
+      if (q && !`${r.user || ''} ${r.action} ${r.entity} ${r.entityId || ''}`.toLowerCase().includes(q)) return false;
+      if (res === 'ok' && !r.succeeded) return false;
+      if (res === 'fail' && r.succeeded) return false;
+      return true;
+    });
+    tb.innerHTML = rows.length ? rows.map(r => {
+      const t = new Date(r.occurredUtc);
+      const when = isNaN(t) ? r.occurredUtc : t.toISOString().slice(0, 19).replace('T', ' ');
+      const ok = r.succeeded;
+      return `<tr><td class="tnum">${when}</td><td>${r.user || '—'}</td><td>${r.action}</td><td>${r.entity}</td><td>${r.entityId || '—'}</td>
+        <td><span class="pill ${ok ? 'pill--ok' : 'pill--danger'}">${ok ? 'OK' : 'Failed'}</span></td></tr>`;
+    }).join('') : emptyRow(6, 'No matching entries');
+    const cnt = doc.querySelector('#cmpCount'); if (cnt) cnt.textContent = `${rows.length} of ${all.length}`;
   }
 
   /* ====================== AI — Clinical Risk (SRS §4.1) ========== */
@@ -1756,7 +1783,7 @@ window.HIS = window.HIS || {};
     if (id === 'mlc') { initMlc(doc); HIS.saveHandlers.mlc = () => doCreateMlc(doc); }
     if (id === 'queue') { initQueue(doc); }
     if (id === 'feedback') { initFeedback(doc); HIS.saveHandlers.feedback = () => doSubmitSurvey(doc); }
-    if (id === 'compliance') loadCompliance(doc);
+    if (id === 'compliance') initCompliance(doc);
     if (id === 'ai') initAi(doc);
   };
 
