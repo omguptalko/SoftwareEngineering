@@ -205,6 +205,18 @@ public sealed class ExperienceRepository : IExperienceRepository
         const string sql = @"INSERT INTO support.ConsentCapture (TemplateId, PatientId, SignatureType, CapturedUtc) VALUES (@TemplateId, @PatientId, @SignatureType, @CapturedUtc); SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return await c.QuerySingleAsync<long>(new CommandDefinition(sql, cc, cancellationToken: ct));
     }
+    public async Task<IReadOnlyList<(long, string, string, string?, DateTime)>> GetConsentCapturesAsync(CancellationToken ct = default)
+    {
+        using var c = await _f.OpenDataAsync(ct);
+        var rows = (await c.QueryAsync<(long ConsentId, int TemplateId, long PatientId, string? SignatureType, DateTime CapturedUtc)>(new CommandDefinition(
+            "SELECT ConsentId, TemplateId, PatientId, SignatureType, CapturedUtc FROM support.ConsentCapture ORDER BY ConsentId DESC", cancellationToken: ct))).ToList();
+        var pats = await MasterLookup.PatientNamesAsync(_f, rows.Select(r => r.PatientId), ct);
+        using var mc = await _f.OpenMasterAsync(ct);
+        var tpls = (await mc.QueryAsync<(int TemplateId, string Title)>(new CommandDefinition(
+            "SELECT TemplateId, Title FROM master.ConsentTemplate", cancellationToken: ct))).ToDictionary(t => t.TemplateId, t => t.Title);
+        return rows.Select(r => (r.ConsentId, pats.GetValueOrDefault(r.PatientId, ""),
+            tpls.GetValueOrDefault(r.TemplateId, "Template #" + r.TemplateId), r.SignatureType, r.CapturedUtc)).ToList();
+    }
     public async Task<IReadOnlyList<(int, string, string)>> GetCertTemplatesAsync(CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

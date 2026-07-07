@@ -1087,6 +1087,31 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== CONSENT & e-DOCUMENTS (SRS §3.29) ======= */
+  function consent() {
+    return `<div class="screen">
+      ${head('bi-file-earmark-check', 'Consent &amp; e-Documents', 'Informed-consent capture · e-signature · consent register',
+        `<button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-pen"></i> Capture Consent <span class="fk">F9</span></button>`)}
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-pen"></i> Capture Consent</div><div class="panel__body">
+          <div id="csBanner">${banner(null)}</div>
+          <div class="form-grid mt8">
+            <div class="f wide"><label>Consent Template <span class="req">*</span></label><div class="field"><select class="ctl" id="csTemplate"><option value="">Loading templates…</option></select></div></div>
+            <div class="f wide"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="csPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
+            <div class="f"><label>Signature Type</label><div class="field"><select class="ctl" id="csSig"><option>e-Signature</option><option>Thumb Impression</option><option>Wet Signature</option><option>Witnessed / Verbal</option></select></div></div>
+          </div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-pen"></i> Capture Consent <span class="fk">F9</span></button><span class="hintline">Template + patient chuno → Capture. Register me aa jayega.</span></div>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-journal-check"></i> Consent Register <span class="ph-right hintline" id="csCount"></span></div>
+          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>#</th><th>Patient</th><th>Template</th><th>Signature</th><th>Captured</th></tr></thead>
+            <tbody id="csRegister">${emptyRow(5, 'Loading…')}</tbody>
+          </table></div></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
   /* ====================== BIO-MEDICAL WASTE (SRS §3.25) ============ */
   function bmwm() {
     return `<div class="screen">
@@ -1503,7 +1528,7 @@ window.HIS = window.HIS || {};
   }
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, consent, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1708,6 +1733,7 @@ window.HIS = window.HIS || {};
     if (id === 'ambulance') { initAmbulance(doc); }
     if (id === 'diet') { initDiet(doc); HIS.saveHandlers.diet = () => doOrderDiet(doc); }
     if (id === 'mortuary') { initMortuary(doc); HIS.saveHandlers.mortuary = () => doAdmitBody(doc); }
+    if (id === 'consent') { initConsent(doc); HIS.saveHandlers.consent = () => doCaptureConsent(doc); }
     if (id === 'bmwm') { initBmwm(doc); HIS.saveHandlers.bmwm = () => doGenerateBag(doc); }
     if (id === 'mlc') { initMlc(doc); HIS.saveHandlers.mlc = () => doCreateMlc(doc); }
     if (id === 'queue') { initQueue(doc); }
@@ -1883,6 +1909,46 @@ window.HIS = window.HIS || {};
       HIS.toast('Body released', 'bi-box-arrow-up');
       loadMortuary(doc);
     } catch (e) { HIS.toast('Release failed: ' + e.message); }
+  }
+
+  /* ---- Consent & e-Documents ----------------------------------------- */
+  async function initConsent(doc) {
+    loadConsentCaptures(doc);
+    try {
+      const tpls = await HIS.api.consentTemplates();
+      const sel = doc.querySelector('#csTemplate');
+      if (sel) sel.innerHTML = tpls.length
+        ? '<option value="">— select template —</option>' + tpls.map(t =>
+            `<option value="${t.templateId}">${t.title} (${(t.lang || '').toUpperCase()})</option>`).join('')
+        : '<option value="">No templates configured</option>';
+    } catch (e) { /* ignore */ }
+    const pf = doc.querySelector('#csPatient');
+    if (pf) { const upd = async () => { const u = pickedUhid(doc, 'csPatient'); const b = doc.querySelector('#csBanner'); if (!u) { if (b) b.innerHTML = banner(null); return; } try { const p = await HIS.api.patientByUhid(u); if (p && b) b.innerHTML = banner(p); } catch (e) {} };
+      pf.addEventListener('change', upd); pf.addEventListener('blur', upd); }
+  }
+  async function loadConsentCaptures(doc) {
+    const tb = doc.querySelector('#csRegister'); if (!tb) return;
+    try {
+      const rows = await HIS.api.consentCaptures();
+      tb.innerHTML = rows.length ? rows.map(r =>
+        `<tr><td>${r.consentId}</td><td>${r.patient || '—'}</td><td>${r.template}</td><td><span class="pill pill--info">${r.signatureType || '—'}</span></td><td>${r.capturedUtc}</td></tr>`
+      ).join('') : emptyRow(5, 'No consents captured yet');
+      const cnt = doc.querySelector('#csCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} consent(s)` : '';
+    } catch (e) { tb.innerHTML = emptyRow(5, 'Consent API unavailable'); }
+  }
+  async function doCaptureConsent(doc) {
+    const tid = val(doc, 'csTemplate');
+    if (!tid) { HIS.toast('Select a consent template'); return; }
+    const uhid = pickedUhid(doc, 'csPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3)'); return; }
+    try {
+      await HIS.api.captureConsent({ templateId: parseInt(tid, 10), patientUhid: uhid, signatureType: val(doc, 'csSig') || null });
+      HIS.toast('Consent captured', 'bi-file-earmark-check');
+      const p = doc.querySelector('#csPatient'); if (p) p.value = '';
+      const t = doc.querySelector('#csTemplate'); if (t) t.selectedIndex = 0;
+      const b = doc.querySelector('#csBanner'); if (b) b.innerHTML = banner(null);
+      loadConsentCaptures(doc);
+    } catch (e) { HIS.toast('Capture failed: ' + e.message); }
   }
 
   function initBmwm(doc) { loadBmwm(doc); }

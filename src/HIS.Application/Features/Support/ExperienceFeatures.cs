@@ -39,6 +39,17 @@ public sealed class CaptureConsentHandler : MediatR.IRequestHandler<CaptureConse
     }
 }
 
+public sealed record ConsentCaptureRowDto(long ConsentId, string Patient, string Template, string? SignatureType, string CapturedUtc);
+public sealed record GetConsentCapturesQuery : IQuery<IReadOnlyList<ConsentCaptureRowDto>>;
+public sealed class GetConsentCapturesHandler : MediatR.IRequestHandler<GetConsentCapturesQuery, IReadOnlyList<ConsentCaptureRowDto>>
+{
+    private readonly IExperienceRepository _r;
+    public GetConsentCapturesHandler(IExperienceRepository r) { _r = r; }
+    public async Task<IReadOnlyList<ConsentCaptureRowDto>> Handle(GetConsentCapturesQuery q, CancellationToken ct)
+        => (await _r.GetConsentCapturesAsync(ct)).Select(r => new ConsentCaptureRowDto(
+            r.ConsentId, r.Patient, r.Template, r.SignatureType, r.CapturedUtc.ToString("yyyy-MM-dd HH:mm"))).ToList();
+}
+
 // ============================ Certificates (SRS §3.16) ============================
 public sealed record CertTemplateDto(int TemplateId, string CertType, string Title);
 public sealed record GetCertTemplatesQuery : IQuery<IReadOnlyList<CertTemplateDto>>;

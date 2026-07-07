@@ -101,6 +101,7 @@ public sealed class ConsentController : ControllerBase
 {
     private readonly IMediator _m; public ConsentController(IMediator m) => _m = m;
     [HttpGet("templates")] public Task<IReadOnlyList<ConsentTemplateDto>> Templates(CancellationToken ct) => _m.Send(new GetConsentTemplatesQuery(), ct);
+    [HttpGet("captures")] public Task<IReadOnlyList<ConsentCaptureRowDto>> Captures(CancellationToken ct) => _m.Send(new GetConsentCapturesQuery(), ct);
     [HttpPost] public Task<long> Capture([FromBody] CaptureConsentCommand cmd, CancellationToken ct) => _m.Send(cmd, ct);
 }
 

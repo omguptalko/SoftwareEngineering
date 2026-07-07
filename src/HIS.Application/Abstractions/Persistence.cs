@@ -261,6 +261,7 @@ public interface IExperienceRepository
 {
     Task<IReadOnlyList<(int TemplateId, string Code, string Title, string Lang)>> GetConsentTemplatesAsync(CancellationToken ct = default);
     Task<long> InsertConsentCaptureAsync(ConsentCapture c, CancellationToken ct = default);
+    Task<IReadOnlyList<(long ConsentId, string Patient, string Template, string? SignatureType, DateTime CapturedUtc)>> GetConsentCapturesAsync(CancellationToken ct = default);
     Task<IReadOnlyList<(int TemplateId, string CertType, string Title)>> GetCertTemplatesAsync(CancellationToken ct = default);
     Task<long> InsertCertificateAsync(IssuedCertificate cert, CancellationToken ct = default);
     Task ApproveCertificateAsync(long certId, int doctorId, CancellationToken ct = default);
