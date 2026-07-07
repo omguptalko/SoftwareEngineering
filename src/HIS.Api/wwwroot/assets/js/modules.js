@@ -900,7 +900,7 @@ window.HIS = window.HIS || {};
         </div>
         <div class="panel"><div class="panel__head"><i class="bi bi-calendar-check"></i> Attendance</div><div class="panel__body">
           <div class="form-grid one" style="gap:6px">
-            <div class="f"><label>Employee</label><div class="field"><input class="ctl code" id="attCode" placeholder="EMP code (or click staff)"></div></div>
+            <div class="f"><label>Employee</label><div class="field"><select class="ctl" id="attCode"><option value="">— select employee —</option></select></div></div>
             <div class="f"><label>Date</label><div class="field"><input class="ctl" id="attDate" type="date"></div></div>
             <div class="f"><label>Status</label><div class="field"><select class="ctl" id="attStatus"><option>Present</option><option>Absent</option><option>Half-day</option><option>Leave</option></select></div></div>
             <div class="f"><label>In / Out</label><div class="field"><input class="ctl" id="attIn" placeholder="09:00" style="width:70px;margin-right:6px"><input class="ctl" id="attOut" placeholder="17:30" style="width:70px"></div></div>
@@ -2215,6 +2215,9 @@ window.HIS = window.HIS || {};
       tb.innerHTML = rows.length ? rows.map(s =>
         `<tr data-code="${s.employeeCode}" style="cursor:pointer"><td><b>${s.employeeCode}</b></td><td>${s.fullName}</td><td>${s.designation || '—'}</td><td>${s.department || '—'}</td></tr>`
       ).join('') : emptyRow(4, 'No staff yet');
+      // Populate the attendance employee dropdown from the same staff list (only valid codes).
+      const sel = doc.querySelector('#attCode');
+      if (sel) { const cur = sel.value; sel.innerHTML = '<option value="">— select employee —</option>' + rows.map(s => `<option value="${s.employeeCode}">${s.employeeCode} · ${s.fullName}</option>`).join(''); if (cur) sel.value = cur; }
       tb.querySelectorAll('[data-code]').forEach(tr => tr.addEventListener('click', () => {
         tb.querySelectorAll('tr').forEach(x => x.classList.remove('sel')); tr.classList.add('sel');
         const code = tr.dataset.code;
@@ -2245,7 +2248,10 @@ window.HIS = window.HIS || {};
     try {
       await HIS.api.markAttendance({ employeeCode: code, workDate: val(doc, 'attDate'), status: val(doc, 'attStatus'),
         inTime: val(doc, 'attIn') || null, outTime: val(doc, 'attOut') || null });
-      HIS.toast('Attendance marked', 'bi-check2'); loadAttendance(doc);
+      HIS.toast('Attendance marked · ' + code, 'bi-check2');
+      const ai = doc.querySelector('#attIn'); if (ai) ai.value = '';
+      const ao = doc.querySelector('#attOut'); if (ao) ao.value = '';
+      loadAttendance(doc);
     } catch (e) { HIS.toast('Mark failed: ' + e.message); }
   }
 
