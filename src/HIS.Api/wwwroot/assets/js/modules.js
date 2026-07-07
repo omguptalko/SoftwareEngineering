@@ -923,7 +923,7 @@ window.HIS = window.HIS || {};
         `<button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-calculator"></i> Run Payroll <span class="fk">F9</span></button>`)}
       <div class="panel"><div class="panel__body">
         <div class="form-grid three">
-          <div class="f"><label>Employee <span class="req">*</span></label><div class="field"><input class="ctl code" id="prCode" placeholder="EMP code"></div></div>
+          <div class="f"><label>Employee <span class="req">*</span></label><div class="field"><select class="ctl" id="prCode"><option value="">— select employee —</option></select></div></div>
           <div class="f"><label>Year</label><div class="field"><input class="ctl" id="prYear" value="${now.getFullYear()}"></div></div>
           <div class="f"><label>Month</label><div class="field"><input class="ctl" id="prMonth" value="${now.getMonth() + 1}"></div></div>
           <div class="f"><label>Basic Pay</label><div class="field with-unit"><input class="ctl num" id="prBasic" placeholder="0"><span class="unit">₹</span></div></div>
@@ -2264,9 +2264,17 @@ window.HIS = window.HIS || {};
   }
 
   /* ---- Phase 8: Payroll — run, summary, approve ---------------------- */
-  function initPayroll(doc) {
+  async function initPayroll(doc) {
     loadPayroll(doc);
     const rb = doc.querySelector('#btnRunPayroll'); if (rb) rb.addEventListener('click', () => doRunPayroll(doc));
+    // Populate the employee dropdown from staff (only valid codes).
+    try {
+      const staff = await HIS.api.hrStaff();
+      const sel = doc.querySelector('#prCode');
+      if (sel) sel.innerHTML = '<option value="">— select employee —</option>' + staff.map(s => `<option value="${s.employeeCode}">${s.employeeCode} · ${s.fullName}</option>`).join('');
+    } catch (e) { /* ignore */ }
+    // Reload the table when year/month changes.
+    ['prYear', 'prMonth'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.addEventListener('change', () => loadPayroll(doc)); });
   }
   async function loadPayroll(doc) {
     const tb = doc.querySelector('#prList'); if (!tb) return;
