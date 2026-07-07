@@ -1406,8 +1406,15 @@ window.HIS = window.HIS || {};
   function radiology() {
     return `<div class="screen">
       ${head('bi-radioactive', 'Radiology &amp; Imaging', 'Order studies · worklist · report', '')}
-      <div class="panel"><div class="panel__head"><i class="bi bi-card-list"></i> Radiology Worklist <span class="ph-right muted" id="radCount"></span></div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+      <div class="panel"><div class="panel__head"><i class="bi bi-card-list"></i> Radiology Worklist <span class="ph-right hintline" id="radCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:240px"><input class="ctl" id="radqText" placeholder="Search order # / patient / study…"></div>
+            <select class="ctl" id="radqStatus" style="max-width:150px"><option value="">All statuses</option><option>Scheduled</option><option>Reported</option></select>
+            <select class="ctl" id="radqModality" style="max-width:150px"><option value="">All modalities</option><option>X-Ray</option><option>CT</option><option>MRI</option><option>USG</option><option>ECG</option><option>Mammography</option></select>
+            <button class="btn btn--sm" id="radqClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>Order</th><th>Patient</th><th>Modality</th><th>Study</th><th>Status</th><th></th></tr></thead>
           <tbody id="radWorklist">${emptyRow(6, 'Loading…')}</tbody>
         </table></div></div></div>
@@ -2884,24 +2891,44 @@ window.HIS = window.HIS || {};
   function initRadiology(doc) {
     loadRadWorklist(doc);
     const b = doc.querySelector('#radReportBtn'); if (b) b.addEventListener('click', () => doReportRadiology(doc));
+    ['radqText', 'radqStatus', 'radqModality'].forEach(id => {
+      const el = doc.querySelector('#' + id); if (el) el.addEventListener('input', () => renderRadRows(doc));
+    });
+    const clr = doc.querySelector('#radqClear');
+    if (clr) clr.addEventListener('click', () => {
+      ['radqText', 'radqStatus', 'radqModality'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      renderRadRows(doc);
+    });
   }
   async function loadRadWorklist(doc) {
     const tb = doc.querySelector('#radWorklist'); if (!tb) return;
-    try {
-      const rows = await HIS.api.radWorklist();
-      const cnt = doc.querySelector('#radCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' orders' : '';
-      tb.innerHTML = rows.length ? rows.map(r => {
-        const cls = r.status === 'Reported' ? 'pill--ok' : 'pill--warn';
-        const act = r.status !== 'Reported' ? `<button class="btn btn--sm" data-radrep="${r.radOrderId}" data-patient="${r.patient}" data-study="${r.modality}${r.study ? ' ' + r.study : ''}"><i class="bi bi-file-earmark-medical"></i> Report</button>` : '';
-        return `<tr><td>#${r.radOrderId}</td><td>${r.patient}</td><td>${r.modality}</td><td>${r.study || ''}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${act}</td></tr>`;
-      }).join('') : emptyRow(6, 'No radiology orders');
-      tb.querySelectorAll('[data-radrep]').forEach(b => b.addEventListener('click', () => {
-        doc.dataset.radOrder = b.dataset.radrep;
-        const who = doc.querySelector('#radRepWho'); if (who) who.textContent = '#' + b.dataset.radrep + ' · ' + b.dataset.study + ' · ' + b.dataset.patient;
-        const rb = doc.querySelector('#radReportBtn'); if (rb && rb.closest('.panel')) rb.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        HIS.toast('Selected order #' + b.dataset.radrep + ' — enter report, then File', 'bi-file-earmark-medical');
-      }));
-    } catch (e) { tb.innerHTML = emptyRow(6, 'Worklist API unavailable'); }
+    try { doc._radRows = await HIS.api.radWorklist() || []; renderRadRows(doc); }
+    catch (e) { doc._radRows = []; tb.innerHTML = emptyRow(6, 'Worklist API unavailable'); }
+  }
+  // Apply search + status + modality filters over the loaded worklist.
+  function renderRadRows(doc) {
+    const tb = doc.querySelector('#radWorklist'); if (!tb) return;
+    const all = doc._radRows || [];
+    const q = (val(doc, 'radqText') || '').toLowerCase();
+    const st = val(doc, 'radqStatus') || '', mod = val(doc, 'radqModality') || '';
+    const rows = all.filter(r => {
+      if (q && !`${r.radOrderId} ${r.patient} ${r.modality} ${r.study || ''}`.toLowerCase().includes(q)) return false;
+      if (st && r.status !== st) return false;
+      if (mod && r.modality !== mod) return false;
+      return true;
+    });
+    tb.innerHTML = rows.length ? rows.map(r => {
+      const cls = r.status === 'Reported' ? 'pill--ok' : 'pill--warn';
+      const act = r.status !== 'Reported' ? `<button class="btn btn--sm" data-radrep="${r.radOrderId}" data-patient="${r.patient}" data-study="${r.modality}${r.study ? ' ' + r.study : ''}"><i class="bi bi-file-earmark-medical"></i> Report</button>` : '';
+      return `<tr><td>#${r.radOrderId}</td><td>${r.patient}</td><td>${r.modality}</td><td>${r.study || ''}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${act}</td></tr>`;
+    }).join('') : emptyRow(6, 'No matching orders');
+    const cnt = doc.querySelector('#radCount'); if (cnt) cnt.textContent = `showing ${rows.length} of ${all.length}`;
+    tb.querySelectorAll('[data-radrep]').forEach(b => b.addEventListener('click', () => {
+      doc.dataset.radOrder = b.dataset.radrep;
+      const who = doc.querySelector('#radRepWho'); if (who) who.textContent = '#' + b.dataset.radrep + ' · ' + b.dataset.study + ' · ' + b.dataset.patient;
+      const rb = doc.querySelector('#radReportBtn'); if (rb && rb.closest('.panel')) rb.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      HIS.toast('Selected order #' + b.dataset.radrep + ' — enter report, then File', 'bi-file-earmark-medical');
+    }));
   }
   async function doOrderStudy(doc) {
     const uhid = pickedUhid(doc, 'radPatient');
