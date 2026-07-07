@@ -409,12 +409,14 @@ window.HIS = window.HIS || {};
 
   /* ============================ BILLING =============================== */
   function billing() {
-    const p = HIS.mock.currentPatient;
     return `<div class="screen">
       ${head('bi-receipt', 'Billing &amp; Revenue Cycle', 'OPD/IPD/Lab/Pharmacy consolidated invoice',
         `<button class="btn btn--ghost btn--sm" data-act="print"><i class="bi bi-printer"></i> Print Bill <span class="fk">F12</span></button>
-         <button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-cash-coin"></i> Collect &amp; Save <span class="fk">F9</span></button>`)}
-      ${banner(p)}
+         <button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-receipt"></i> Create Bill <span class="fk">F9</span></button>`)}
+      <div id="billBanner">${banner(null)}</div>
+      <div class="panel"><div class="panel__body" style="padding:8px 12px">
+        <div class="f" style="max-width:440px"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="billPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
+      </div></div>
       <div class="cols-side">
         <div class="panel"><div class="panel__head"><i class="bi bi-list-ul"></i> Charges
           <span class="ph-right"><button class="btn btn--sm" data-addrow="chargeGrid"><i class="bi bi-plus-lg"></i> Add Line</button></span></div>
@@ -445,6 +447,12 @@ window.HIS = window.HIS || {};
             <p class="hintline" style="padding:8px 0 0">Gateway provider is configured server-side (no keys in the UI).</p>
           </div></div>
         </div>
+      </div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-card-list"></i> Recent Bills <span class="ph-right hintline" id="billCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Bill No</th><th>Date</th><th>Patient</th><th class="num">Gross ₹</th><th class="num">Payable ₹</th><th class="num">Paid ₹</th><th class="num">Balance ₹</th><th>Status</th></tr></thead>
+          <tbody id="billList">${emptyRow(8, 'Loading…')}</tbody>
+        </table></div></div>
       </div>
     </div>`;
   }
@@ -1690,6 +1698,8 @@ window.HIS = window.HIS || {};
     Object.keys(map).forEach(tb => { const el = doc.querySelector('#' + tb); if (el) el.dataset.tpl = map[tb]; });
 
     if (id === 'billing') { wireBilling(doc); HIS.saveHandlers.billing = () => doCreateBill(doc);
+      loadBills(doc);
+      const pf = doc.querySelector('#billPatient'); if (pf) { pf.addEventListener('change', () => showBillPatient(doc)); pf.addEventListener('blur', () => showBillPatient(doc)); }
       const cb = doc.querySelector('#btnCreateBill'); if (cb) cb.addEventListener('click', () => doCreateBill(doc));
       const cp = doc.querySelector('#btnCollectPay'); if (cp) cp.addEventListener('click', () => doCollectPayment(doc)); }
     if (id === 'dashboard') loadDashboard(doc);
@@ -3822,8 +3832,8 @@ window.HIS = window.HIS || {};
 
   /* ---- Phase 6: create bill from charge lines (rates from tariff master) */
   async function doCreateBill(doc) {
-    const p = HIS.mock.currentPatient;
-    if (!p || !p.uhid) { HIS.toast('No patient loaded — F3 to select'); return; }
+    const uhid = pickedUhid(doc, 'billPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3) first'); return; }
     const lines = Array.from(doc.querySelectorAll('#chargeBody tr')).map(tr => {
       const svc = tr.querySelector('.svc') ? tr.querySelector('.svc').value.trim() : (tr.children[0] ? tr.children[0].textContent.trim() : '');
       const qty = parseFloat(tr.querySelector('.qty') ? tr.querySelector('.qty').value : '1') || 1;
@@ -3833,19 +3843,36 @@ window.HIS = window.HIS || {};
     }).filter(l => l.tariffCode || l.description);
     if (!lines.length) { HIS.toast('Add at least one charge line'); return; }
     const cmd = {
-      patientUhid: p.uhid,
+      patientUhid: uhid,
       discountAmount: parseFloat(val(doc, 'billDiscount')) || 0,
       insurancePays: parseFloat(val(doc, 'billInsurance')) || 0,
       lines
     };
     try {
       const r = await HIS.api.createBill(cmd);
-      doc.dataset.billId = r.billId;
+      doc.dataset.billId = r.billId; doc.dataset.billUhid = uhid;
       const ref = doc.querySelector('#payBillRef'); if (ref) ref.textContent = r.billNo;
       const pa = doc.querySelector('#payAmount'); if (pa) pa.value = r.patientPays.toFixed(2);
       HIS.toast('Bill ' + r.billNo + ' · payable ₹' + r.patientPays, 'bi-receipt');
       await renderBill(doc, r.billId);
+      loadBills(doc);
     } catch (e) { HIS.toast('Bill failed: ' + e.message); }
+  }
+  async function showBillPatient(doc) {
+    const uhid = pickedUhid(doc, 'billPatient'); const b = doc.querySelector('#billBanner');
+    if (!uhid) { if (b) b.innerHTML = banner(null); return; }
+    try { const p = await HIS.api.patientByUhid(uhid); if (p && b) b.innerHTML = banner(p); } catch (e) {}
+  }
+  async function loadBills(doc) {
+    const tb = doc.querySelector('#billList'); if (!tb) return;
+    try {
+      const rows = await HIS.api.billsList();
+      const pill = s => ({ Paid: 'pill--ok', Settled: 'pill--ok', Cancelled: 'pill--danger', Open: 'pill--warn' }[s] || 'pill--info');
+      tb.innerHTML = rows.length ? rows.map(b =>
+        `<tr><td><b>${b.billNo}</b></td><td>${b.createdUtc}</td><td>${b.patient || '—'}</td><td class="num">${b.gross.toFixed(2)}</td><td class="num">${b.patientPays.toFixed(2)}</td><td class="num">${b.paid.toFixed(2)}</td><td class="num">${b.balance.toFixed(2)}</td><td><span class="pill ${pill(b.status)}">${b.status}</span></td></tr>`
+      ).join('') : emptyRow(8, 'No bills yet');
+      const cnt = doc.querySelector('#billCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} bill(s)` : '';
+    } catch (e) { tb.innerHTML = emptyRow(8, 'Bills API unavailable'); }
   }
   async function renderBill(doc, billId) {
     try {
@@ -3859,15 +3886,15 @@ window.HIS = window.HIS || {};
     } catch (e) { /* keep entered grid on error */ }
   }
   async function doCollectPayment(doc) {
-    const p = HIS.mock.currentPatient;
     const billId = doc.dataset.billId ? parseInt(doc.dataset.billId, 10) : null;
     if (!billId) { HIS.toast('Create the bill first'); return; }
     const amount = parseFloat(val(doc, 'payAmount')) || 0;
     if (amount <= 0) { HIS.toast('Enter an amount'); return; }
     try {
-      const r = await HIS.api.collectPayment({ billId, patientUhid: p.uhid, mode: val(doc, 'payMode'), amount });
+      const r = await HIS.api.collectPayment({ billId, patientUhid: doc.dataset.billUhid || null, mode: val(doc, 'payMode'), amount });
       HIS.toast('Paid via ' + r.provider + ' · ' + r.reference + (r.billSettled ? ' · BILL SETTLED' : ''), 'bi-check2-circle');
       if (r.billSettled) { const ref = doc.querySelector('#payBillRef'); if (ref) ref.textContent += ' · Paid'; }
+      loadBills(doc);
     } catch (e) { HIS.toast('Payment failed: ' + e.message); }
   }
 

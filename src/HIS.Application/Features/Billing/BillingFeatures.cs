@@ -83,6 +83,18 @@ public sealed class CreateBillHandler : MediatR.IRequestHandler<CreateBillComman
 public sealed record BillLineViewDto(string Description, decimal Qty, decimal Rate, decimal Amount);
 public sealed record BillDto(long BillId, string BillNo, decimal Gross, decimal Discount, decimal InsurancePays, decimal PatientPays, string Status, IReadOnlyList<BillLineViewDto> Lines);
 
+public sealed record BillRowDto(long BillId, string BillNo, string Patient, decimal Gross, decimal PatientPays, decimal Paid, decimal Balance, string Status, string CreatedUtc);
+public sealed record GetBillsQuery : IQuery<IReadOnlyList<BillRowDto>>;
+public sealed class GetBillsHandler : MediatR.IRequestHandler<GetBillsQuery, IReadOnlyList<BillRowDto>>
+{
+    private readonly IBillingRepository _billing; private readonly IBranchContext _ctx;
+    public GetBillsHandler(IBillingRepository billing, IBranchContext ctx) { _billing = billing; _ctx = ctx; }
+    public async Task<IReadOnlyList<BillRowDto>> Handle(GetBillsQuery q, CancellationToken ct)
+        => (await _billing.GetBillsAsync(_ctx.BranchId ?? 0, ct)).Select(b => new BillRowDto(
+            b.BillId, b.BillNo, b.Patient, b.Gross, b.PatientPays, b.Paid,
+            b.PatientPays - b.Paid, b.Status, b.CreatedUtc.ToString("yyyy-MM-dd HH:mm"))).ToList();
+}
+
 public sealed record GetBillQuery(long BillId) : IQuery<BillDto?>;
 
 public sealed class GetBillHandler : MediatR.IRequestHandler<GetBillQuery, BillDto?>

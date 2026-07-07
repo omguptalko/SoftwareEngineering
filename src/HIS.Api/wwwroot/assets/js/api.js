@@ -130,6 +130,7 @@ HIS.api = (function () {
     // Phase 6 — Billing & Payments
     createBill:      (cmd) => post('/api/billing/bills', cmd),
     getBill:         (id) => get(`/api/billing/bills/${id}`),
+    billsList:       () => get('/api/billing/bills'),
     collectPayment:  (cmd) => post('/api/payments/collect', cmd),
     // Phase 7 — Insurance / Cashless / Schemes
     capturePolicy:   (cmd) => post('/api/claims/policies', cmd),

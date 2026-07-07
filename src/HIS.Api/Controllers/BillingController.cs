@@ -14,6 +14,9 @@ public sealed class BillingController : ControllerBase
     [HttpPost("bills")]
     public Task<CreateBillResult> CreateBill([FromBody] CreateBillCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 
+    [HttpGet("bills")]
+    public Task<IReadOnlyList<BillRowDto>> Bills(CancellationToken ct) => _mediator.Send(new GetBillsQuery(), ct);
+
     [HttpGet("bills/{billId:long}")]
     public async Task<ActionResult<BillDto>> GetBill(long billId, CancellationToken ct)
     {

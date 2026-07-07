@@ -70,6 +70,20 @@ public sealed class BillingRepository : IBillingRepository
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<(long, string, string, decimal, decimal, decimal, string, DateTime)>> GetBillsAsync(int branchId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenDataAsync(ct);
+        var rows = (await c.QueryAsync<(long BillId, string BillNo, long? PatientId, decimal Gross, decimal PatientPays, decimal Paid, string Status, DateTime CreatedUtc)>(new CommandDefinition(
+            @"SELECT b.BillId, b.BillNo, b.PatientId, b.GrossAmount, b.PatientPays,
+                     ISNULL((SELECT SUM(p.Amount) FROM billing.Payment p WHERE p.BillId = b.BillId AND p.Status = 'Captured'), 0) AS Paid,
+                     b.Status, b.CreatedUtc
+              FROM billing.Bill b WHERE b.BranchId = @branchId ORDER BY b.BillId DESC", new { branchId }, cancellationToken: ct))).ToList();
+        var pats = await MasterLookup.PatientNamesAsync(_f, rows.Where(r => r.PatientId.HasValue).Select(r => r.PatientId!.Value), ct);
+        return rows.Select(r => (r.BillId, r.BillNo,
+            r.PatientId.HasValue ? pats.GetValueOrDefault(r.PatientId.Value, "") : "",
+            r.Gross, r.PatientPays, r.Paid, r.Status, r.CreatedUtc)).ToList();
+    }
+
     public async Task<long> InsertPaymentAsync(Payment p, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);
