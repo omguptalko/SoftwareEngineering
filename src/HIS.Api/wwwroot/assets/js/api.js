@@ -198,5 +198,6 @@ HIS.api = (function () {
     grievances:      () => get('/api/feedback/grievances'),
     submitSurvey:    (cmd) => post('/api/feedback/survey', cmd),
     logGrievance:    (cmd) => post('/api/feedback/grievances', cmd),
+    resolveGrievance:(id, tatMinutes) => post(`/api/feedback/grievances/${id}/resolve`, { tatMinutes }),
   };
 })();

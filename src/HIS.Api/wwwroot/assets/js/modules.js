@@ -1209,10 +1209,10 @@ window.HIS = window.HIS || {};
           </div>
           <button class="btn mt8" id="btnLogGrievance" style="width:100%"><i class="bi bi-exclamation-circle"></i> Log Grievance (SLA from config)</button>
         </div></div>
-        <div class="panel"><div class="panel__head"><i class="bi bi-list-task"></i> Grievances</div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-list-task"></i> Grievances <span class="ph-right hintline" id="grCount"></span></div>
           <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
-            <thead><tr><th>Category</th><th>Status</th><th>Created</th></tr></thead>
-            <tbody id="grList">${emptyRow(3, 'Loading…')}</tbody>
+            <thead><tr><th>Category</th><th>Status</th><th>Created</th><th></th></tr></thead>
+            <tbody id="grList">${emptyRow(4, 'Loading…')}</tbody>
           </table></div></div></div>
       </div>
     </div>`;
@@ -2095,18 +2095,32 @@ window.HIS = window.HIS || {};
   async function loadGrievances(doc) {
     const tb = doc.querySelector('#grList'); if (!tb) return;
     try { const rows = await HIS.api.grievances();
-      tb.innerHTML = rows.length ? rows.map(g => `<tr><td>${g.category || '—'}</td><td><span class="pill ${g.status === 'Resolved' ? 'pill--ok' : 'pill--warn'}">${g.status}</span></td><td>${g.created}</td></tr>`).join('') : emptyRow(3, 'No grievances');
-    } catch (e) { tb.innerHTML = emptyRow(3, 'API unavailable'); }
+      const cnt = doc.querySelector('#grCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} · ${rows.filter(g => g.status !== 'Resolved').length} open` : '';
+      tb.innerHTML = rows.length ? rows.map(g => {
+        const done = g.status === 'Resolved';
+        return `<tr><td>${g.category || '—'}</td><td><span class="pill ${done ? 'pill--ok' : 'pill--warn'}">${g.status}</span></td><td>${g.created}</td><td>${done ? '✓' : `<button class="btn btn--sm" data-resolve="${g.grievanceId}"><i class="bi bi-check2"></i> Resolve</button>`}</td></tr>`;
+      }).join('') : emptyRow(4, 'No grievances');
+      tb.querySelectorAll('[data-resolve]').forEach(b => b.addEventListener('click', () => doResolveGrievance(doc, b.dataset.resolve)));
+    } catch (e) { tb.innerHTML = emptyRow(4, 'API unavailable'); }
   }
   async function doSubmitSurvey(doc) {
-    try { await HIS.api.submitSurvey({ patientUhid: val(doc, 'fbPatient') || null, score: parseInt(val(doc, 'fbScore'), 10), comments: val(doc, 'fbComments') || null }); HIS.toast('Survey submitted', 'bi-star-fill'); }
-    catch (e) { HIS.toast('Submit failed: ' + e.message); }
+    try {
+      await HIS.api.submitSurvey({ patientUhid: pickedUhid(doc, 'fbPatient') || null, score: parseInt(val(doc, 'fbScore'), 10), comments: val(doc, 'fbComments') || null });
+      HIS.toast('Survey submitted · thank you', 'bi-star-fill');
+      const p = doc.querySelector('#fbPatient'); if (p) p.value = '';
+      const c = doc.querySelector('#fbComments'); if (c) c.value = '';
+      const s = doc.querySelector('#fbScore'); if (s) s.selectedIndex = 0;
+    } catch (e) { HIS.toast('Submit failed: ' + e.message); }
   }
   async function doLogGrievance(doc) {
     const cat = val(doc, 'grCategory');
     if (!cat) { HIS.toast('Enter a category'); return; }
-    try { await HIS.api.logGrievance({ patientUhid: val(doc, 'fbPatient') || null, category: cat }); HIS.toast('Grievance logged (SLA set)', 'bi-exclamation-circle'); doc.querySelector('#grCategory').value = ''; loadGrievances(doc); }
+    try { await HIS.api.logGrievance({ patientUhid: pickedUhid(doc, 'fbPatient') || null, category: cat }); HIS.toast('Grievance logged (SLA set)', 'bi-exclamation-circle'); doc.querySelector('#grCategory').value = ''; loadGrievances(doc); }
     catch (e) { HIS.toast('Log failed: ' + e.message); }
+  }
+  async function doResolveGrievance(doc, id) {
+    try { await HIS.api.resolveGrievance(id, 60); HIS.toast('Grievance resolved · #' + id, 'bi-check2-circle'); loadGrievances(doc); }
+    catch (e) { HIS.toast('Resolve failed: ' + e.message); }
   }
 
   /* ---- Phase 9: occupational health ---------------------------------- */
