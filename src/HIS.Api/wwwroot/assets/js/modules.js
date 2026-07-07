@@ -1218,6 +1218,33 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== ASSET & EQUIPMENT (SRS §3.19) ========== */
+  function assets() {
+    return `<div class="screen">
+      ${head('bi-cpu', 'Asset &amp; Equipment', 'Biomedical equipment register · AMC · preventive maintenance',
+        `<button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-plus-lg"></i> Register Asset <span class="fk">F9</span></button>`)}
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-plus-square"></i> Register Asset</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f"><label>Asset Tag <span class="req">*</span></label><div class="field"><input class="ctl code" id="asTag" placeholder="e.g. BME-0042"></div></div>
+            <div class="f"><label>Name <span class="req">*</span></label><div class="field"><input class="ctl" id="asName" placeholder="e.g. Ventilator"></div></div>
+            <div class="f"><label>Category</label><div class="field"><select class="ctl" id="asCategory"><option value="">—</option><option>Ventilator</option><option>Monitor</option><option>Infusion Pump</option><option>Imaging</option><option>Lab Analyzer</option><option>OT Equipment</option><option>Sterilizer</option><option>Other</option></select></div></div>
+            <div class="f"><label>AMC Expiry</label><div class="field"><input class="ctl" id="asAmc" type="date"></div></div>
+            <div class="f"><label>Next Maintenance</label><div class="field"><input class="ctl" id="asMaint" type="date"></div></div>
+          </div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-plus-lg"></i> Register Asset <span class="fk">F9</span></button><span class="hintline">Tag + name zaroori. AMC / maintenance dates se due-alerts aate hain.</span></div>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-hdd-stack"></i> Asset Register
+          <span class="ph-right"><input class="ctl" id="asqText" placeholder="Search tag / name / category…" style="max-width:200px"></span></div>
+          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>Tag</th><th>Name</th><th>Category</th><th>AMC Expiry</th><th>Next Maint.</th><th>Status</th></tr></thead>
+            <tbody id="asList">${emptyRow(6, 'Loading…')}</tbody>
+          </table></div><span class="hintline" id="asCount" style="padding:8px 12px;display:block"></span></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
   /* ============================ PLACEHOLDER ========================= */
   HIS.placeholder = function (m) {
     const bullets = (HIS.srs[m.id] || ['Module screen scoped in SRS v2.0.', 'Detailed form &amp; workflow planned for the next build pass.'])
@@ -1543,7 +1570,7 @@ window.HIS = window.HIS || {};
   }
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, consent, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, consent, bmwm, mlc, queue, feedback, compliance, assets, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1784,6 +1811,7 @@ window.HIS = window.HIS || {};
     if (id === 'queue') { initQueue(doc); }
     if (id === 'feedback') { initFeedback(doc); HIS.saveHandlers.feedback = () => doSubmitSurvey(doc); }
     if (id === 'compliance') initCompliance(doc);
+    if (id === 'assets') { initAssets(doc); HIS.saveHandlers.assets = () => doRegisterAsset(doc); }
     if (id === 'ai') initAi(doc);
   };
 
@@ -2148,6 +2176,43 @@ window.HIS = window.HIS || {};
   async function doResolveGrievance(doc, id) {
     try { await HIS.api.resolveGrievance(id, 60); HIS.toast('Grievance resolved · #' + id, 'bi-check2-circle'); loadGrievances(doc); }
     catch (e) { HIS.toast('Resolve failed: ' + e.message); }
+  }
+
+  /* ---- Asset & Equipment --------------------------------------------- */
+  function initAssets(doc) {
+    loadAssets(doc);
+    const s = doc.querySelector('#asqText'); if (s) s.addEventListener('input', () => renderAssets(doc));
+  }
+  async function loadAssets(doc) {
+    const tb = doc.querySelector('#asList'); if (!tb) return;
+    try { doc._asRows = await HIS.api.assets() || []; renderAssets(doc); }
+    catch (e) { doc._asRows = []; tb.innerHTML = emptyRow(6, 'Assets API unavailable'); }
+  }
+  function renderAssets(doc) {
+    const tb = doc.querySelector('#asList'); if (!tb) return;
+    const all = doc._asRows || [];
+    const q = (val(doc, 'asqText') || '').toLowerCase();
+    const rows = all.filter(a => !q || `${a.assetTag} ${a.name} ${a.category || ''}`.toLowerCase().includes(q));
+    tb.innerHTML = rows.length ? rows.map(a => {
+      const amc = a.amcDue ? `<span class="pill pill--danger">${a.amcExpiry || 'expired'}</span>` : (a.amcExpiry || '—');
+      const mnt = a.maintenanceDue ? `<span class="pill pill--warn">${a.nextMaintenance || 'due'}</span>` : (a.nextMaintenance || '—');
+      return `<tr><td class="code">${a.assetTag}</td><td>${a.name}</td><td>${a.category || '—'}</td><td>${amc}</td><td>${mnt}</td><td><span class="pill ${a.status === 'Active' ? 'pill--ok' : 'pill--muted'}">${a.status}</span></td></tr>`;
+    }).join('') : emptyRow(6, 'No assets');
+    const cnt = doc.querySelector('#asCount');
+    if (cnt) { const due = all.filter(a => a.amcDue || a.maintenanceDue).length; cnt.textContent = `Showing ${rows.length} of ${all.length}${due ? ' · ' + due + ' need attention (AMC / maintenance)' : ''}`; }
+  }
+  async function doRegisterAsset(doc) {
+    const tag = val(doc, 'asTag'), name = val(doc, 'asName');
+    if (!tag) { HIS.toast('Enter an asset tag'); return; }
+    if (!name) { HIS.toast('Enter the asset name'); return; }
+    try {
+      await HIS.api.registerAsset({ assetTag: tag, name, category: val(doc, 'asCategory') || null,
+        amcExpiry: val(doc, 'asAmc') || null, nextMaintenance: val(doc, 'asMaint') || null });
+      HIS.toast('Asset registered · ' + tag, 'bi-cpu');
+      ['asTag', 'asName', 'asAmc', 'asMaint'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      const c = doc.querySelector('#asCategory'); if (c) c.selectedIndex = 0;
+      loadAssets(doc);
+    } catch (e) { HIS.toast('Register failed: ' + e.message); }
   }
 
   /* ---- Phase 9: occupational health ---------------------------------- */
