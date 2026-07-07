@@ -450,8 +450,8 @@ window.HIS = window.HIS || {};
       </div>
       <div class="panel"><div class="panel__head"><i class="bi bi-card-list"></i> Recent Bills <span class="ph-right hintline" id="billCount"></span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
-          <thead><tr><th>Bill No</th><th>Date</th><th>Patient</th><th class="num">Gross ₹</th><th class="num">Payable ₹</th><th class="num">Paid ₹</th><th class="num">Balance ₹</th><th>Status</th></tr></thead>
-          <tbody id="billList">${emptyRow(8, 'Loading…')}</tbody>
+          <thead><tr><th>Bill No</th><th>Date</th><th>Patient</th><th class="num">Gross ₹</th><th class="num">Payable ₹</th><th class="num">Paid ₹</th><th class="num">Balance ₹</th><th>Status</th><th></th></tr></thead>
+          <tbody id="billList">${emptyRow(9, 'Loading…')}</tbody>
         </table></div></div>
       </div>
     </div>`;
@@ -3854,6 +3854,9 @@ window.HIS = window.HIS || {};
       insurancePays: parseFloat(val(doc, 'billInsurance')) || 0,
       lines
     };
+    // Open the print tab now (inside the click gesture) so pop-up blockers allow it.
+    const win = window.open('', '_blank');
+    if (win) win.document.write('<p style="font-family:system-ui;padding:24px;color:#555">Generating bill…</p>');
     try {
       const r = await HIS.api.createBill(cmd);
       doc.dataset.billId = r.billId; doc.dataset.billUhid = uhid;
@@ -3862,7 +3865,51 @@ window.HIS = window.HIS || {};
       HIS.toast('Bill ' + r.billNo + ' · payable ₹' + r.patientPays, 'bi-receipt');
       await renderBill(doc, r.billId);
       loadBills(doc);
-    } catch (e) { HIS.toast('Bill failed: ' + e.message); }
+      // Render the printable invoice into the new tab.
+      try {
+        const [bill, patient] = await Promise.all([HIS.api.getBill(r.billId), HIS.api.patientByUhid(uhid).catch(() => null)]);
+        writeBillInvoice(win, bill, patient);
+      } catch (e2) { if (win) win.close(); }
+    } catch (e) { if (win) win.close(); HIS.toast('Bill failed: ' + e.message); }
+  }
+  // Build a printable invoice document in the opened tab.
+  function writeBillInvoice(win, bill, patient) {
+    if (!win || !bill) return;
+    const esc = s => (s == null ? '' : String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])));
+    const inr = n => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tenant = (window.HIS && HIS.tenant && HIS.tenant.name) || 'Finnid HIS';
+    const rows = (bill.lines || []).map((l, i) =>
+      `<tr><td>${i + 1}</td><td>${esc(l.description)}</td><td class="c">${l.qty}</td><td class="r">${inr(l.rate)}</td><td class="r">${inr(l.amount)}</td></tr>`).join('');
+    const pm = patient ? `${esc(patient.name)} · ${patient.age ?? ''}/${(patient.sex || '').charAt(0)} · UHID ${esc(patient.uhid)}${patient.mobile ? ' · ' + esc(patient.mobile) : ''}` : '';
+    win.document.open();
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(bill.billNo)}</title>
+      <style>
+        *{box-sizing:border-box} body{font-family:system-ui,Segoe UI,Arial,sans-serif;color:#1a1a1a;margin:0;padding:28px;font-size:13px}
+        .hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #222;padding-bottom:12px}
+        .hd h1{margin:0;font-size:22px} .muted{color:#666;font-size:12px}
+        .doc{font-size:20px;font-weight:700;text-align:right} .meta{margin:14px 0;line-height:1.6}
+        table{width:100%;border-collapse:collapse;margin-top:10px} th,td{padding:8px 10px;border-bottom:1px solid #e0e0e0;text-align:left}
+        th{background:#f4f4f4;font-size:11px;text-transform:uppercase;letter-spacing:.4px} td.c,th.c{text-align:center} td.r,th.r{text-align:right}
+        .tot{width:320px;margin-left:auto;margin-top:14px} .tot td{border:0;padding:4px 10px} .tot .r{text-align:right}
+        .net{font-size:16px;font-weight:700;border-top:2px solid #222} .status{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:12px;background:#eef;font-size:12px}
+        .actions{margin-top:22px} button{padding:8px 16px;font-size:13px;cursor:pointer;border:1px solid #ccc;border-radius:6px;background:#fff}
+        button.p{background:#0d6efd;color:#fff;border-color:#0d6efd}
+        @media print{.actions{display:none} body{padding:0}}
+      </style></head><body>
+      <div class="hd"><div><h1>${esc(tenant)}</h1><div class="muted">Consolidated Bill / Tax Invoice</div></div>
+        <div><div class="doc">${esc(bill.billNo)}</div><div class="muted">Status: ${esc(bill.status)}</div></div></div>
+      <div class="meta"><b>Patient:</b> ${pm || '—'}</div>
+      <table><thead><tr><th>#</th><th>Service / Item</th><th class="c">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" class="c">No line items</td></tr>'}</tbody></table>
+      <table class="tot">
+        <tr><td>Gross</td><td class="r">${inr(bill.gross)}</td></tr>
+        <tr><td>Discount</td><td class="r">- ${inr(bill.discount)}</td></tr>
+        <tr><td>Insurance Pays</td><td class="r">- ${inr(bill.insurancePays)}</td></tr>
+        <tr class="net"><td>Net Payable (Patient)</td><td class="r">${inr(bill.patientPays)}</td></tr>
+      </table>
+      <div class="actions"><button class="p" onclick="window.print()">🖨 Print</button> <button onclick="window.close()">Close</button></div>
+      </body></html>`);
+    win.document.close();
   }
   async function showBillPatient(doc) {
     const uhid = pickedUhid(doc, 'billPatient'); const b = doc.querySelector('#billBanner');
@@ -3875,10 +3922,16 @@ window.HIS = window.HIS || {};
       const rows = await HIS.api.billsList();
       const pill = s => ({ Paid: 'pill--ok', Settled: 'pill--ok', Cancelled: 'pill--danger', Open: 'pill--warn' }[s] || 'pill--info');
       tb.innerHTML = rows.length ? rows.map(b =>
-        `<tr><td><b>${b.billNo}</b></td><td>${b.createdUtc}</td><td>${b.patient || '—'}</td><td class="num">${b.gross.toFixed(2)}</td><td class="num">${b.patientPays.toFixed(2)}</td><td class="num">${b.paid.toFixed(2)}</td><td class="num">${b.balance.toFixed(2)}</td><td><span class="pill ${pill(b.status)}">${b.status}</span></td></tr>`
-      ).join('') : emptyRow(8, 'No bills yet');
+        `<tr><td><b>${b.billNo}</b></td><td>${b.createdUtc}</td><td>${b.patient || '—'}</td><td class="num">${b.gross.toFixed(2)}</td><td class="num">${b.patientPays.toFixed(2)}</td><td class="num">${b.paid.toFixed(2)}</td><td class="num">${b.balance.toFixed(2)}</td><td><span class="pill ${pill(b.status)}">${b.status}</span></td><td><button class="btn btn--sm" data-print-bill="${b.billId}" data-pat="${(b.patient || '').replace(/"/g, '')}"><i class="bi bi-printer"></i></button></td></tr>`
+      ).join('') : emptyRow(9, 'No bills yet');
       const cnt = doc.querySelector('#billCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} bill(s)` : '';
-    } catch (e) { tb.innerHTML = emptyRow(8, 'Bills API unavailable'); }
+      tb.querySelectorAll('[data-print-bill]').forEach(btn => btn.addEventListener('click', async () => {
+        const win = window.open('', '_blank');
+        if (win) win.document.write('<p style="font-family:system-ui;padding:24px;color:#555">Loading bill…</p>');
+        try { const bill = await HIS.api.getBill(btn.dataset.printBill); writeBillInvoice(win, bill, { name: btn.dataset.pat }); }
+        catch (e) { if (win) win.close(); HIS.toast('Print failed: ' + e.message); }
+      }));
+    } catch (e) { tb.innerHTML = emptyRow(9, 'Bills API unavailable'); }
   }
   async function renderBill(doc, billId) {
     try {
