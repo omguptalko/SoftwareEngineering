@@ -1062,6 +1062,31 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== MORTUARY & DEATH (SRS §3.27) =========== */
+  function mortuary() {
+    return `<div class="screen">
+      ${head('bi-file-earmark-x', 'Mortuary &amp; Death', 'Body intake · storage · MLC / police intimation · release',
+        `<button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-box-arrow-in-down"></i> Admit Body <span class="fk">F9</span></button>`)}
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-plus"></i> Body Intake</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f wide"><label>Deceased (Patient)</label><div class="field with-btn"><input class="ctl" id="moPatient" data-lookup="patient" placeholder="F3 patient / UHID… (blank = unidentified)"><button class="lk" data-lookup="patient">F3</button></div></div>
+            <div class="f"><label>Storage / Freezer No <span class="req">*</span></label><div class="field"><input class="ctl code" id="moStorage" placeholder="e.g. MF-04"></div></div>
+            <div class="f"><label>MLC Linked</label><div class="field"><select class="ctl" id="moMlc"><option value="false">No</option><option value="true">Yes — medico-legal</option></select></div></div>
+            <div class="f"><label>Police Intimated</label><div class="field"><select class="ctl" id="moPolice"><option value="false">No</option><option value="true">Yes</option></select></div></div>
+          </div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-box-arrow-in-down"></i> Admit Body <span class="fk">F9</span></button><span class="hintline">Storage no. zaroori. MLC ho to police intimation mark karo.</span></div>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-snow"></i> Mortuary Register <span class="ph-right hintline" id="moCount"></span></div>
+          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>#</th><th>Deceased</th><th>Storage</th><th>Admitted</th><th>MLC</th><th>Status</th><th></th></tr></thead>
+            <tbody id="moRegister">${emptyRow(7, 'Loading…')}</tbody>
+          </table></div></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
   /* ====================== BIO-MEDICAL WASTE (SRS §3.25) ============ */
   function bmwm() {
     return `<div class="screen">
@@ -1470,7 +1495,7 @@ window.HIS = window.HIS || {};
   }
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1674,6 +1699,7 @@ window.HIS = window.HIS || {};
     if (id === 'telemedicine') { initTele(doc); HIS.saveHandlers.telemedicine = () => doScheduleTele(doc); }
     if (id === 'ambulance') { initAmbulance(doc); }
     if (id === 'diet') { initDiet(doc); HIS.saveHandlers.diet = () => doOrderDiet(doc); }
+    if (id === 'mortuary') { initMortuary(doc); HIS.saveHandlers.mortuary = () => doAdmitBody(doc); }
     if (id === 'bmwm') { initBmwm(doc); HIS.saveHandlers.bmwm = () => doGenerateBag(doc); }
     if (id === 'mlc') { initMlc(doc); HIS.saveHandlers.mlc = () => doCreateMlc(doc); }
     if (id === 'queue') { initQueue(doc); }
@@ -1809,6 +1835,46 @@ window.HIS = window.HIS || {};
       const c = doc.querySelector('#dtCost'); if (c) c.value = '';
       loadDietOrders(doc);
     } catch (e) { HIS.toast('Order failed: ' + e.message); }
+  }
+
+  /* ---- Mortuary & Death ---------------------------------------------- */
+  function initMortuary(doc) { loadMortuary(doc); }
+  async function loadMortuary(doc) {
+    const tb = doc.querySelector('#moRegister'); if (!tb) return;
+    try {
+      const rows = await HIS.api.mortuaryList();
+      tb.innerHTML = rows.length ? rows.map(m => {
+        const released = !!m.released;
+        return `<tr><td>${m.recordId}</td><td>${m.patient || '<span class="muted">Unidentified</span>'}</td><td class="code">${m.storageNo || '—'}</td><td>${m.admitted}</td>
+          <td>${m.mlc ? '<span class="pill pill--danger">MLC</span>' : 'No'}</td>
+          <td>${released ? `<span class="pill pill--ok">Released</span>` : '<span class="pill pill--warn">In storage</span>'}</td>
+          <td>${released ? '✓' : `<button class="btn btn--sm" data-release="${m.recordId}"><i class="bi bi-box-arrow-up"></i> Release</button>`}</td></tr>`;
+      }).join('') : emptyRow(7, 'No records yet');
+      const cnt = doc.querySelector('#moCount'); if (cnt) { const inStore = rows.filter(m => !m.released).length; cnt.textContent = `${rows.length} record(s) · ${inStore} in storage`; }
+      tb.querySelectorAll('[data-release]').forEach(b => b.addEventListener('click', () => doReleaseBody(doc, b.dataset.release)));
+    } catch (e) { tb.innerHTML = emptyRow(7, 'Mortuary API unavailable'); }
+  }
+  async function doAdmitBody(doc) {
+    const storage = val(doc, 'moStorage');
+    if (!storage) { HIS.toast('Enter a storage / freezer number'); return; }
+    try {
+      await HIS.api.admitBody({
+        patientUhid: pickedUhid(doc, 'moPatient') || null, storageNo: storage,
+        mlcLinked: val(doc, 'moMlc') === 'true', policeIntimated: val(doc, 'moPolice') === 'true'
+      });
+      HIS.toast('Body admitted · ' + storage, 'bi-box-arrow-in-down');
+      ['moPatient', 'moStorage'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      const mlc = doc.querySelector('#moMlc'); if (mlc) mlc.selectedIndex = 0;
+      const pol = doc.querySelector('#moPolice'); if (pol) pol.selectedIndex = 0;
+      loadMortuary(doc);
+    } catch (e) { HIS.toast('Admit failed: ' + e.message); }
+  }
+  async function doReleaseBody(doc, recordId) {
+    try {
+      await HIS.api.releaseBody(recordId);
+      HIS.toast('Body released', 'bi-box-arrow-up');
+      loadMortuary(doc);
+    } catch (e) { HIS.toast('Release failed: ' + e.message); }
   }
 
   function initBmwm(doc) { loadBmwm(doc); }
