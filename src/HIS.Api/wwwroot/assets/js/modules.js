@@ -2904,7 +2904,7 @@ window.HIS = window.HIS || {};
     } catch (e) { tb.innerHTML = emptyRow(6, 'Worklist API unavailable'); }
   }
   async function doOrderStudy(doc) {
-    const uhid = val(doc, 'radPatient');
+    const uhid = pickedUhid(doc, 'radPatient');
     if (!uhid) { HIS.toast('Select a patient (F3) to order'); return; }
     const cmd = { patientUhid: uhid, modality: val(doc, 'radModality'), studyName: val(doc, 'radStudy') || null,
       isPcPndtRegulated: !!(doc.querySelector('#radPcpndt') && doc.querySelector('#radPcpndt').checked) };
