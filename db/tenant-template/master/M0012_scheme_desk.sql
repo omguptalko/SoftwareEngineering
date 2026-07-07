@@ -26,5 +26,5 @@ GO
 /* ---- activate scheme + MIS + occ-health + telemedicine + ambulance */
 IF OBJECT_ID('master.Module') IS NOT NULL
     UPDATE master.Module SET Built = 1
-    WHERE ModuleId IN ('esic', 'cghs', 'echs', 'statescheme', 'claimsmis', 'occhealth', 'telemedicine', 'ambulance');
+    WHERE ModuleId IN ('esic', 'cghs', 'echs', 'statescheme', 'claimsmis', 'occhealth', 'telemedicine', 'ambulance', 'diet');
 GO

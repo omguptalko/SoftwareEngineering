@@ -1036,6 +1036,32 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== DIET & KITCHEN (SRS §3.26) =============== */
+  function diet() {
+    return `<div class="screen">
+      ${head('bi-egg-fried', 'Diet &amp; Kitchen', 'Therapeutic diet orders for admitted patients · kitchen worklist',
+        `<button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-clipboard2-check"></i> Order Diet <span class="fk">F9</span></button>`)}
+      <div class="cols-side">
+        <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-pulse"></i> Order Diet</div><div class="panel__body">
+          <div class="form-grid">
+            <div class="f wide"><label>Admitted Patient <span class="req">*</span></label><div class="field"><select class="ctl" id="dtAdmission"><option value="">Loading admitted patients…</option></select></div></div>
+            <div class="f"><label>Diet Type <span class="req">*</span></label><div class="field"><select class="ctl" id="dtType">
+              <option>Normal</option><option>Diabetic</option><option>Renal</option><option>Cardiac / Low-salt</option><option>Soft</option><option>Liquid</option><option>High-protein</option><option>Low-fat</option><option>NPO (Nil by mouth)</option>
+            </select></div></div>
+            <div class="f"><label>Cost / day</label><div class="field with-unit"><input class="ctl num" id="dtCost" placeholder="0"><span class="unit">₹</span></div></div>
+          </div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-clipboard2-check"></i> Order Diet <span class="fk">F9</span></button><span class="hintline">Admitted patient chuno → diet type + cost → Order. Kitchen worklist me aa jayega.</span></div>
+        </div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-egg-fried"></i> Kitchen Worklist <span class="ph-right hintline" id="dtCount"></span></div>
+          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>#</th><th>Patient</th><th>Diet Type</th><th class="num">Cost ₹</th></tr></thead>
+            <tbody id="dtOrders">${emptyRow(4, 'Loading…')}</tbody>
+          </table></div></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
   /* ====================== BIO-MEDICAL WASTE (SRS §3.25) ============ */
   function bmwm() {
     return `<div class="screen">
@@ -1444,7 +1470,7 @@ window.HIS = window.HIS || {};
   }
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, bmwm, mlc, queue, feedback, compliance, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, bmwm, mlc, queue, feedback, compliance, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1647,6 +1673,7 @@ window.HIS = window.HIS || {};
     if (id === 'occhealth') { initOccHealth(doc); HIS.saveHandlers.occhealth = () => doConductExam(doc); }
     if (id === 'telemedicine') { initTele(doc); HIS.saveHandlers.telemedicine = () => doScheduleTele(doc); }
     if (id === 'ambulance') { initAmbulance(doc); }
+    if (id === 'diet') { initDiet(doc); HIS.saveHandlers.diet = () => doOrderDiet(doc); }
     if (id === 'bmwm') { initBmwm(doc); HIS.saveHandlers.bmwm = () => doGenerateBag(doc); }
     if (id === 'mlc') { initMlc(doc); HIS.saveHandlers.mlc = () => doCreateMlc(doc); }
     if (id === 'queue') { initQueue(doc); }
@@ -1748,6 +1775,39 @@ window.HIS = window.HIS || {};
   }
 
   /* ---- Phase 10: BMWM ------------------------------------------------ */
+  /* ---- Diet & Kitchen ------------------------------------------------ */
+  async function initDiet(doc) {
+    loadDietOrders(doc);
+    try {
+      const rows = await HIS.api.admittedPatients();
+      const sel = doc.querySelector('#dtAdmission');
+      if (sel) sel.innerHTML = rows.length
+        ? '<option value="">— select admitted patient —</option>' + rows.map(a =>
+            `<option value="${a.admissionId}">${a.patient} · ${a.ward || ''} ${a.bedNo || ''}</option>`).join('')
+        : '<option value="">No admitted patients</option>';
+    } catch (e) { /* ignore */ }
+  }
+  async function loadDietOrders(doc) {
+    const tb = doc.querySelector('#dtOrders'); if (!tb) return;
+    try {
+      const rows = await HIS.api.dietList();
+      tb.innerHTML = rows.length ? rows.map(d =>
+        `<tr><td>${d.dietOrderId}</td><td>${d.patient}</td><td><span class="pill pill--info">${d.dietType}</span></td><td class="num">${d.cost ?? '—'}</td></tr>`
+      ).join('') : emptyRow(4, 'No diet orders yet');
+      const cnt = doc.querySelector('#dtCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} order(s)` : '';
+    } catch (e) { tb.innerHTML = emptyRow(4, 'Diet API unavailable'); }
+  }
+  async function doOrderDiet(doc) {
+    const adm = val(doc, 'dtAdmission');
+    if (!adm) { HIS.toast('Select an admitted patient'); return; }
+    try {
+      await HIS.api.orderDiet({ admissionId: parseInt(adm, 10), dietType: val(doc, 'dtType'), cost: numOrNull(val(doc, 'dtCost')) });
+      HIS.toast('Diet ordered', 'bi-egg-fried');
+      const c = doc.querySelector('#dtCost'); if (c) c.value = '';
+      loadDietOrders(doc);
+    } catch (e) { HIS.toast('Order failed: ' + e.message); }
+  }
+
   function initBmwm(doc) { loadBmwm(doc); }
   async function loadBmwm(doc) {
     try {

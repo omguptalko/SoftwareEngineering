@@ -168,6 +168,8 @@ HIS.api = (function () {
     // Phase 10 — Support & statutory
     ambulances:      () => get('/api/ambulance'),
     addAmbulance:    (cmd) => post('/api/ambulance', cmd),
+    dietList:        () => get('/api/diet'),
+    orderDiet:       (cmd) => post('/api/diet', cmd),
     ambDispatches:   () => get('/api/ambulance/dispatches'),
     ambDispatch:     (cmd) => post('/api/ambulance/dispatch', cmd),
     ambArrive:       (id) => post(`/api/ambulance/dispatches/${id}/arrive`, {}),
