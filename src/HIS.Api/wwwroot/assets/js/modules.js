@@ -1126,8 +1126,16 @@ window.HIS = window.HIS || {};
           <div class="f wide"><label>Injury Details</label><div class="field"><input class="ctl" id="mlcInjury" placeholder="Nature of injury / incident"></div></div>
         </div>
       </div></div>
-      <div class="panel"><div class="panel__head"><i class="bi bi-journal-text"></i> MLC Register</div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+      <div class="panel"><div class="panel__head"><i class="bi bi-journal-text"></i> MLC Register <span class="ph-right hintline" id="mlcCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:240px"><input class="ctl" id="mlcqText" placeholder="Search MLC no. / patient / police station…"></div>
+            <select class="ctl" id="mlcqAck" style="max-width:160px"><option value="">All</option><option value="pending">Police Ack pending</option><option value="ack">Acknowledged</option></select>
+            <div class="field with-unit"><input class="ctl" id="mlcqFrom" type="date"><span class="unit">from</span></div>
+            <div class="field with-unit"><input class="ctl" id="mlcqTo" type="date"><span class="unit">to</span></div>
+            <button class="btn btn--sm" id="mlcqClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>MLC No.</th><th>Patient</th><th>Police Station</th><th>Police Ack</th><th>Created</th><th></th></tr></thead>
           <tbody id="mlcList">${emptyRow(6, 'Loading…')}</tbody>
         </table></div></div></div>
@@ -1895,13 +1903,41 @@ window.HIS = window.HIS || {};
   }
 
   /* ---- Phase 10: MLC ------------------------------------------------- */
-  function initMlc(doc) { loadMlc(doc); }
+  function initMlc(doc) {
+    loadMlc(doc);
+    ['mlcqText', 'mlcqAck', 'mlcqFrom', 'mlcqTo'].forEach(id => {
+      const el = doc.querySelector('#' + id); if (el) el.addEventListener('input', () => renderMlcRows(doc));
+    });
+    const clr = doc.querySelector('#mlcqClear');
+    if (clr) clr.addEventListener('click', () => {
+      ['mlcqText', 'mlcqAck', 'mlcqFrom', 'mlcqTo'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      renderMlcRows(doc);
+    });
+  }
   async function loadMlc(doc) {
     const tb = doc.querySelector('#mlcList'); if (!tb) return;
-    try { const rows = await HIS.api.mlcList();
-      tb.innerHTML = rows.length ? rows.map(m => `<tr><td><b>${m.mlcNo}</b></td><td>${m.patient || '—'}</td><td>${m.policeStation || '—'}</td><td>${m.policeAck || '<span class="pill pill--warn">pending</span>'}</td><td>${m.created}</td><td>${m.policeAck ? '✓' : `<button class="btn btn--sm" data-intimate="${m.mlcId}">Police Ack</button>`}</td></tr>`).join('') : emptyRow(6, 'No MLC cases');
-      tb.querySelectorAll('[data-intimate]').forEach(b => b.addEventListener('click', async () => { const ack = prompt('Police acknowledgement ref (e.g. FIR no.):'); if (!ack) return; try { await HIS.api.mlcIntimate(b.dataset.intimate, ack); HIS.toast('Police intimated'); loadMlc(doc); } catch (e) { HIS.toast(e.message); } }));
-    } catch (e) { tb.innerHTML = emptyRow(6, 'API unavailable'); }
+    try { doc._mlcRows = await HIS.api.mlcList() || []; renderMlcRows(doc); }
+    catch (e) { doc._mlcRows = []; tb.innerHTML = emptyRow(6, 'API unavailable'); }
+  }
+  // Apply search + police-ack + date-range filters over the loaded MLC cases.
+  function renderMlcRows(doc) {
+    const tb = doc.querySelector('#mlcList'); if (!tb) return;
+    const all = doc._mlcRows || [];
+    const q = (val(doc, 'mlcqText') || '').toLowerCase();
+    const ack = val(doc, 'mlcqAck') || '';
+    const from = val(doc, 'mlcqFrom') || '', to = val(doc, 'mlcqTo') || '';
+    const rows = all.filter(m => {
+      if (q && !`${m.mlcNo} ${m.patient || ''} ${m.policeStation || ''}`.toLowerCase().includes(q)) return false;
+      if (ack === 'pending' && m.policeAck) return false;
+      if (ack === 'ack' && !m.policeAck) return false;
+      const d = (m.created || '').slice(0, 10);
+      if (from && (!d || d < from)) return false;
+      if (to && (!d || d > to)) return false;
+      return true;
+    });
+    tb.innerHTML = rows.length ? rows.map(m => `<tr><td><b>${m.mlcNo}</b></td><td>${m.patient || '—'}</td><td>${m.policeStation || '—'}</td><td>${m.policeAck || '<span class="pill pill--warn">pending</span>'}</td><td>${m.created}</td><td>${m.policeAck ? '✓' : `<button class="btn btn--sm" data-intimate="${m.mlcId}">Police Ack</button>`}</td></tr>`).join('') : emptyRow(6, 'No matching MLC cases');
+    const cnt = doc.querySelector('#mlcCount'); if (cnt) cnt.textContent = `showing ${rows.length} of ${all.length}`;
+    tb.querySelectorAll('[data-intimate]').forEach(b => b.addEventListener('click', async () => { const ackRef = prompt('Police acknowledgement ref (e.g. FIR no.):'); if (!ackRef) return; try { await HIS.api.mlcIntimate(b.dataset.intimate, ackRef); HIS.toast('Police intimated'); loadMlc(doc); } catch (e) { HIS.toast(e.message); } }));
   }
   async function doCreateMlc(doc) {
     try {
