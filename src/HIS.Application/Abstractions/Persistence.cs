@@ -52,6 +52,11 @@ public interface ILookupRepository
     Task<IReadOnlyList<Tariff>> GetTariffsAsync(int branchId, string? q, CancellationToken ct = default);
 }
 
+public interface IBranchRepository
+{
+    Task<IReadOnlyList<(int BranchId, string Code, string Name, string? City, string? State, bool IsActive)>> GetAllAsync(CancellationToken ct = default);
+}
+
 public interface IPatientRepository
 {
     Task<Patient?> GetByUhidAsync(string uhid, CancellationToken ct = default);

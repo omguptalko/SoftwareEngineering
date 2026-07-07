@@ -29,6 +29,20 @@ public sealed class ModuleRegistryRepository : IModuleRegistryRepository
     }
 }
 
+public sealed class BranchRepository : IBranchRepository
+{
+    private readonly ITenantConnectionFactory _f;
+    public BranchRepository(ITenantConnectionFactory f) => _f = f;
+
+    public async Task<IReadOnlyList<(int, string, string, string?, string?, bool)>> GetAllAsync(CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        var rows = await c.QueryAsync<(int BranchId, string Code, string Name, string? City, string? State, bool IsActive)>(new CommandDefinition(
+            "SELECT BranchId, Code, Name, City, State, IsActive FROM master.Branch ORDER BY Code", cancellationToken: ct));
+        return rows.ToList();
+    }
+}
+
 public sealed class LookupRepository : ILookupRepository
 {
     // L1.8 cutover: F3 master lookups are now served from the resolved tenant's

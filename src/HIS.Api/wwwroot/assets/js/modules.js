@@ -1245,6 +1245,25 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== MULTI-BRANCH SYNC (SRS §3.21) ========= */
+  function multibranch() {
+    return `<div class="screen">
+      ${head('bi-diagram-3', 'Multi-Branch Sync', 'Branch directory · data-plane topology',
+        `<button class="btn btn--ghost btn--sm" data-act="refresh"><i class="bi bi-arrow-clockwise"></i> Refresh <span class="fk">F5</span></button>`)}
+      <div class="kpis" id="mbKpis"><div class="muted" style="padding:12px">Loading…</div></div>
+      <div class="panel mt12"><div class="panel__head"><i class="bi bi-buildings"></i> Branches <span class="ph-right"><input class="ctl" id="mbqText" placeholder="Search code / name / city…" style="max-width:200px"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Code</th><th>Name</th><th>City</th><th>State</th><th>Status</th></tr></thead>
+          <tbody id="mbBranches">${emptyRow(5, 'Loading…')}</tbody>
+        </table></div><span class="hintline" id="mbBranchCount" style="padding:8px 12px;display:block"></span></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-hdd-network"></i> Data Plane · Databases <span class="ph-right hintline" id="mbDpCount"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Tenant</th><th>Fiscal Year</th><th>Kind</th><th>Database</th></tr></thead>
+          <tbody id="mbDataPlane">${emptyRow(4, 'Loading…')}</tbody>
+        </table></div><span class="hintline" style="padding:8px 12px;display:block"><i class="bi bi-info-circle"></i> Branches share one tenant master DB — strongly consistent, no replication lag by design.</span></div></div>
+    </div>`;
+  }
+
   /* ============================ PLACEHOLDER ========================= */
   HIS.placeholder = function (m) {
     const bullets = (HIS.srs[m.id] || ['Module screen scoped in SRS v2.0.', 'Detailed form &amp; workflow planned for the next build pass.'])
@@ -1570,7 +1589,7 @@ window.HIS = window.HIS || {};
   }
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, consent, bmwm, mlc, queue, feedback, compliance, assets, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, consent, bmwm, mlc, queue, feedback, compliance, assets, multibranch, ai };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1812,6 +1831,7 @@ window.HIS = window.HIS || {};
     if (id === 'feedback') { initFeedback(doc); HIS.saveHandlers.feedback = () => doSubmitSurvey(doc); }
     if (id === 'compliance') initCompliance(doc);
     if (id === 'assets') { initAssets(doc); HIS.saveHandlers.assets = () => doRegisterAsset(doc); }
+    if (id === 'multibranch') initMultiBranch(doc);
     if (id === 'ai') initAi(doc);
   };
 
@@ -2213,6 +2233,50 @@ window.HIS = window.HIS || {};
       const c = doc.querySelector('#asCategory'); if (c) c.selectedIndex = 0;
       loadAssets(doc);
     } catch (e) { HIS.toast('Register failed: ' + e.message); }
+  }
+
+  /* ---- Multi-Branch Sync (read-only console) ------------------------- */
+  function initMultiBranch(doc) {
+    loadBranches(doc); loadDataPlane(doc);
+    const rf = doc.querySelector('[data-act="refresh"]'); if (rf) rf.addEventListener('click', () => { loadBranches(doc); loadDataPlane(doc); });
+    const s = doc.querySelector('#mbqText'); if (s) s.addEventListener('input', () => renderBranches(doc));
+  }
+  async function loadBranches(doc) {
+    const tb = doc.querySelector('#mbBranches'); if (!tb) return;
+    try {
+      doc._mbBranches = await HIS.api.branches() || [];
+      const all = doc._mbBranches, active = all.filter(b => b.isActive).length;
+      const kp = doc.querySelector('#mbKpis');
+      if (kp) kp.innerHTML =
+        `<div class="kpi"><div class="v tnum">${all.length}</div><div class="l">Branches</div></div>
+         <div class="kpi"><div class="v tnum">${active}</div><div class="l">Active</div></div>
+         <div class="kpi"><div class="v tnum" id="mbDbKpi">—</div><div class="l">Databases</div></div>`;
+      renderBranches(doc);
+    } catch (e) { doc._mbBranches = []; tb.innerHTML = emptyRow(5, 'Branches API unavailable'); }
+  }
+  function renderBranches(doc) {
+    const tb = doc.querySelector('#mbBranches'); if (!tb) return;
+    const all = doc._mbBranches || [];
+    const q = (val(doc, 'mbqText') || '').toLowerCase();
+    const rows = all.filter(b => !q || `${b.code} ${b.name} ${b.city || ''} ${b.state || ''}`.toLowerCase().includes(q));
+    tb.innerHTML = rows.length ? rows.map(b =>
+      `<tr><td class="code">${b.code}</td><td>${b.name}</td><td>${b.city || '—'}</td><td>${b.state || '—'}</td><td><span class="pill ${b.isActive ? 'pill--ok' : 'pill--muted'}">${b.isActive ? 'Active' : 'Inactive'}</span></td></tr>`
+    ).join('') : emptyRow(5, 'No branches');
+    const cnt = doc.querySelector('#mbBranchCount'); if (cnt) cnt.textContent = `Showing ${rows.length} of ${all.length} branch(es)`;
+  }
+  async function loadDataPlane(doc) {
+    const tb = doc.querySelector('#mbDataPlane'); if (!tb) return;
+    try {
+      const rows = await HIS.api.platformTenants();
+      tb.innerHTML = rows.length ? rows.map(t =>
+        `<tr><td>${t.code}</td><td>${t.fiscalYear || '—'}</td><td><span class="pill ${t.dbKind === 'master' ? 'pill--info' : 'pill--muted'}">${t.dbKind}</span></td><td class="code">${t.dbName}</td></tr>`
+      ).join('') : emptyRow(4, 'No databases');
+      const dp = doc.querySelector('#mbDpCount'); if (dp) dp.textContent = `${rows.length} database(s)`;
+      const kpi = doc.querySelector('#mbDbKpi'); if (kpi) kpi.textContent = rows.length;
+    } catch (e) {
+      tb.innerHTML = emptyRow(4, 'Platform catalog — sign in as a platform admin to view');
+      const dp = doc.querySelector('#mbDpCount'); if (dp) dp.textContent = 'platform-admin only';
+    }
   }
 
   /* ---- Phase 9: occupational health ---------------------------------- */

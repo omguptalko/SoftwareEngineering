@@ -15,6 +15,10 @@ public sealed class MastersController : ControllerBase
     [HttpGet("drugs")]
     public Task<IReadOnlyList<DrugDto>> Drugs(CancellationToken ct) => _mediator.Send(new GetDrugsAdminQuery(), ct);
 
+    /// <summary>Branch directory for this tenant (Multi-Branch Sync console).</summary>
+    [HttpGet("branches")]
+    public Task<IReadOnlyList<BranchRowDto>> Branches(CancellationToken ct) => _mediator.Send(new GetBranchesQuery(), ct);
+
     /// <summary>Create or update a drug (gated by 'masters.manage').</summary>
     [HttpPost("drugs")]
     public Task<int> SaveDrug([FromBody] SaveDrugCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);

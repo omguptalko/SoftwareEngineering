@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddSingleton<IFieldProtector, AesGcmFieldProtector>();
         services.AddScoped<IModuleRegistryRepository, ModuleRegistryRepository>();
         services.AddScoped<ILookupRepository, LookupRepository>();
+        services.AddScoped<IBranchRepository, BranchRepository>();
         services.AddScoped<IPatientRepository, PatientRepository>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();

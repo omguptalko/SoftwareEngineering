@@ -128,6 +128,8 @@ HIS.api = (function () {
     setDrugActive:   (drugId, isActive) => post('/api/masters/drugs/set-active', { drugId, isActive }),
     assets:          () => get('/api/assets'),
     registerAsset:   (cmd) => post('/api/assets', cmd),
+    branches:        () => get('/api/masters/branches'),
+    platformTenants: () => get('/api/platform/tenants'),
     // Phase 6 — Billing & Payments
     createBill:      (cmd) => post('/api/billing/bills', cmd),
     getBill:         (id) => get(`/api/billing/bills/${id}`),
