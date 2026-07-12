@@ -72,9 +72,9 @@ INSERT dbo.Module (ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsR
  ('assets','admin','bi-tools','Asset & Equipment',0,NULL,35,'§3.19'),
  ('multibranch','admin','bi-diagram-3','Multi-Branch Sync',0,NULL,36,'§3.21'),
  ('compliance','admin','bi-shield-check','Compliance & Audit',0,NULL,37,'§3.22'),
- ('abdm','admin','bi-fingerprint','ABDM / ABHA Console',0,'NEW',38,'§6.2'),
+ ('abdm','admin','bi-fingerprint','ABDM / ABHA Console',1,'NEW',38,'§6.2'),
  ('ai','admin','bi-cpu','AI Suite',0,NULL,39,'§4'),
- ('paymentgw','admin','bi-wallet2','Payment Gateway',0,NULL,40,'§5');
+ ('paymentgw','admin','bi-wallet2','Payment Gateway',1,NULL,40,'§5');
 GO
 
 /* ---- RBAC: the 14 SRS §2.2 roles (data, not code enums) ------------- */

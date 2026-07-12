@@ -37,4 +37,13 @@ public sealed class PaymentsController : ControllerBase
 
     [HttpPost("deposit")]
     public Task<AddDepositResult> Deposit([FromBody] AddDepositCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Payment Gateway console (§5) — configured provider / environment / modes.</summary>
+    [HttpGet("gateway")]
+    public Task<GatewayStatusDto> Gateway(CancellationToken ct) => _mediator.Send(new GetGatewayStatusQuery(), ct);
+
+    /// <summary>Gateway transactions ledger (billing.Payment), newest first.</summary>
+    [HttpGet]
+    public Task<IReadOnlyList<GatewayTxnDto>> Transactions([FromQuery] int take = 100, CancellationToken ct = default)
+        => _mediator.Send(new GetGatewayTransactionsQuery(take), ct);
 }

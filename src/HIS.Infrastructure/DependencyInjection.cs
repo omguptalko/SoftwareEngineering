@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IPharmacyRepository, PharmacyRepository>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IAssetRepository, AssetRepository>();
+        services.AddScoped<IAbdmRepository, AbdmRepository>();
         services.AddScoped<IBillingRepository, BillingRepository>();
         services.AddScoped<IPaymentGateway, SandboxPaymentGateway>();
         services.AddScoped<IClaimsRepository, ClaimsRepository>();

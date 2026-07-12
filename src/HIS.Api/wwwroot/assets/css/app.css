@@ -252,6 +252,93 @@ table.grid input.gi:focus, table.grid select.gi:focus { border-color: var(--acce
 .subhead { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 700; margin: 2px 0 8px; display: flex; align-items: center; gap: 7px; }
 .subhead::after { content: ""; flex: 1; height: 1px; background: var(--line-2); }
 
+/* Inline checkbox chip (e.g. ABDM HI-Types multi-select) */
+.chk { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-xs); font-weight: 600;
+       color: var(--ink); border: 1px solid var(--line-2); border-radius: 4px; padding: 4px 8px; cursor: pointer; user-select: none; }
+.chk:hover { border-color: var(--brand); }
+.chk input { accent-color: var(--brand); margin: 0; }
+
+/* Standalone small avatar (e.g. HPR professional rows) */
+.av-sm { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+         background: var(--brand-50); color: var(--brand-700); font-weight: 800; font-size: 10px;
+         margin-right: 6px; vertical-align: middle; }
+
+/* ===== AI Suite — Risk Assessment result ===== */
+.assess-hero { display: flex; gap: 16px; align-items: center; border: 1px solid var(--line);
+               border-radius: var(--radius-lg); padding: 14px 16px; }
+.assess-hero.is-ok     { background: var(--ok-bg);     border-color: var(--ok); }
+.assess-hero.is-info   { background: var(--info-bg);   border-color: var(--info); }
+.assess-hero.is-warn   { background: var(--warn-bg);   border-color: var(--warn); }
+.assess-hero.is-danger { background: var(--danger-bg); border-color: var(--danger); }
+.assess-hero .ah-score { text-align: center; min-width: 78px; padding-right: 16px; border-right: 1px solid var(--line-2); }
+.assess-hero .ah-num { font-size: 40px; font-weight: 800; line-height: 1; color: var(--ink); }
+.assess-hero .ah-cap { font-size: var(--fs-xs); letter-spacing: 1px; color: var(--muted); margin-top: 3px; }
+.assess-hero .ah-body { flex: 1; min-width: 0; }
+.assess-hero .ah-band { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 7px; }
+.assess-hero.is-ok     .ah-band { color: var(--ok); }
+.assess-hero.is-info   .ah-band { color: var(--info); }
+.assess-hero.is-warn   .ah-band { color: var(--warn); }
+.assess-hero.is-danger .ah-band { color: var(--danger); }
+.rk-meter { display: flex; gap: 4px; margin: 9px 0 2px; }
+.rk-meter .seg { flex: 1; text-align: center; font-size: 10px; font-weight: 700; padding: 3px 2px;
+                 border-radius: 4px; background: var(--surface-2); color: var(--muted-2); border: 1px solid var(--line-2); }
+.rk-meter .seg.on-ok     { background: var(--ok);     color: #fff; border-color: var(--ok); }
+.rk-meter .seg.on-info   { background: var(--info);   color: #fff; border-color: var(--info); }
+.rk-meter .seg.on-warn   { background: var(--warn);   color: #fff; border-color: var(--warn); }
+.rk-meter .seg.on-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+.assess-rec { display: flex; gap: 9px; align-items: flex-start; background: var(--surface-2);
+              border: 1px solid var(--line-2); border-radius: var(--radius); padding: 10px 12px; margin-top: 12px; }
+.assess-rec i { color: var(--brand); font-size: 16px; margin-top: 1px; }
+.assess-rec b { display: block; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 2px; }
+
+.factor { padding: 8px 0; border-bottom: 1px solid var(--line-2); }
+.factor:last-child { border-bottom: 0; }
+.factor-h { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 13px; }
+.factor-pts { font-weight: 800; font-size: 12px; padding: 1px 7px; border-radius: 10px; background: var(--danger-bg); color: var(--danger); }
+.factor-track { height: 6px; border-radius: 3px; background: var(--surface-2); margin: 5px 0 4px; overflow: hidden; }
+.factor-track > span { display: block; height: 100%; border-radius: 3px; background: var(--danger); }
+.factor-note { font-size: var(--fs-xs); color: var(--muted); }
+
+/* Big icon variant of the hero score cell (e.g. claim pre-scrub verdict) */
+.assess-hero .ah-ico { font-size: 34px; line-height: 1; }
+.assess-hero.is-ok     .ah-ico { color: var(--ok); }
+.assess-hero.is-info   .ah-ico { color: var(--info); }
+.assess-hero.is-warn   .ah-ico { color: var(--warn); }
+.assess-hero.is-danger .ah-ico { color: var(--danger); }
+
+/* Coloured stat chips (pass / warn / fail summary) */
+.stat-chips { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
+.stat-chip { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-xs); font-weight: 700;
+             padding: 3px 9px; border-radius: 12px; background: var(--surface-2); color: var(--muted-2); border: 1px solid var(--line-2); }
+.stat-chip b { font-size: 13px; }
+.stat-chip.is-ok     { background: var(--ok-bg);     color: var(--ok);     border-color: var(--ok); }
+.stat-chip.is-warn   { background: var(--warn-bg);   color: var(--warn);   border-color: var(--warn); }
+.stat-chip.is-danger { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+
+/* Pre-scrub check list */
+.chk-list { display: flex; flex-direction: column; }
+.chk-item { display: flex; gap: 10px; align-items: flex-start; padding: 9px 2px; border-bottom: 1px solid var(--line-2); }
+.chk-item:last-child { border-bottom: 0; }
+.chk-ico { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; color: #fff; margin-top: 1px; }
+.chk-ico.is-ok     { background: var(--ok); }
+.chk-ico.is-warn   { background: var(--warn); }
+.chk-ico.is-danger { background: var(--danger); }
+.chk-rule { font-weight: 700; font-size: 13px; }
+.chk-detail { font-size: var(--fs-xs); color: var(--muted); margin-top: 1px; }
+.assess-fin { display: flex; gap: 18px; flex-wrap: wrap; background: var(--surface-2); border: 1px solid var(--line-2);
+              border-radius: var(--radius); padding: 9px 12px; margin-top: 10px; }
+.assess-fin .fin { font-size: var(--fs-xs); color: var(--muted); }
+.assess-fin .fin b { display: block; font-size: 14px; color: var(--ink); font-weight: 800; }
+
+/* Inline days-of-cover bar (inventory forecast) */
+.covbar { display: inline-block; width: 56px; height: 6px; border-radius: 3px; background: var(--surface-2);
+          overflow: hidden; vertical-align: middle; }
+.covbar > span { display: block; height: 100%; border-radius: 3px; }
+.covbar > span.is-ok     { background: var(--ok); }
+.covbar > span.is-warn   { background: var(--warn); }
+.covbar > span.is-danger { background: var(--danger); }
+
 /* Pipeline / stepper (claims workflow) */
 .pipeline { display: flex; gap: 0; }
 .pstep { flex: 1; position: relative; text-align: center; padding: 8px 6px; }
@@ -367,7 +454,7 @@ table.grid input.gi:focus, table.grid select.gi:focus { border-color: var(--acce
 .muted { color: var(--muted); }
 .tnum { font-variant-numeric: tabular-nums; }
 .right { text-align: right; }
-.mt8{margin-top:8px}.mt12{margin-top:12px}.mb0{margin-bottom:0}
+.mt8{margin-top:8px}.mt12{margin-top:12px}.mb0{margin-bottom:0}.mb8{margin-bottom:8px}
 .flex{display:flex}.gap6{gap:6px}.gap10{gap:10px}.aic{align-items:center}.between{justify-content:space-between}
 .scrollx{overflow-x:auto}
 

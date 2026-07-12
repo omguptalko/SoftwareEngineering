@@ -98,9 +98,9 @@ IF NOT EXISTS (SELECT 1 FROM master.Module WHERE ModuleId=N'multibranch')
 IF NOT EXISTS (SELECT 1 FROM master.Module WHERE ModuleId=N'compliance')
     INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef) VALUES (N'compliance', N'admin', N'bi-shield-check', N'Compliance & Audit', 0, NULL, 37, N'A3.22');
 IF NOT EXISTS (SELECT 1 FROM master.Module WHERE ModuleId=N'abdm')
-    INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef) VALUES (N'abdm', N'admin', N'bi-fingerprint', N'ABDM / ABHA Console', 0, N'NEW', 38, N'A6.2');
+    INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef) VALUES (N'abdm', N'admin', N'bi-fingerprint', N'ABDM / ABHA Console', 1, N'NEW', 38, N'A6.2');
 IF NOT EXISTS (SELECT 1 FROM master.Module WHERE ModuleId=N'ai')
     INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef) VALUES (N'ai', N'admin', N'bi-cpu', N'AI Suite', 0, NULL, 39, N'A4');
 IF NOT EXISTS (SELECT 1 FROM master.Module WHERE ModuleId=N'paymentgw')
-    INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef) VALUES (N'paymentgw', N'admin', N'bi-wallet2', N'Payment Gateway', 0, NULL, 40, N'A5');
+    INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, Badge, SortOrder, SrsRef) VALUES (N'paymentgw', N'admin', N'bi-wallet2', N'Payment Gateway', 1, NULL, 40, N'A5');
 GO

@@ -129,12 +129,23 @@ HIS.api = (function () {
     assets:          () => get('/api/assets'),
     registerAsset:   (cmd) => post('/api/assets', cmd),
     branches:        () => get('/api/masters/branches'),
+    // §6.2 — ABDM / ABHA Console (consent artifacts + HFR/HPR registries)
+    abdmConsents:    () => get('/api/abdm/consents'),
+    abdmRequestConsent:(cmd) => post('/api/abdm/consents', cmd),
+    abdmGrantConsent:(id, validityMonths) => post(`/api/abdm/consents/${id}/grant`, { validityMonths }),
+    abdmRevokeConsent:(id) => post(`/api/abdm/consents/${id}/revoke`, {}),
+    abdmFacilities:  () => get('/api/abdm/facilities'),
+    abdmOnboardFacility:(cmd) => post('/api/abdm/facilities', cmd),
+    abdmProfessionals:() => get('/api/abdm/professionals'),
+    abdmOnboardProfessional:(cmd) => post('/api/abdm/professionals', cmd),
     platformTenants: () => get('/api/platform/tenants'),
     // Phase 6 — Billing & Payments
     createBill:      (cmd) => post('/api/billing/bills', cmd),
     getBill:         (id) => get(`/api/billing/bills/${id}`),
     billsList:       () => get('/api/billing/bills'),
     collectPayment:  (cmd) => post('/api/payments/collect', cmd),
+    gatewayStatus:   () => get('/api/payments/gateway'),
+    gatewayTxns:     (take) => get(`/api/payments${take ? `?take=${take}` : ''}`),
     // Phase 7 — Insurance / Cashless / Schemes
     capturePolicy:   (cmd) => post('/api/claims/policies', cmd),
     eligibility:     (uhid) => get(`/api/claims/eligibility?patientUhid=${encodeURIComponent(uhid)}`),

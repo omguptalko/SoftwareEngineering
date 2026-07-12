@@ -94,6 +94,20 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         return await c.QuerySingleAsync<long>(new CommandDefinition(sql, p, cancellationToken: ct));
     }
 
+    public async Task<IReadOnlyList<(long, string?, string, string, string?, decimal, string?, string, DateTime)>> GetPaymentsAsync(int take, CancellationToken ct = default)
+    {
+        if (take <= 0) take = 100;
+        using var c = await _f.OpenDataAsync(ct);
+        var rows = (await c.QueryAsync<(long PaymentId, string? BillNo, long PatientId, string Mode, string? Gateway, decimal Amount, string? GatewayRef, string Status, DateTime CreatedUtc)>(new CommandDefinition(
+            @"SELECT TOP (@take) p.PaymentId, b.BillNo, p.PatientId, p.Mode, p.Gateway, p.Amount, p.GatewayRef, p.Status, p.CreatedUtc
+                FROM billing.Payment p
+                LEFT JOIN billing.Bill b ON b.BillId = p.BillId
+               ORDER BY p.PaymentId DESC", new { take }, cancellationToken: ct))).ToList();
+        var names = await MasterLookup.PatientNamesAsync(_f, rows.Select(r => r.PatientId), ct);
+        return rows.Select(r => (r.PaymentId, r.BillNo, names.GetValueOrDefault(r.PatientId, "Patient #" + r.PatientId),
+            r.Mode, r.Gateway, r.Amount, r.GatewayRef, r.Status, r.CreatedUtc)).ToList();
+    }
+
     public async Task<decimal> GetPaidTotalAsync(long billId, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);

@@ -1245,6 +1245,116 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== ABDM / ABHA CONSOLE (SRS §6.2) ======== */
+  const ABDM_PURPOSES = [
+    ['CAREMGT', 'Care Management'], ['BTG', 'Break the Glass'], ['PUBHLTH', 'Public Health'],
+    ['HPAYMT', 'Healthcare Payment'], ['DSRCH', 'Disease Specific Research'], ['SELF', 'Self Requested']
+  ];
+  const ABDM_HITYPES = ['OPConsultation', 'Prescription', 'DiagnosticReport', 'DischargeSummary', 'ImmunizationRecord', 'HealthDocumentRecord', 'WellnessRecord', 'Invoice'];
+
+  function abdm() {
+    return `<div class="screen">
+      ${head('bi-fingerprint', 'ABDM / ABHA Console', 'Consent artifacts (HIP/HIU) · HFR facilities · HPR professionals · §6.2',
+        `<button class="btn btn--ghost btn--sm" data-act="refresh"><i class="bi bi-arrow-clockwise"></i> Refresh <span class="fk">F5</span></button>
+         <button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-shield-plus"></i> Request Consent <span class="fk">F9</span></button>`)}
+      <div class="kpis" id="abKpis"><div class="muted" style="padding:12px">Loading…</div></div>
+
+      <div class="cols-side mt12">
+        <div class="panel"><div class="panel__head"><i class="bi bi-shield-plus"></i> Request Consent Artifact</div><div class="panel__body">
+          <div id="abBanner">${banner(null)}</div>
+          <div class="form-grid mt8">
+            <div class="f wide"><label>Patient <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="abPatient" data-lookup="patient" placeholder="F3 patient / UHID…"><button class="lk" data-lookup="patient">F3</button></div></div>
+            <div class="f"><label>Purpose <span class="req">*</span></label><div class="field"><select class="ctl" id="abPurpose">${ABDM_PURPOSES.map(p => `<option value="${p[0]}">${p[1]} (${p[0]})</option>`).join('')}</select></div></div>
+            <div class="f"><label>Consent Expiry</label><div class="field"><input class="ctl" id="abExpiry" type="date"></div></div>
+          </div>
+          <div class="subhead mt12">HI Types (health-information to share)</div>
+          <div class="flex gap6" style="flex-wrap:wrap;padding:4px 0" id="abHiTypes">
+            ${ABDM_HITYPES.map((t, i) => `<label class="chk"><input type="checkbox" value="${t}"${i < 2 ? ' checked' : ''}> ${t}</label>`).join('')}
+          </div>
+          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-shield-plus"></i> Request Consent <span class="fk">F9</span></button><span class="hintline">Patient + purpose chuno → Request. Register me <b>Requested</b> aayega; phir Grant/Revoke.</span></div>
+        </div></div>
+
+        <div class="panel"><div class="panel__head"><i class="bi bi-shield-check"></i> Consent Register <span class="ph-right hintline" id="abConsentCount"></span></div>
+          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>#</th><th>Patient</th><th>ABHA</th><th>Purpose</th><th>Status</th><th>Expiry</th><th></th></tr></thead>
+            <tbody id="abConsents">${emptyRow(7, 'Loading…')}</tbody>
+          </table></div></div>
+        </div>
+      </div>
+
+      <div class="panel mt12"><div class="panel__head"><i class="bi bi-hospital"></i> HFR — Health Facility Registry
+        <span class="ph-right"><input class="ctl" id="abHfrq" placeholder="Search branch / HFR code…" style="max-width:220px"></span></div>
+        <div class="panel__body">
+          <div class="form-grid three">
+            <div class="f"><label>Branch <span class="req">*</span></label><div class="field"><select class="ctl" id="abHfrBranch"><option value="">Loading…</option></select></div></div>
+            <div class="f"><label>HFR Facility ID <span class="req">*</span></label><div class="field"><input class="ctl code" id="abHfrCode" placeholder="e.g. IN0123456789"></div></div>
+            <div class="f"><label>&nbsp;</label><button class="btn btn--primary" id="abHfrBtn" style="width:100%"><i class="bi bi-hospital"></i> Onboard Facility</button></div>
+          </div>
+          <span class="hintline"><i class="bi bi-info-circle"></i> Branch + HFR Facility ID daalo → Onboard. HFR se branch ki verified facility identity ABDM me register hoti hai (§6.2).</span>
+          <div class="subhead mt12">Onboarded Facilities <span class="ph-right hintline" id="abHfrCount"></span></div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>Branch</th><th>HFR Facility ID</th><th>Status</th><th>Onboarded</th></tr></thead>
+            <tbody id="abFacilities">${emptyRow(4, 'Loading…')}</tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="panel"><div class="panel__head"><i class="bi bi-person-badge"></i> HPR — Healthcare Professional Registry
+        <span class="ph-right"><input class="ctl" id="abHprq" placeholder="Search doctor / dept / HPR ID…" style="max-width:220px"></span></div>
+        <div class="panel__body">
+          <div class="form-grid three">
+            <div class="f"><label>Doctor <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="abHprDoctor" data-lookup="doctor" placeholder="F3 doctor…"><button class="lk" data-lookup="doctor">F3</button></div></div>
+            <div class="f"><label>HPR ID <span class="req">*</span></label><div class="field"><input class="ctl code" id="abHprCode" placeholder="e.g. 71-1234-5678-9012"></div></div>
+            <div class="f"><label>&nbsp;</label><button class="btn btn--primary" id="abHprBtn" style="width:100%"><i class="bi bi-person-plus"></i> Onboard Professional</button></div>
+          </div>
+          <span class="hintline"><i class="bi bi-info-circle"></i> Doctor (F3) + HPR ID daalo → Onboard. HPR se doctor ki verified professional identity ABDM me link hoti hai (§6.2).</span>
+          <div class="subhead mt12">Onboarded Professionals <span class="ph-right hintline" id="abHprCount"></span></div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>Doctor</th><th>Department</th><th>HPR ID</th><th>Status</th><th>Onboarded</th></tr></thead>
+            <tbody id="abProfessionals">${emptyRow(5, 'Loading…')}</tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ====================== PAYMENT GATEWAY (SRS §5) ============== */
+  function paymentgw() {
+    return `<div class="screen">
+      ${head('bi-wallet2', 'Payment Gateway', 'Configured provider · transaction ledger · settlement status · §5',
+        `<span id="pgUpd" class="hintline" style="margin-left:auto"></span>
+         <button class="btn btn--sm" id="pgAuto" style="margin-left:8px"><i class="bi bi-arrow-repeat"></i> Auto: On</button>
+         <button class="btn btn--primary btn--sm" data-act="refresh" style="margin-left:6px"><i class="bi bi-arrow-clockwise"></i> Refresh <span class="fk">F5</span></button>`)}
+      <div class="kpis" id="pgKpis"><div class="muted" style="padding:12px">Loading…</div></div>
+
+      <div class="panel mt12"><div class="panel__head"><i class="bi bi-credit-card-2-front"></i> Gateway Status</div>
+        <div class="panel__body"><div id="pgStatus"><div class="muted" style="padding:12px">Loading gateway…</div></div></div>
+      </div>
+
+      <div class="panel"><div class="panel__head"><i class="bi bi-receipt-cutoff"></i> Transaction Ledger <span class="ph-right hintline" id="pgCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:220px"><input class="ctl" id="pgq" placeholder="Search ref / patient / bill…"></div>
+            <select class="ctl" id="pgMode" style="max-width:140px"><option value="">All modes</option></select>
+            <select class="ctl" id="pgStatus" style="max-width:150px">
+              <option value="">All statuses</option>
+              <option value="Captured">Captured</option>
+              <option value="Failed">Failed</option>
+              <option value="Refunded">Refunded</option>
+              <option value="Initiated">Initiated / Pending</option>
+            </select>
+            <div class="field with-unit"><input class="ctl" id="pgFrom" type="date"><span class="unit">from</span></div>
+            <div class="field with-unit"><input class="ctl" id="pgTo" type="date"><span class="unit">to</span></div>
+            <button class="btn btn--sm" id="pgClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Ref</th><th>Patient</th><th>Bill</th><th>Mode</th><th>Gateway</th><th class="num">Amount</th><th>Status</th><th>Time</th></tr></thead>
+          <tbody id="pgTxns">${emptyRow(8, 'Loading…')}</tbody>
+        </table></div><span class="hintline" id="pgShown" style="padding:8px 12px;display:block"></span></div>
+      </div>
+    </div>`;
+  }
+
   /* ====================== MULTI-BRANCH SYNC (SRS §3.21) ========= */
   function multibranch() {
     return `<div class="screen">
@@ -1317,13 +1427,22 @@ window.HIS = window.HIS || {};
           </div>
           <button class="btn btn--primary mt8" style="width:100%" data-act="save"><i class="bi bi-clipboard-check"></i> Register &amp; Triage <span class="fk">F9</span></button>
         </div></div>
-        <div class="panel"><div class="panel__head"><i class="bi bi-box-arrow-right"></i> Disposition <span class="ph-right muted" id="erDispWho">select a board row</span></div><div class="panel__body">
-          <div class="form-grid">
-            <div class="f"><label>Disposition</label><div class="field"><select class="ctl" id="erDisp"><option>AdmitICU</option><option>AdmitWard</option><option>Discharge</option><option>Refer</option><option>LAMA</option><option>Expired</option></select></div></div>
-            <div class="f"><label>Bed (for admit)</label><div class="field with-btn"><input class="ctl" id="erBed" data-lookup="ward" placeholder="F3 free bed…"><button class="lk" data-lookup="ward">F3</button></div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-box-arrow-right"></i> Disposition</div><div class="panel__body">
+          <div id="erDispBanner">${erDispBanner(null)}</div>
+          <div class="form-grid one mt8">
+            <div class="f"><label>Outcome <span class="req">*</span></label><div class="field"><select class="ctl" id="erDisp">
+              <option value="AdmitICU">Admit to ICU</option>
+              <option value="AdmitWard">Admit to Ward</option>
+              <option value="Discharge" selected>Discharge</option>
+              <option value="Refer">Refer out</option>
+              <option value="LAMA">LAMA — left against advice</option>
+              <option value="Expired">Expired</option>
+            </select></div></div>
+            <div class="f" id="erBedRow" hidden><label>Bed / Ward <span class="req">*</span></label><div class="field with-btn"><input class="ctl" id="erBed" data-lookup="ward" placeholder="F3 free bed…"><button class="lk" data-lookup="ward">F3</button></div></div>
             <div class="f"><label>Consultant</label><div class="field with-btn"><input class="ctl" id="erDispDoctor" data-lookup="doctor" placeholder="F3 doctor…"><button class="lk" data-lookup="doctor">F3</button></div></div>
           </div>
-          <button class="btn mt8" style="width:100%" id="erDisposeBtn"><i class="bi bi-check2-circle"></i> Confirm Disposition</button>
+          <div class="assess-rec mt8" id="erDispHint" style="display:none"><i class="bi bi-info-circle-fill"></i><div></div></div>
+          <button class="btn btn--primary mt12" style="width:100%" id="erDisposeBtn" disabled><i class="bi bi-check2-circle"></i> Confirm Disposition</button>
         </div></div>
       </div>
     </div>`;
@@ -1589,7 +1708,7 @@ window.HIS = window.HIS || {};
   }
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, consent, bmwm, mlc, queue, feedback, compliance, assets, multibranch, ai };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, consent, bmwm, mlc, queue, feedback, compliance, assets, multibranch, ai, abdm, paymentgw };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1684,18 +1803,25 @@ window.HIS = window.HIS || {};
           </div>
           <button class="btn btn--primary mt12" id="aiCompute" style="width:100%"><i class="bi bi-cpu"></i> Compute Risk Score</button>
         </div></div>
-        <div class="panel"><div class="panel__head"><i class="bi bi-activity"></i> Assessment</div><div class="panel__body">
-          <div id="aiResult"><div class="muted" style="padding:12px">Enter vitals and compute.</div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-activity"></i> Assessment
+          <span class="ph-right hintline">Explainable · NEWS2-style</span></div><div class="panel__body">
+          <div id="aiResult">${aiAssessEmpty()}</div>
         </div></div>
       </div></div>
 
       <div data-pane="fc" hidden>
         <div class="panel"><div class="panel__head"><i class="bi bi-box-seam"></i> Demand Forecast &amp; Reorder
-          <button class="btn btn--primary btn--sm" id="aiRunForecast" style="margin-left:auto"><i class="bi bi-graph-up-arrow"></i> Run Forecast</button></div>
-          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <span id="aiFcUpd" class="hintline" style="margin-left:auto"></span>
+          <button class="btn btn--sm" id="aiFcAuto" style="margin-left:8px"><i class="bi bi-arrow-repeat"></i> Auto: On</button>
+          <button class="btn btn--primary btn--sm" id="aiRunForecast" style="margin-left:6px"><i class="bi bi-graph-up-arrow"></i> Run Forecast</button></div>
+          <div class="panel__body">
+            <div id="aiFcSummary"></div>
+            <div class="grid-wrap" style="border:0"><table class="grid">
             <thead><tr><th>Code</th><th>Item</th><th class="num">Stock</th><th class="num">Avg/day</th><th class="num">Days cover</th><th class="num">Suggest order</th><th>Urgency</th></tr></thead>
             <tbody id="aiFcBody">${emptyRow(7, 'Run the forecast to project reorder needs')}</tbody>
-          </table></div></div></div>
+          </table></div>
+            <span class="hintline mt8" style="display:block"><i class="bi bi-info-circle"></i> Days-cover bar target = 30-day reorder cover. <span class="pill pill--danger">Critical</span> &lt; reorder level · <span class="pill pill--warn">High</span> nearing · <span class="pill pill--ok">Monitor</span> healthy.</span>
+          </div></div>
       </div>
 
       <div data-pane="ps" hidden><div class="cols-side">
@@ -1704,71 +1830,205 @@ window.HIS = window.HIS || {};
             <div class="f"><label>Package code</label><div class="field"><input class="ctl" id="psPkg" value="CD-014" placeholder="e.g. CD-014"></div></div>
             <div class="f"><label>Claimed amount (₹)</label><div class="field"><input class="ctl" id="psAmt" type="number" value="70000"></div></div>
             <div class="f"><label>Patient UHID (optional)</label><div class="field"><input class="ctl" id="psUhid" placeholder="optional — enables policy checks"></div></div>
-            <div class="f"><label>Documents attached</label><div class="field" id="psDocs" style="display:flex;flex-wrap:wrap;gap:10px;padding:6px 0">
-              <label><input type="checkbox" value="Discharge Summary" checked> Discharge Summary</label>
-              <label><input type="checkbox" value="Final Bill" checked> Final Bill</label>
-              <label><input type="checkbox" value="ID Proof"> ID Proof</label>
-              <label><input type="checkbox" value="Pre-Auth Approval"> Pre-Auth Approval</label>
+            <div class="f"><label>Documents attached</label><div class="field" id="psDocs" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 0">
+              <label class="chk"><input type="checkbox" value="Discharge Summary" checked> Discharge Summary</label>
+              <label class="chk"><input type="checkbox" value="Final Bill" checked> Final Bill</label>
+              <label class="chk"><input type="checkbox" value="ID Proof"> ID Proof</label>
+              <label class="chk"><input type="checkbox" value="Pre-Auth Approval"> Pre-Auth Approval</label>
             </div></div>
           </div>
           <button class="btn btn--primary mt12" id="aiRunPreScrub" style="width:100%"><i class="bi bi-shield-check"></i> Pre-Scrub Claim</button>
         </div></div>
-        <div class="panel"><div class="panel__head"><i class="bi bi-list-check"></i> Pre-Submission Checks</div><div class="panel__body">
-          <div id="psResult"><div class="muted" style="padding:12px">Enter claim details and pre-scrub.</div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-list-check"></i> Pre-Submission Checks
+          <span class="ph-right hintline">Rule-based · pre-flight</span></div><div class="panel__body">
+          <div id="psResult">${aiPreScrubEmpty()}</div>
         </div></div>
       </div></div>
     </div>`;
   }
+  const AI_FC_INTERVAL = 30000;   // inventory forecast auto-refresh cadence (ms)
+
   function initAi(doc) {
     const rb = doc.querySelector('#aiCompute'); if (rb) rb.addEventListener('click', () => computeRisk(doc));
     const fb = doc.querySelector('#aiRunForecast'); if (fb) fb.addEventListener('click', () => runForecast(doc));
     const pb = doc.querySelector('#aiRunPreScrub'); if (pb) pb.addEventListener('click', () => runPreScrub(doc));
+    // Inventory forecast is a pure read → auto-load on open + periodic auto-refresh.
+    runForecast(doc);
+    aiSetAutoRefresh(doc, true);
+    const ab = doc.querySelector('#aiFcAuto'); if (ab) ab.addEventListener('click', () => aiSetAutoRefresh(doc, !doc._aiFcAuto));
   }
-  async function runForecast(doc) {
-    const tb = doc.querySelector('#aiFcBody');
-    tb.innerHTML = emptyRow(7, 'Forecasting…');
-    const band = { 'Critical': 'pill--danger', 'High': 'pill--warn', 'Monitor': 'pill--ok' };
+
+  // Toggle the forecast auto-refresh timer. The interval self-clears once the
+  // module's doc leaves the DOM (tab closed), so no leaks or ghost polling.
+  function aiSetAutoRefresh(doc, on) {
+    doc._aiFcAuto = on;
+    if (doc._aiFcTimer) { clearInterval(doc._aiFcTimer); doc._aiFcTimer = null; }
+    if (on) {
+      doc._aiFcTimer = setInterval(() => {
+        if (!document.body.contains(doc)) { clearInterval(doc._aiFcTimer); doc._aiFcTimer = null; return; }
+        runForecast(doc, true);   // silent — no loading flash on background refresh
+      }, AI_FC_INTERVAL);
+    }
+    const b = doc.querySelector('#aiFcAuto');
+    if (b) { b.classList.toggle('btn--primary', on); b.innerHTML = `<i class="bi bi-arrow-repeat"></i> Auto: ${on ? 'On' : 'Off'}`; }
+  }
+  const FC_URGENCY = {
+    Critical: { pill: 'pill--danger', cls: 'danger' },
+    High:     { pill: 'pill--warn',   cls: 'warn' },
+    Monitor:  { pill: 'pill--ok',     cls: 'ok' }
+  };
+  const FC_COVER_TARGET = 30;   // reorder cover target (days) — bar scales against this
+
+  function renderForecastSummary(doc, rows) {
+    const el = doc.querySelector('#aiFcSummary'); if (!el) return;
+    const crit = rows.filter(r => r.urgency === 'Critical').length;
+    const high = rows.filter(r => r.urgency === 'High').length;
+    const units = rows.reduce((s, r) => s + (r.suggestedOrderQty || 0), 0);
+    el.innerHTML =
+      `<div class="kpis" style="margin-bottom:12px">
+        <div class="kpi"><div class="v tnum">${rows.length}</div><div class="l">Items forecast</div></div>
+        <div class="kpi"><div class="v tnum" style="color:var(--danger)">${crit}</div><div class="l">Critical</div></div>
+        <div class="kpi"><div class="v tnum" style="color:var(--warn)">${high}</div><div class="l">High priority</div></div>
+        <div class="kpi"><div class="v tnum">${units.toLocaleString('en-IN')}</div><div class="l">Units to order</div></div>
+      </div>`;
+  }
+
+  async function runForecast(doc, silent) {
+    const tb = doc.querySelector('#aiFcBody'); if (!tb) return;
+    if (!silent) tb.innerHTML = emptyRow(7, 'Forecasting…');
     try {
       const rows = await HIS.api.aiForecast();
-      tb.innerHTML = rows.length ? rows.map(r =>
-        `<tr><td>${r.code}</td><td>${r.name}</td><td class="num">${r.stock}</td><td class="num">${r.avgDailyUse}</td>
-          <td class="num">${r.daysOfCover}</td><td class="num"><b>${r.suggestedOrderQty}</b></td>
-          <td><span class="pill ${band[r.urgency] || 'pill--muted'}">${r.urgency}</span></td></tr>`).join('') : emptyRow(7, 'No stock items');
-    } catch (e) { tb.innerHTML = emptyRow(7, 'Forecast API error'); }
+      if (!rows.length) { tb.innerHTML = emptyRow(7, 'No stock items'); return; }
+      renderForecastSummary(doc, rows);
+      const upd = doc.querySelector('#aiFcUpd');
+      if (upd) upd.innerHTML = `<i class="bi bi-clock-history"></i> Updated ${new Date().toLocaleTimeString()}`;
+      // Critical first, then High, then Monitor — most urgent on top.
+      const rank = { Critical: 0, High: 1, Monitor: 2 };
+      const sorted = rows.slice().sort((a, b) => (rank[a.urgency] ?? 9) - (rank[b.urgency] ?? 9) || a.daysOfCover - b.daysOfCover);
+      tb.innerHTML = sorted.map(r => {
+        const u = FC_URGENCY[r.urgency] || { pill: 'pill--muted', cls: 'ok' };
+        const w = Math.max(4, Math.min(100, Math.round((r.daysOfCover / FC_COVER_TARGET) * 100)));
+        return `<tr><td class="code">${r.code}</td><td>${r.name}</td><td class="num tnum">${r.stock}</td><td class="num tnum">${r.avgDailyUse}</td>
+          <td class="num"><div style="display:flex;align-items:center;gap:7px;justify-content:flex-end"><span class="tnum">${r.daysOfCover}d</span><span class="covbar"><span class="is-${u.cls}" style="width:${w}%"></span></span></div></td>
+          <td class="num tnum"><b>${(r.suggestedOrderQty || 0).toLocaleString('en-IN')}</b></td>
+          <td><span class="pill ${u.pill}">${r.urgency}</span></td></tr>`;
+      }).join('');
+    } catch (e) { if (!silent) tb.innerHTML = emptyRow(7, 'Forecast API error'); }
   }
+  function aiPreScrubEmpty() {
+    return `<div style="text-align:center;padding:30px 14px;color:var(--muted-2)">
+      <i class="bi bi-shield-check" style="font-size:30px;display:block;margin-bottom:10px;color:var(--brand)"></i>
+      <div style="font-weight:600;color:var(--muted)">No pre-scrub run yet</div>
+      <div style="font-size:12px;margin-top:4px">Fill the claim details on the left, then <b>Pre-Scrub Claim</b>.</div>
+    </div>`;
+  }
+
+  const PS_VERDICT = {
+    Clean:  { cls: 'ok',     icon: 'bi-shield-fill-check' },
+    Review: { cls: 'warn',   icon: 'bi-shield-fill-exclamation' },
+    Reject: { cls: 'danger', icon: 'bi-shield-fill-x' }
+  };
+  const PS_SEV = {
+    pass: { cls: 'ok',     icon: 'bi-check-lg',        order: 2 },
+    warn: { cls: 'warn',   icon: 'bi-exclamation-lg',  order: 1 },
+    fail: { cls: 'danger', icon: 'bi-x-lg',            order: 0 }
+  };
+  const rupee = n => (n == null ? null : '₹' + Number(n).toLocaleString('en-IN'));
+
+  function renderPreScrub(r) {
+    const v = PS_VERDICT[r.verdict] || { cls: 'muted', icon: 'bi-shield' };
+    const fin = [
+      ['Package rate', rupee(r.packageRate)],
+      ['Available balance', rupee(r.availableBalance)],
+      ['Est. co-pay', rupee(r.estimatedCoPay)]
+    ].filter(x => x[1] != null);
+    const finBox = fin.length
+      ? `<div class="assess-fin">${fin.map(x => `<div class="fin">${x[0]}<b>${x[1]}</b></div>`).join('')}</div>` : '';
+    const checks = (r.checks || []).slice().sort((a, b) =>
+      (PS_SEV[a.severity]?.order ?? 9) - (PS_SEV[b.severity]?.order ?? 9));
+    const list = checks.map(c => {
+      const s = PS_SEV[c.severity] || { cls: 'muted', icon: 'bi-dot' };
+      return `<div class="chk-item"><span class="chk-ico is-${s.cls}"><i class="bi ${s.icon}"></i></span>
+        <div><div class="chk-rule">${c.rule}</div><div class="chk-detail">${c.detail}</div></div></div>`;
+    }).join('');
+    return `<div class="assess-hero is-${v.cls}">
+        <div class="ah-score"><i class="bi ${v.icon} ah-ico"></i></div>
+        <div class="ah-body">
+          <div class="ah-band"><i class="bi ${v.icon}"></i> ${r.verdict}</div>
+          <div class="stat-chips">
+            <span class="stat-chip is-ok"><b>${r.passed}</b> passed</span>
+            <span class="stat-chip is-warn"><b>${r.warnings}</b> warnings</span>
+            <span class="stat-chip is-danger"><b>${r.failures}</b> failures</span>
+          </div>
+        </div>
+      </div>
+      ${finBox}
+      <div class="subhead mt12">Checks (${checks.length})</div>
+      <div class="chk-list">${list}</div>`;
+  }
+
   async function runPreScrub(doc) {
     const docs = Array.from(doc.querySelectorAll('#psDocs input:checked')).map(c => c.value);
     const input = { packageCode: val(doc, 'psPkg') || null, claimedAmount: Number(val(doc, 'psAmt')) || 0, patientUhid: val(doc, 'psUhid') || null, documents: docs };
     const host = doc.querySelector('#psResult');
-    host.innerHTML = '<div class="muted" style="padding:12px">Scrubbing…</div>';
-    const sev = { pass: 'pill--ok', warn: 'pill--warn', fail: 'pill--danger' };
-    const verdictBand = { Clean: 'pill--ok', Review: 'pill--warn', Reject: 'pill--danger' };
+    host.innerHTML = '<div class="muted" style="padding:12px"><i class="bi bi-hourglass-split"></i> Scrubbing…</div>';
     try {
       const r = await HIS.api.aiPreScrub(input);
-      host.innerHTML =
-        `<div class="kpis"><div class="kpi"><div class="v"><span class="pill ${verdictBand[r.verdict] || 'pill--muted'}" style="font-size:14px">${r.verdict}</span></div><div class="l">Verdict</div></div>
-           <div class="kpi"><div class="v tnum">${r.passed}</div><div class="l">Passed</div></div>
-           <div class="kpi"><div class="v tnum">${r.warnings}</div><div class="l">Warnings</div></div>
-           <div class="kpi"><div class="v tnum">${r.failures}</div><div class="l">Failures</div></div></div>
-         <div class="grid-wrap mt12" style="border:0"><table class="grid"><thead><tr><th>Result</th><th>Rule</th><th>Detail</th></tr></thead>
-         <tbody>${r.checks.map(c => `<tr><td><span class="pill ${sev[c.severity] || 'pill--muted'}">${c.severity}</span></td><td>${c.rule}</td><td>${c.detail}</td></tr>`).join('')}</tbody></table></div>`;
+      host.innerHTML = renderPreScrub(r);
     } catch (e) { host.innerHTML = '<div class="muted" style="padding:12px">Pre-scrub API error: ' + e.message + '</div>'; }
   }
+  function aiAssessEmpty() {
+    return `<div style="text-align:center;padding:30px 14px;color:var(--muted-2)">
+      <i class="bi bi-clipboard2-pulse" style="font-size:30px;display:block;margin-bottom:10px;color:var(--brand)"></i>
+      <div style="font-weight:600;color:var(--muted)">No assessment yet</div>
+      <div style="font-size:12px;margin-top:4px">Enter the patient's vitals on the left, then <b>Compute Risk Score</b>.</div>
+    </div>`;
+  }
+
+  // Risk band → visual treatment. Order defines the severity meter left→right.
+  const AI_BANDS = [
+    { key: 'Low', cls: 'ok', icon: 'bi-check-circle-fill' },
+    { key: 'Low-Medium', cls: 'info', icon: 'bi-info-circle-fill' },
+    { key: 'Medium', cls: 'warn', icon: 'bi-exclamation-triangle-fill' },
+    { key: 'High', cls: 'danger', icon: 'bi-exclamation-octagon-fill' }
+  ];
+
+  function renderRiskAssessment(r) {
+    const active = Math.max(0, AI_BANDS.findIndex(b => b.key === r.band));
+    const cur = AI_BANDS[active] || AI_BANDS[0];
+    const meter = AI_BANDS.map((b, i) =>
+      `<span class="seg${i === active ? ' on-' + b.cls : ''}">${b.key}</span>`).join('');
+    const maxPts = Math.max(1, ...(r.flags || []).map(f => Math.abs(f.points) || 0));
+    const factors = (r.flags && r.flags.length)
+      ? r.flags.slice().sort((a, b) => (b.points || 0) - (a.points || 0)).map(f => {
+          const w = Math.round((Math.abs(f.points) || 0) / maxPts * 100);
+          return `<div class="factor">
+            <div class="factor-h"><span>${f.parameter}</span><span class="factor-pts" style="background:var(--${cur.cls}-bg);color:var(--${cur.cls})">+${f.points}</span></div>
+            <div class="factor-track"><span style="width:${w}%;background:var(--${cur.cls})"></span></div>
+            <div class="factor-note">${f.note}</div></div>`;
+        }).join('')
+      : `<div style="text-align:center;padding:16px;color:var(--ok)"><i class="bi bi-check-circle-fill"></i> All parameters within normal range</div>`;
+    return `<div class="assess-hero is-${cur.cls}">
+        <div class="ah-score"><div class="ah-num">${r.score}</div><div class="ah-cap">SCORE</div></div>
+        <div class="ah-body">
+          <div class="ah-band"><i class="bi ${cur.icon}"></i> ${r.band} Risk</div>
+          <div class="rk-meter">${meter}</div>
+        </div>
+      </div>
+      <div class="assess-rec"><i class="bi bi-lightbulb-fill"></i><div><b>Recommended action</b>${r.recommendation}</div></div>
+      <div class="subhead mt12">Contributing factors</div>
+      <div>${factors}</div>
+      <div class="muted mt8" style="font-size:11px"><i class="bi bi-cpu"></i> Model: ${r.model}</div>`;
+  }
+
   async function computeRisk(doc) {
     const num = id => { const v = doc.querySelector('#' + id).value; return v === '' ? null : Number(v); };
     const vitals = { respiratoryRate: num('aiRr'), spO2: num('aiSpo2'), temperatureC: num('aiTemp'), systolicBp: num('aiSbp'), heartRate: num('aiHr'), consciousness: doc.querySelector('#aiCon').value };
     const host = doc.querySelector('#aiResult');
-    host.innerHTML = '<div class="muted" style="padding:12px">Scoring…</div>';
+    host.innerHTML = '<div class="muted" style="padding:12px"><i class="bi bi-hourglass-split"></i> Scoring…</div>';
     try {
       const r = await HIS.api.aiRisk(vitals);
-      const band = { 'High': 'pill--danger', 'Medium': 'pill--warn', 'Low-Medium': 'pill--info', 'Low': 'pill--ok' }[r.band] || 'pill--muted';
-      host.innerHTML =
-        `<div class="kpis"><div class="kpi"><div class="v tnum">${r.score}</div><div class="l">Aggregate score</div></div>
-           <div class="kpi"><div class="v"><span class="pill ${band}" style="font-size:14px">${r.band}</span></div><div class="l">Risk band</div></div></div>
-         <div class="mt12" style="padding:8px 2px"><b>Recommendation:</b> ${r.recommendation}</div>
-         <div class="grid-wrap mt8" style="border:0"><table class="grid"><thead><tr><th>Parameter</th><th class="num">Points</th><th>Value</th></tr></thead>
-         <tbody>${r.flags.length ? r.flags.map(f => `<tr><td>${f.parameter}</td><td class="num">${f.points}</td><td>${f.note}</td></tr>`).join('') : emptyRow(3, 'All parameters in normal range')}</tbody></table></div>
-         <div class="muted mt8" style="font-size:11px">Model: ${r.model}</div>`;
+      host.innerHTML = renderRiskAssessment(r);
     } catch (e) { host.innerHTML = '<div class="muted" style="padding:12px">Risk API error: ' + e.message + '</div>'; }
   }
 
@@ -1833,7 +2093,277 @@ window.HIS = window.HIS || {};
     if (id === 'assets') { initAssets(doc); HIS.saveHandlers.assets = () => doRegisterAsset(doc); }
     if (id === 'multibranch') initMultiBranch(doc);
     if (id === 'ai') initAi(doc);
+    if (id === 'abdm') { initAbdm(doc); HIS.saveHandlers.abdm = () => doRequestConsent(doc); }
+    if (id === 'paymentgw') initPaymentGw(doc);
   };
+
+  /* ---- §5: Payment Gateway console ----------------------------------- */
+  const PG_TXN_INTERVAL = 30000;   // ledger auto-refresh cadence (ms)
+
+  function initPaymentGw(doc) {
+    loadGatewayStatus(doc);
+    loadGatewayTxns(doc);
+    pgSetAutoRefresh(doc, true);
+    const rf = doc.querySelector('[data-act="refresh"]'); if (rf) rf.addEventListener('click', () => { loadGatewayStatus(doc); loadGatewayTxns(doc); });
+    const ab = doc.querySelector('#pgAuto'); if (ab) ab.addEventListener('click', () => pgSetAutoRefresh(doc, !doc._pgAuto));
+    ['pgq', 'pgMode', 'pgStatus', 'pgFrom', 'pgTo'].forEach(id => {
+      const el = doc.querySelector('#' + id);
+      if (el) { el.addEventListener('input', () => renderPgTxns(doc)); el.addEventListener('change', () => renderPgTxns(doc)); }
+    });
+    const clr = doc.querySelector('#pgClear');
+    if (clr) clr.addEventListener('click', () => {
+      ['pgq', 'pgMode', 'pgStatus', 'pgFrom', 'pgTo'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      renderPgTxns(doc);
+    });
+  }
+
+  function pgSetAutoRefresh(doc, on) {
+    doc._pgAuto = on;
+    if (doc._pgTimer) { clearInterval(doc._pgTimer); doc._pgTimer = null; }
+    if (on) {
+      doc._pgTimer = setInterval(() => {
+        if (!document.body.contains(doc)) { clearInterval(doc._pgTimer); doc._pgTimer = null; return; }
+        loadGatewayTxns(doc, true);   // silent
+      }, PG_TXN_INTERVAL);
+    }
+    const b = doc.querySelector('#pgAuto');
+    if (b) { b.classList.toggle('btn--primary', on); b.innerHTML = `<i class="bi bi-arrow-repeat"></i> Auto: ${on ? 'On' : 'Off'}`; }
+  }
+
+  async function loadGatewayStatus(doc) {
+    const host = doc.querySelector('#pgStatus'); if (!host) return;
+    try {
+      const s = await HIS.api.gatewayStatus();
+      const cls = s.isSandbox ? 'warn' : 'ok';
+      const envPill = s.isSandbox
+        ? '<span class="pill pill--warn"><i class="bi bi-cone-striped"></i> Sandbox · test mode</span>'
+        : '<span class="pill pill--ok"><i class="bi bi-check-circle-fill"></i> Live</span>';
+      host.innerHTML =
+        `<div class="assess-hero is-${cls}">
+          <div class="ah-score"><i class="bi bi-credit-card-2-front ah-ico"></i></div>
+          <div class="ah-body">
+            <div class="ah-band">${s.provider}</div>
+            <div style="margin-top:6px">${envPill}</div>
+          </div>
+        </div>
+        <div class="subhead mt12">Supported payment modes</div>
+        <div class="flex gap6" style="flex-wrap:wrap">${(s.modes || []).map(m => `<span class="pill pill--info">${pgModeIcon(m)} ${m}</span>`).join('')}</div>
+        <span class="hintline mt8" style="display:block"><i class="bi bi-shield-lock"></i> Provider keys are held server-side (Key Vault) — never in the UI. Switching provider/environment is a config change, not a code change.</span>`;
+      // populate the ledger mode filter from the configured modes
+      const sel = doc.querySelector('#pgMode');
+      if (sel && sel.options.length <= 1) sel.innerHTML = '<option value="">All modes</option>' + (s.modes || []).map(m => `<option value="${m}">${m}</option>`).join('');
+    } catch (e) { host.innerHTML = '<div class="muted" style="padding:12px">Gateway status unavailable</div>'; }
+  }
+
+  const pgModeIcon = m => {
+    const k = { UPI: 'bi-phone', Card: 'bi-credit-card', NetBanking: 'bi-bank', QR: 'bi-qr-code', Cash: 'bi-cash-stack' }[m] || 'bi-wallet2';
+    return `<i class="bi ${k}"></i>`;
+  };
+  const pgStatusPill = s => {
+    const k = { Captured: 'ok', Paid: 'ok', Failed: 'danger', Refunded: 'muted', Initiated: 'warn', Pending: 'warn' }[s] || 'info';
+    return `<span class="pill pill--${k}">${s}</span>`;
+  };
+
+  async function loadGatewayTxns(doc, silent) {
+    const tb = doc.querySelector('#pgTxns'); if (!tb) return;
+    if (!silent) tb.innerHTML = emptyRow(8, 'Loading…');
+    try {
+      doc._pgTxns = await HIS.api.gatewayTxns(200) || [];
+      renderPgTxns(doc);
+      const upd = doc.querySelector('#pgUpd');
+      if (upd) upd.innerHTML = `<i class="bi bi-clock-history"></i> Updated ${new Date().toLocaleTimeString()}`;
+    } catch (e) { if (!silent) { doc._pgTxns = []; tb.innerHTML = emptyRow(8, 'Payments API unavailable'); } }
+  }
+
+  function renderPgTxns(doc) {
+    const tb = doc.querySelector('#pgTxns'); if (!tb) return;
+    const all = doc._pgTxns || [];
+    const q = (val(doc, 'pgq') || '').toLowerCase();
+    const mode = val(doc, 'pgMode');
+    const status = val(doc, 'pgStatus');
+    const from = val(doc, 'pgFrom');   // yyyy-mm-dd
+    const to = val(doc, 'pgTo');
+    // Initiated filter also catches Pending (both are "not yet settled").
+    const statusMatch = s => !status || s === status || (status === 'Initiated' && s === 'Pending');
+    const day = t => (t.createdUtc || '').slice(0, 10);   // "yyyy-mm-dd HH:mm" → date part
+    const rows = all.filter(t =>
+      (!mode || t.mode === mode) &&
+      statusMatch(t.status) &&
+      (!from || day(t) >= from) &&
+      (!to || day(t) <= to) &&
+      (!q || `${t.reference || ''} ${t.patient} ${t.billNo || ''}`.toLowerCase().includes(q)));
+    const filtered = q || mode || status || from || to;
+    tb.innerHTML = rows.length ? rows.map(t =>
+      `<tr><td class="code">${t.reference || '—'}</td><td>${t.patient}</td><td>${t.billNo || '—'}</td>
+        <td>${pgModeIcon(t.mode)} ${t.mode}</td><td>${t.gateway || '—'}</td>
+        <td class="num tnum">₹${Number(t.amount).toLocaleString('en-IN')}</td>
+        <td>${pgStatusPill(t.status)}</td><td class="tnum">${t.createdUtc}</td></tr>`
+    ).join('') : emptyRow(8, filtered ? 'No transactions match the filters' : 'No transactions yet');
+
+    // KPI strip reflects the CURRENT filter (so totals track what you're viewing).
+    const kp = doc.querySelector('#pgKpis');
+    if (kp) {
+      const captured = rows.filter(t => t.status === 'Captured' || t.status === 'Paid');
+      const failed = rows.filter(t => t.status === 'Failed').length;
+      const total = captured.reduce((s, t) => s + Number(t.amount || 0), 0);
+      kp.innerHTML =
+        `<div class="kpi"><div class="v tnum">₹${total.toLocaleString('en-IN')}</div><div class="l">Captured ${filtered ? '(filtered)' : '(total)'}</div></div>
+         <div class="kpi"><div class="v tnum">${rows.length}</div><div class="l">Transactions</div></div>
+         <div class="kpi"><div class="v tnum" style="color:var(--ok)">${captured.length}</div><div class="l">Captured</div></div>
+         <div class="kpi"><div class="v tnum" style="color:var(--danger)">${failed}</div><div class="l">Failed</div></div>`;
+    }
+    const label = all.length ? `${rows.length} of ${all.length} transaction(s)${filtered ? ' · filtered' : ''}` : '';
+    const c = doc.querySelector('#pgCount'); if (c) c.textContent = label;
+    const sh = doc.querySelector('#pgShown'); if (sh) sh.textContent = label;
+  }
+
+  /* ---- §6.2: ABDM / ABHA Console ------------------------------------- */
+  function initAbdm(doc) {
+    loadAbdmConsents(doc);
+    loadAbdmFacilities(doc);
+    loadAbdmProfessionals(doc);
+    // Branch dropdown for HFR onboarding.
+    HIS.api.branches().then(bs => {
+      const sel = doc.querySelector('#abHfrBranch');
+      if (sel) sel.innerHTML = bs.length
+        ? '<option value="">— select branch —</option>' + bs.map(b => `<option value="${b.branchId}">${b.code} · ${b.name}</option>`).join('')
+        : '<option value="">No branches</option>';
+    }).catch(() => {});
+    // Refresh button reloads all three registers.
+    const rf = doc.querySelector('[data-act="refresh"]');
+    if (rf) rf.addEventListener('click', () => { loadAbdmConsents(doc); loadAbdmFacilities(doc); loadAbdmProfessionals(doc); });
+    // Live patient banner as the UHID is picked (F3).
+    const pf = doc.querySelector('#abPatient');
+    if (pf) { const upd = async () => { const u = pickedUhid(doc, 'abPatient'); const b = doc.querySelector('#abBanner'); if (!u) { if (b) b.innerHTML = banner(null); return; } try { const p = await HIS.api.patientByUhid(u); if (p && b) b.innerHTML = banner(p); } catch (e) {} };
+      pf.addEventListener('change', upd); pf.addEventListener('blur', upd); }
+    const hb = doc.querySelector('#abHfrBtn'); if (hb) hb.addEventListener('click', () => doOnboardFacility(doc));
+    const pb = doc.querySelector('#abHprBtn'); if (pb) pb.addEventListener('click', () => doOnboardProfessional(doc));
+    const hq = doc.querySelector('#abHfrq'); if (hq) hq.addEventListener('input', () => renderAbFacilities(doc));
+    const pq = doc.querySelector('#abHprq'); if (pq) pq.addEventListener('input', () => renderAbProfessionals(doc));
+    // Enter in the HPR ID / HFR code field submits the onboarding.
+    const hc = doc.querySelector('#abHfrCode'); if (hc) hc.addEventListener('keydown', e => { if (e.key === 'Enter') doOnboardFacility(doc); });
+    const pc = doc.querySelector('#abHprCode'); if (pc) pc.addEventListener('keydown', e => { if (e.key === 'Enter') doOnboardProfessional(doc); });
+  }
+
+  const abdmStatusPill = s => {
+    const k = { Granted: 'ok', Requested: 'warn', Revoked: 'muted', Expired: 'danger' }[s] || 'info';
+    return `<span class="pill pill--${k}">${s}</span>`;
+  };
+
+  async function loadAbdmConsents(doc) {
+    const tb = doc.querySelector('#abConsents'); if (!tb) return;
+    try {
+      const rows = await HIS.api.abdmConsents();
+      tb.innerHTML = rows.length ? rows.map(r => {
+        const actions = r.status === 'Requested'
+          ? `<button class="btn btn--sm" data-ab-grant="${r.consentArtifactId}"><i class="bi bi-check2"></i> Grant</button> <button class="btn btn--sm" data-ab-revoke="${r.consentArtifactId}"><i class="bi bi-x"></i></button>`
+          : r.status === 'Granted'
+            ? `<button class="btn btn--sm" data-ab-revoke="${r.consentArtifactId}"><i class="bi bi-slash-circle"></i> Revoke</button>`
+            : '';
+        return `<tr><td>${r.consentArtifactId}</td><td>${r.patient || '—'}</td><td class="code">${r.abhaNumber || '—'}</td><td>${r.purpose || '—'}</td><td>${abdmStatusPill(r.status)}</td><td>${r.expiryUtc || '—'}</td><td class="right">${actions}</td></tr>`;
+      }).join('') : emptyRow(7, 'No consent artifacts yet');
+      const cnt = doc.querySelector('#abConsentCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} artifact(s)` : '';
+      tb.querySelectorAll('[data-ab-grant]').forEach(b => b.addEventListener('click', () => doSetConsent(doc, b.dataset.abGrant, 'grant')));
+      tb.querySelectorAll('[data-ab-revoke]').forEach(b => b.addEventListener('click', () => doSetConsent(doc, b.dataset.abRevoke, 'revoke')));
+      renderAbdmKpis(doc, rows);
+    } catch (e) { tb.innerHTML = emptyRow(7, 'ABDM API unavailable'); }
+  }
+
+  function renderAbdmKpis(doc, consents) {
+    const kp = doc.querySelector('#abKpis'); if (!kp) return;
+    const granted = consents.filter(c => c.status === 'Granted').length;
+    const requested = consents.filter(c => c.status === 'Requested').length;
+    const revoked = consents.filter(c => c.status === 'Revoked').length;
+    kp.innerHTML =
+      `<div class="kpi"><div class="v tnum">${consents.length}</div><div class="l">Consent artifacts</div></div>
+       <div class="kpi"><div class="v tnum">${granted}</div><div class="l">Granted / active</div></div>
+       <div class="kpi"><div class="v tnum">${requested}</div><div class="l">Awaiting grant</div></div>
+       <div class="kpi"><div class="v tnum">${revoked}</div><div class="l">Revoked</div></div>`;
+  }
+
+  const abdmLinkPill = code => code
+    ? '<span class="pill pill--ok"><i class="bi bi-check-circle-fill"></i> Linked</span>'
+    : '<span class="pill pill--warn">Pending</span>';
+
+  async function loadAbdmFacilities(doc) {
+    const tb = doc.querySelector('#abFacilities'); if (!tb) return;
+    try { doc._abFac = await HIS.api.abdmFacilities() || []; renderAbFacilities(doc); }
+    catch (e) { doc._abFac = []; tb.innerHTML = emptyRow(4, 'ABDM API unavailable'); }
+  }
+  function renderAbFacilities(doc) {
+    const tb = doc.querySelector('#abFacilities'); if (!tb) return;
+    const q = (val(doc, 'abHfrq') || '').toLowerCase();
+    const rows = (doc._abFac || []).filter(r => !q || `${r.branch} ${r.hfrCode || ''}`.toLowerCase().includes(q));
+    tb.innerHTML = rows.length ? rows.map(r =>
+      `<tr><td><i class="bi bi-hospital" style="color:var(--muted);margin-right:5px"></i>${r.branch}</td><td class="code">${r.hfrCode || '—'}</td><td>${abdmLinkPill(r.hfrCode)}</td><td class="tnum">${r.onboardedUtc || '—'}</td></tr>`
+    ).join('') : emptyRow(4, q ? 'No matches' : 'No facilities onboarded');
+    const c = doc.querySelector('#abHfrCount'); if (c) c.textContent = (doc._abFac || []).length ? `${(doc._abFac || []).length} facility(ies)` : '';
+  }
+
+  async function loadAbdmProfessionals(doc) {
+    const tb = doc.querySelector('#abProfessionals'); if (!tb) return;
+    try { doc._abHpr = await HIS.api.abdmProfessionals() || []; renderAbProfessionals(doc); }
+    catch (e) { doc._abHpr = []; tb.innerHTML = emptyRow(5, 'ABDM API unavailable'); }
+  }
+  function renderAbProfessionals(doc) {
+    const tb = doc.querySelector('#abProfessionals'); if (!tb) return;
+    const q = (val(doc, 'abHprq') || '').toLowerCase();
+    const rows = (doc._abHpr || []).filter(r => !q || `${r.doctor} ${r.department || ''} ${r.hprCode || ''}`.toLowerCase().includes(q));
+    tb.innerHTML = rows.length ? rows.map(r =>
+      `<tr><td><span class="av-sm">${initials(r.doctor)}</span>${r.doctor}</td><td>${r.department ? `<span class="pill pill--info">${r.department}</span>` : '—'}</td><td class="code">${r.hprCode || '—'}</td><td>${abdmLinkPill(r.hprCode)}</td><td class="tnum">${r.onboardedUtc || '—'}</td></tr>`
+    ).join('') : emptyRow(5, q ? 'No matches' : 'No professionals onboarded');
+    const c = doc.querySelector('#abHprCount'); if (c) c.textContent = (doc._abHpr || []).length ? `${(doc._abHpr || []).length} professional(s)` : '';
+  }
+
+  async function doRequestConsent(doc) {
+    const uhid = pickedUhid(doc, 'abPatient');
+    if (!uhid) { HIS.toast('Select a patient (F3)'); return; }
+    const hiTypes = Array.from(doc.querySelectorAll('#abHiTypes input:checked')).map(c => c.value);
+    const expiry = val(doc, 'abExpiry');
+    try {
+      await HIS.api.abdmRequestConsent({ patientUhid: uhid, purpose: val(doc, 'abPurpose'), hiTypes, expiry: expiry || null });
+      HIS.toast('Consent artifact requested', 'bi-shield-plus');
+      const p = doc.querySelector('#abPatient'); if (p) p.value = '';
+      const b = doc.querySelector('#abBanner'); if (b) b.innerHTML = banner(null);
+      loadAbdmConsents(doc);
+    } catch (e) { HIS.toast('Request failed: ' + e.message); }
+  }
+
+  async function doSetConsent(doc, id, action) {
+    try {
+      if (action === 'grant') await HIS.api.abdmGrantConsent(id, 6);   // default 6-month validity window
+      else await HIS.api.abdmRevokeConsent(id);
+      HIS.toast(action === 'grant' ? 'Consent granted' : 'Consent revoked', action === 'grant' ? 'bi-check2-circle' : 'bi-slash-circle');
+      loadAbdmConsents(doc);
+    } catch (e) { HIS.toast(action + ' failed: ' + e.message); }
+  }
+
+  async function doOnboardFacility(doc) {
+    const branchId = val(doc, 'abHfrBranch');
+    if (!branchId) { HIS.toast('Select a branch'); return; }
+    const code = val(doc, 'abHfrCode');
+    if (!code) { HIS.toast('Enter an HFR code'); return; }
+    try {
+      await HIS.api.abdmOnboardFacility({ branchId: parseInt(branchId, 10), hfrCode: code });
+      HIS.toast('Facility onboarded to HFR', 'bi-hospital');
+      const c = doc.querySelector('#abHfrCode'); if (c) c.value = '';
+      loadAbdmFacilities(doc);
+    } catch (e) { HIS.toast('Onboard failed: ' + e.message); }
+  }
+
+  async function doOnboardProfessional(doc) {
+    const docCode = pickedUhid(doc, 'abHprDoctor');
+    if (!docCode) { HIS.toast('Select a doctor (F3)'); return; }
+    const code = val(doc, 'abHprCode');
+    if (!code) { HIS.toast('Enter an HPR ID'); return; }
+    try {
+      await HIS.api.abdmOnboardProfessional({ doctorCode: docCode, hprCode: code });
+      HIS.toast('Professional onboarded to HPR', 'bi-person-badge');
+      const c = doc.querySelector('#abHprCode'); if (c) c.value = '';
+      const d = doc.querySelector('#abHprDoctor'); if (d) d.value = '';
+      loadAbdmProfessionals(doc);
+    } catch (e) { HIS.toast('Onboard failed: ' + e.message); }
+  }
 
   /* ---- Phase 10: ambulance ------------------------------------------- */
   function initAmbulance(doc) {
@@ -2883,9 +3413,41 @@ window.HIS = window.HIS || {};
 
   /* ---- ICU & Emergency Trauma (SRS §3.5/§3.6) ------------------------- */
   const TRIAGE_COLOUR = { 1: '#e5484d', 2: '#f5820e', 3: '#f2c94c', 4: '#37a35e', 5: '#3b82f6' };
+  // Disposition outcomes → whether a bed is required, colour, and guidance.
+  const ER_DISP = {
+    AdmitICU:  { bed: true,  cls: 'danger', hint: 'Admits to an ICU bed — pick a free bed (F3) and the patient must be registered (UHID).' },
+    AdmitWard: { bed: true,  cls: 'warn',   hint: 'Admits to a ward bed — pick a free bed (F3) and the patient must be registered (UHID).' },
+    Discharge: { bed: false, cls: 'ok',     hint: 'Closes the ED encounter and sends the patient home. No bed required.' },
+    Refer:     { bed: false, cls: 'info',   hint: 'Refers the patient to another facility / higher centre. No bed required.' },
+    LAMA:      { bed: false, cls: 'warn',   hint: 'Left Against Medical Advice — records the patient’s refusal of further care.' },
+    Expired:   { bed: false, cls: 'muted',  hint: 'Records death in the ED — may trigger the MLC / mortuary workflow.' }
+  };
+
+  // Selected-patient banner for the Disposition panel. sel = {patient, uhid, level, category, colour} | null.
+  function erDispBanner(sel) {
+    if (!sel) return `<div class="pbanner selectable" style="border-left-color:var(--line-2)">
+      <div class="av" style="background:var(--surface-2);color:var(--muted-2)"><i class="bi bi-hand-index"></i></div>
+      <div><div class="nm">No patient selected</div>
+      <div class="meta"><span>Click <b>Dispose</b> on a triage row above to pick a patient</span></div></div></div>`;
+    const col = sel.colour || '#999';
+    return `<div class="pbanner selectable" style="border-left-color:${col}">
+      <div class="av" style="background:${col};color:#fff">${sel.level ? 'L' + sel.level : '?'}</div>
+      <div style="min-width:0"><div class="nm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sel.patient || 'Unidentified'}</div>
+      <div class="meta">${sel.uhid ? `<span>UHID <b>${sel.uhid}</b></span>` : '<span><i>Unregistered</i></span>'}<span>Acuity <b>${sel.category || '—'}</b></span></div></div></div>`;
+  }
+
+  function updateErDispFields(doc) {
+    const meta = ER_DISP[val(doc, 'erDisp')] || ER_DISP.Discharge;
+    const bedRow = doc.querySelector('#erBedRow'); if (bedRow) bedRow.hidden = !meta.bed;
+    const hint = doc.querySelector('#erDispHint');
+    if (hint) { hint.style.display = 'flex'; const t = hint.querySelector('div'); if (t) t.textContent = meta.hint; }
+  }
+
   function initEmergency(doc) {
     loadTriageBoard(doc);
     const b = doc.querySelector('#erDisposeBtn'); if (b) b.addEventListener('click', () => doDispose(doc));
+    const sel = doc.querySelector('#erDisp'); if (sel) sel.addEventListener('change', () => updateErDispFields(doc));
+    updateErDispFields(doc);
   }
   async function loadTriageBoard(doc) {
     const tb = doc.querySelector('#erBoard'); if (!tb) return;
@@ -2896,19 +3458,22 @@ window.HIS = window.HIS || {};
         const dot = `<span class="sw" style="background:${TRIAGE_COLOUR[r.triageLevel] || '#999'};display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px"></span>`;
         const when = (r.arrivedUtc || '').replace('T', ' ').slice(11, 16);
         const done = r.status !== 'Waiting' && r.status !== 'InTreatment';
-        const act = done ? '' : `<button class="btn btn--sm" data-dispo="${r.triageId}" data-uhid="${r.uhid || ''}" data-patient="${r.patient || 'Unidentified'}"><i class="bi bi-box-arrow-right"></i> Dispose</button>`;
+        const act = done ? '' : `<button class="btn btn--sm" data-dispo="${r.triageId}" data-uhid="${r.uhid || ''}" data-patient="${(r.patient || 'Unidentified').replace(/"/g, '&quot;')}" data-level="${r.triageLevel || ''}" data-cat="${r.category || ''}" data-colour="${TRIAGE_COLOUR[r.triageLevel] || '#999'}"><i class="bi bi-box-arrow-right"></i> Dispose</button>`;
         return `<tr><td>${dot}<b>${lvl ? 'L' + lvl : ''}</b> ${r.category}</td><td>${r.patient || '<i>Unidentified</i>'}</td><td>${r.chiefComplaint || ''}</td>`
           + `<td>${when}</td><td>${r.arrivalMode || ''}</td><td>${r.isMlc ? '<span class="pill pill--warn">MLC</span>' : ''}</td>`
           + `<td><span class="pill ${done ? 'pill--muted' : 'pill--ok'}">${r.status}</span></td><td>${act}</td></tr>`;
       }).join('') : emptyRow(8, 'No arrivals today');
       tb.querySelectorAll('[data-dispo]').forEach(b => b.addEventListener('click', () => {
         doc.dataset.erTriage = b.dataset.dispo; doc.dataset.erUhid = b.dataset.uhid;
-        const who = doc.querySelector('#erDispWho'); if (who) who.textContent = b.dataset.patient + (b.dataset.uhid ? ' · ' + b.dataset.uhid : '');
+        const bn = doc.querySelector('#erDispBanner');
+        if (bn) bn.innerHTML = erDispBanner({ patient: b.dataset.patient, uhid: b.dataset.uhid, level: b.dataset.level, category: b.dataset.cat, colour: b.dataset.colour });
+        const db = doc.querySelector('#erDisposeBtn'); if (db) db.disabled = false;
+        updateErDispFields(doc);
         tb.querySelectorAll('tr').forEach(tr => { tr.style.background = ''; });
-        const row = b.closest('tr'); if (row) row.style.background = '#eef6ff';
+        const row = b.closest('tr'); if (row) row.style.background = 'var(--brand-50)';
         // Bring the Disposition panel into view so the next step is obvious.
-        const db = doc.querySelector('#erDisposeBtn'); if (db && db.closest('.panel')) db.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        HIS.toast('Selected ' + b.dataset.patient + ' → set Disposition below, then Confirm', 'bi-box-arrow-right');
+        if (db && db.closest('.panel')) db.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        HIS.toast('Selected ' + b.dataset.patient + ' → set the outcome below, then Confirm', 'bi-box-arrow-right');
       }));
     } catch (e) { tb.innerHTML = emptyRow(8, 'Triage board API unavailable'); }
   }
@@ -2947,8 +3512,10 @@ window.HIS = window.HIS || {};
       const r = await HIS.api.disposeTriage(cmd);
       HIS.toast('Disposed · ' + disp + (r.admissionNo ? ' · ' + r.admissionNo + ' (bed ' + r.bedNo + ')' : ''), 'bi-check2-circle');
       delete doc.dataset.erTriage; delete doc.dataset.erUhid;
-      const who = doc.querySelector('#erDispWho'); if (who) who.textContent = 'select a board row';
+      const bn = doc.querySelector('#erDispBanner'); if (bn) bn.innerHTML = erDispBanner(null);
+      const db = doc.querySelector('#erDisposeBtn'); if (db) db.disabled = true;
       const eb = doc.querySelector('#erBed'); if (eb) eb.value = '';
+      const dd = doc.querySelector('#erDispDoctor'); if (dd) dd.value = '';
       loadTriageBoard(doc);
     } catch (e) { HIS.toast('Disposition failed: ' + e.message); }
   }

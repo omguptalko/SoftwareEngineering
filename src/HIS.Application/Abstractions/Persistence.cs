@@ -355,6 +355,22 @@ public interface ISchemeRepository
     Task<IReadOnlyList<(string Patient, string MemberNo, string? SecondaryRef, bool Verified, DateTime? ValidTo)>> GetMembershipsAsync(string schemeType, CancellationToken ct = default);
 }
 
+public interface IAbdmRepository
+{
+    // Consent artifacts (HIP/HIU) — abdm.AbdmConsent (master DB, longitudinal).
+    Task<long> InsertConsentAsync(AbdmConsent c, CancellationToken ct = default);
+    Task<AbdmConsent?> GetConsentAsync(long consentArtifactId, CancellationToken ct = default);
+    Task UpdateConsentStatusAsync(long consentArtifactId, string status, DateTime? grantedUtc, DateTime? expiryUtc, CancellationToken ct = default);
+    Task<IReadOnlyList<(long ConsentArtifactId, string Patient, string? AbhaNumber, string? Purpose, string? HiTypes, string Status, DateTime? GrantedUtc, DateTime? ExpiryUtc)>> GetConsentsAsync(CancellationToken ct = default);
+    // Health Facility Registry (HFR) — master.HfrFacility.
+    Task<int> UpsertFacilityAsync(int branchId, string hfrCode, CancellationToken ct = default);
+    Task<IReadOnlyList<(int HfrId, string Branch, string? HfrCode, DateTime? OnboardedUtc)>> GetFacilitiesAsync(CancellationToken ct = default);
+    // Healthcare Professional Registry (HPR) — master.HprProfessional.
+    Task<int?> GetDoctorIdByCodeAsync(string code, CancellationToken ct = default);
+    Task<int> UpsertProfessionalAsync(int doctorId, string hprCode, CancellationToken ct = default);
+    Task<IReadOnlyList<(int HprId, string Doctor, string? Department, string? HprCode, DateTime? OnboardedUtc)>> GetProfessionalsAsync(CancellationToken ct = default);
+}
+
 public interface IBillingRepository
 {
     Task<Tariff?> GetTariffByCodeAsync(int branchId, string code, CancellationToken ct = default);
@@ -364,6 +380,7 @@ public interface IBillingRepository
     Task<IReadOnlyList<(string Description, decimal Qty, decimal Rate, decimal Amount)>> GetBillLinesAsync(long billId, CancellationToken ct = default);
     Task<IReadOnlyList<(long BillId, string BillNo, string Patient, decimal Gross, decimal PatientPays, decimal Paid, string Status, DateTime CreatedUtc)>> GetBillsAsync(int branchId, CancellationToken ct = default);
     Task<long> InsertPaymentAsync(Payment p, CancellationToken ct = default);
+    Task<IReadOnlyList<(long PaymentId, string? BillNo, string Patient, string Mode, string? Gateway, decimal Amount, string? GatewayRef, string Status, DateTime CreatedUtc)>> GetPaymentsAsync(int take, CancellationToken ct = default);
     Task<decimal> GetPaidTotalAsync(long billId, CancellationToken ct = default);
     Task UpdateBillStatusAsync(long billId, string status, CancellationToken ct = default);
     Task<long> InsertDepositAsync(PatientDeposit d, CancellationToken ct = default);
