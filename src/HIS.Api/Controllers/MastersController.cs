@@ -26,4 +26,16 @@ public sealed class MastersController : ControllerBase
     /// <summary>Deactivate / restore a drug (soft delete — keeps stock history).</summary>
     [HttpPost("drugs/set-active")]
     public Task<bool> SetActive([FromBody] SetDrugActiveCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Doctor master list (all doctors, including deactivated).</summary>
+    [HttpGet("doctors")]
+    public Task<IReadOnlyList<DoctorDto>> Doctors(CancellationToken ct) => _mediator.Send(new GetDoctorsAdminQuery(), ct);
+
+    /// <summary>Create or update a doctor (gated by 'masters.manage').</summary>
+    [HttpPost("doctors")]
+    public Task<int> SaveDoctor([FromBody] SaveDoctorCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Deactivate / restore a doctor (soft delete — keeps clinical history).</summary>
+    [HttpPost("doctors/set-active")]
+    public Task<bool> SetDoctorActive([FromBody] SetDoctorActiveCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }

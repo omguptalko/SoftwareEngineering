@@ -62,6 +62,48 @@ public sealed class LookupRepository : ILookupRepository
               ORDER BY Name", new { q = Like(q) }, cancellationToken: ct))).ToList();
     }
 
+    // ---- Doctor master admin (CRUD) ----
+    public async Task<IReadOnlyList<Doctor>> GetAllDoctorsAsync(CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return (await c.QueryAsync<Doctor>(new CommandDefinition(
+            "SELECT DoctorId, Code, Name, Department, IsActive FROM master.Doctor ORDER BY Name",
+            cancellationToken: ct))).ToList();
+    }
+
+    public async Task<bool> DoctorCodeExistsAsync(string code, int? excludeDoctorId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(1) FROM master.Doctor WHERE Code = @code AND (@excludeDoctorId IS NULL OR DoctorId <> @excludeDoctorId)",
+            new { code, excludeDoctorId }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task<int> InsertDoctorAsync(Doctor d, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.QuerySingleAsync<int>(new CommandDefinition(
+            @"INSERT INTO master.Doctor (Code, Name, Department, IsActive)
+              VALUES (@Code, @Name, @Department, @IsActive);
+              SELECT CAST(SCOPE_IDENTITY() AS INT);", d, cancellationToken: ct));
+    }
+
+    public async Task<bool> UpdateDoctorAsync(Doctor d, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE master.Doctor SET Name = @Name, Department = @Department WHERE DoctorId = @DoctorId",
+            d, cancellationToken: ct)) > 0;
+    }
+
+    public async Task SetDoctorActiveAsync(int doctorId, bool isActive, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE master.Doctor SET IsActive = @isActive WHERE DoctorId = @doctorId",
+            new { doctorId, isActive }, cancellationToken: ct));
+    }
+
     public async Task<IReadOnlyList<Drug>> GetDrugsAsync(string? q, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

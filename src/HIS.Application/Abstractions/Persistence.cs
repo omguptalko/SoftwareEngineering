@@ -37,6 +37,12 @@ public interface IModuleRegistryRepository
 public interface ILookupRepository
 {
     Task<IReadOnlyList<Doctor>> GetDoctorsAsync(string? q, CancellationToken ct = default);
+    // ---- Doctor master admin (CRUD) ----
+    Task<IReadOnlyList<Doctor>> GetAllDoctorsAsync(CancellationToken ct = default);   // includes inactive
+    Task<bool> DoctorCodeExistsAsync(string code, int? excludeDoctorId, CancellationToken ct = default);
+    Task<int> InsertDoctorAsync(Doctor d, CancellationToken ct = default);
+    Task<bool> UpdateDoctorAsync(Doctor d, CancellationToken ct = default);
+    Task SetDoctorActiveAsync(int doctorId, bool isActive, CancellationToken ct = default);
     Task<IReadOnlyList<Drug>> GetDrugsAsync(string? q, CancellationToken ct = default);
     // ---- Drug master admin (CRUD) ----
     Task<IReadOnlyList<Drug>> GetAllDrugsAsync(CancellationToken ct = default);   // includes inactive

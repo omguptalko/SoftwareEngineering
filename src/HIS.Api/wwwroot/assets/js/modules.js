@@ -1647,6 +1647,28 @@ window.HIS = window.HIS || {};
     </div>`;
   }
 
+  /* ====================== DOCTOR MASTER ======================== */
+  function doctormaster() {
+    return `<div class="screen">
+      ${head('bi-person-badge', 'Doctor Master', 'Manage clinical doctors — used across all F3 doctor lookups', '')}
+      <div class="panel"><div class="panel__head"><i class="bi bi-people"></i> Doctors <span class="ph-right"><input class="ctl" id="docq" placeholder="Search code / name / dept…" style="max-width:220px"></span></div>
+        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <thead><tr><th>Code</th><th>Name</th><th>Department</th><th>Status</th><th></th></tr></thead>
+          <tbody id="docList">${emptyRow(5, 'Loading…')}</tbody>
+        </table></div><span class="hintline" id="docCount" style="padding:8px 12px;display:block"></span></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-person-plus"></i> <span id="docFormTitle">Add Doctor</span></div><div class="panel__body">
+        <div class="form-grid three">
+          <div class="f"><label>Code <span class="req">*</span></label><div class="field"><input class="ctl code" id="docCode" placeholder="e.g. DR009"></div></div>
+          <div class="f"><label>Name <span class="req">*</span></label><div class="field"><input class="ctl" id="docName" placeholder="e.g. Dr. N. Sharma"></div></div>
+          <div class="f"><label>Department <span class="req">*</span></label><div class="field"><input class="ctl" id="docDept" list="docDeptList" placeholder="e.g. Nephrology"><datalist id="docDeptList">
+            <option>General Medicine</option><option>Cardiology</option><option>Orthopaedics</option><option>Pulmonology</option><option>Emergency Medicine</option><option>Surgery</option><option>Occupational Health</option><option>Radiology</option><option>Nephrology</option><option>Paediatrics</option><option>Gynaecology</option><option>Anaesthesia</option><option>Dermatology</option><option>ENT</option><option>Ophthalmology</option><option>Psychiatry</option><option>Neurology</option><option>Oncology</option>
+          </datalist></div></div>
+        </div>
+        <div class="flex gap6 mt8"><button class="btn btn--primary" data-act="save"><i class="bi bi-check2-circle"></i> Save Doctor <span class="fk">F9</span></button><button class="btn" id="docReset"><i class="bi bi-arrow-counterclockwise"></i> New / Reset</button><span class="hintline">Code unique hona chahiye (edit pe locked). Save karte hi F3 doctor lookups me aa jayega.</span></div>
+      </div></div>
+    </div>`;
+  }
+
   /* ====================== INVENTORY & STORE (SRS §3.11) ========= */
   function inventory() {
     return `<div class="screen">
@@ -1708,7 +1730,7 @@ window.HIS = window.HIS || {};
   }
 
   /* ============================ Registry ============================ */
-  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, consent, bmwm, mlc, queue, feedback, compliance, assets, multibranch, ai, abdm, paymentgw };
+  HIS.screens = { dashboard, registration, appointments, vitals, opd, ipd, emergency, icu, ot, nursing, radiology, certificates, drugmaster, doctormaster, inventory, bloodbank, billing, pharmacy, lab, cashless, pmjay, esic, cghs, echs, statescheme, claimsmis, hr, payroll, occhealth, telemedicine, ambulance, diet, mortuary, consent, bmwm, mlc, queue, feedback, compliance, assets, multibranch, ai, abdm, paymentgw };
 
   /* Per-screen Save handlers — invoked by the toolbar/F9 Save (see shell.js). */
   HIS.saveHandlers = HIS.saveHandlers || {};
@@ -1793,6 +1815,12 @@ window.HIS = window.HIS || {};
 
       <div data-pane="risk"><div class="cols-side">
         <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-pulse"></i> Vitals</div><div class="panel__body">
+          <div class="flex gap6 mb8" style="align-items:center;flex-wrap:wrap">
+            <span class="hintline" style="margin-right:2px">Load sample:</span>
+            <button class="btn btn--sm" data-sample="Normal"><i class="bi bi-heart-pulse"></i> Normal</button>
+            <button class="btn btn--sm" data-sample="Sepsis"><i class="bi bi-thermometer-half"></i> Sepsis</button>
+            <button class="btn btn--sm" data-sample="Shock"><i class="bi bi-exclamation-octagon"></i> Shock</button>
+          </div>
           <div class="form-grid" style="gap:8px">
             <div class="f"><label>Respiratory rate (/min)</label><div class="field"><input class="ctl" id="aiRr" type="number" value="28"></div></div>
             <div class="f"><label>SpO₂ (%)</label><div class="field"><input class="ctl" id="aiSpo2" type="number" value="90"></div></div>
@@ -1850,6 +1878,7 @@ window.HIS = window.HIS || {};
 
   function initAi(doc) {
     const rb = doc.querySelector('#aiCompute'); if (rb) rb.addEventListener('click', () => computeRisk(doc));
+    doc.querySelectorAll('[data-sample]').forEach(b => b.addEventListener('click', () => aiLoadSample(doc, b.dataset.sample)));
     const fb = doc.querySelector('#aiRunForecast'); if (fb) fb.addEventListener('click', () => runForecast(doc));
     const pb = doc.querySelector('#aiRunPreScrub'); if (pb) pb.addEventListener('click', () => runPreScrub(doc));
     // Inventory forecast is a pure read → auto-load on open + periodic auto-refresh.
@@ -2021,6 +2050,19 @@ window.HIS = window.HIS || {};
       <div class="muted mt8" style="font-size:11px"><i class="bi bi-cpu"></i> Model: ${r.model}</div>`;
   }
 
+  // One-click clinical scenarios for the NEWS2 risk demo → load vitals + auto-score.
+  const AI_SAMPLES = {
+    Normal: { aiRr: 16, aiSpo2: 98, aiTemp: 36.8, aiSbp: 120, aiHr: 75, aiCon: 'Alert' },
+    Sepsis: { aiRr: 24, aiSpo2: 93, aiTemp: 39.2, aiSbp: 96, aiHr: 118, aiCon: 'Alert' },
+    Shock:  { aiRr: 30, aiSpo2: 88, aiTemp: 35.4, aiSbp: 78, aiHr: 132, aiCon: 'Voice' }
+  };
+  function aiLoadSample(doc, name) {
+    const s = AI_SAMPLES[name]; if (!s) return;
+    Object.entries(s).forEach(([id, v]) => { const el = doc.querySelector('#' + id); if (el) el.value = v; });
+    HIS.toast(`Loaded "${name}" vitals`, 'bi-clipboard-pulse');
+    computeRisk(doc);   // auto-score so the assessment updates immediately
+  }
+
   async function computeRisk(doc) {
     const num = id => { const v = doc.querySelector('#' + id).value; return v === '' ? null : Number(v); };
     const vitals = { respiratoryRate: num('aiRr'), spO2: num('aiSpo2'), temperatureC: num('aiTemp'), systolicBp: num('aiSbp'), heartRate: num('aiHr'), consciousness: doc.querySelector('#aiCon').value };
@@ -2051,6 +2093,7 @@ window.HIS = window.HIS || {};
     if (id === 'radiology') { initRadiology(doc); HIS.saveHandlers.radiology = () => doOrderStudy(doc); }
     if (id === 'certificates') { initCertificates(doc); HIS.saveHandlers.certificates = () => doIssueCertificate(doc); }
     if (id === 'drugmaster') { initDrugMaster(doc); HIS.saveHandlers.drugmaster = () => doSaveDrug(doc); }
+    if (id === 'doctormaster') { initDoctorMaster(doc); HIS.saveHandlers.doctormaster = () => doSaveDoctor(doc); }
     if (id === 'inventory') { initInventory(doc); HIS.saveHandlers.inventory = () => doCreatePo(doc); }
     if (id === 'bloodbank') { initBloodBank(doc); HIS.saveHandlers.bloodbank = () => doRaiseBloodRequest(doc); }
     if (id === 'emergency') { initEmergency(doc); HIS.saveHandlers.emergency = () => doRegisterTriage(doc); }
@@ -3807,6 +3850,70 @@ window.HIS = window.HIS || {};
   }
   async function toggleDrug(doc, id, active) {
     try { await HIS.api.setDrugActive(parseInt(id, 10), active); HIS.toast(active ? 'Drug restored' : 'Drug deactivated'); loadDrugMaster(doc); }
+    catch (e) { HIS.toast('Failed: ' + e.message); }
+  }
+
+  /* ---- Doctor Master ------------------------------------------------- */
+  function initDoctorMaster(doc) {
+    loadDoctorMaster(doc);
+    const r = doc.querySelector('#docReset'); if (r) r.addEventListener('click', () => resetDoctorForm(doc));
+    const q = doc.querySelector('#docq'); if (q) q.addEventListener('input', () => renderDoctorRows(doc));
+  }
+  async function loadDoctorMaster(doc) {
+    const tb = doc.querySelector('#docList'); if (!tb) return;
+    try { doc._docRows = await HIS.api.doctorMaster() || []; renderDoctorRows(doc); }
+    catch (e) { doc._docRows = []; tb.innerHTML = emptyRow(5, 'Doctor master API unavailable'); }
+  }
+  function renderDoctorRows(doc) {
+    const tb = doc.querySelector('#docList'); if (!tb) return;
+    const all = doc._docRows || [];
+    const q = (val(doc, 'docq') || '').toLowerCase();
+    const rows = all.filter(d => !q || `${d.code} ${d.name} ${d.department}`.toLowerCase().includes(q));
+    tb.innerHTML = rows.length ? rows.map(d => {
+      const st = d.isActive ? '<span class="pill pill--ok">Active</span>' : '<span class="pill pill--muted">Inactive</span>';
+      const nm = (d.name || '').replace(/"/g, '&quot;');
+      const dp = (d.department || '').replace(/"/g, '&quot;');
+      const toggle = d.isActive ? `<button class="btn btn--sm" data-docoff="${d.doctorId}">Deactivate</button>` : `<button class="btn btn--sm" data-docon="${d.doctorId}">Restore</button>`;
+      return `<tr><td><b>${d.code}</b></td><td><span class="av-sm">${initials(d.name)}</span>${d.name}</td><td><span class="pill pill--info">${d.department}</span></td><td>${st}</td>`
+        + `<td class="flex gap6"><button class="btn btn--sm" data-docedit="${d.doctorId}" data-code="${d.code}" data-name="${nm}" data-dept="${dp}"><i class="bi bi-pencil"></i> Edit</button>${toggle}</td></tr>`;
+    }).join('') : emptyRow(5, q ? 'No matching doctors' : 'No doctors — add one below');
+    const cnt = doc.querySelector('#docCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length} doctor(s)` : '';
+    tb.querySelectorAll('[data-docedit]').forEach(b => b.addEventListener('click', () => editDoctor(doc, b.dataset)));
+    tb.querySelectorAll('[data-docoff]').forEach(b => b.addEventListener('click', () => toggleDoctor(doc, b.dataset.docoff, false)));
+    tb.querySelectorAll('[data-docon]').forEach(b => b.addEventListener('click', () => toggleDoctor(doc, b.dataset.docon, true)));
+  }
+  function editDoctor(doc, ds) {
+    doc.dataset.docEditId = ds.docedit;
+    const set = (id, v) => { const el = doc.querySelector('#' + id); if (el) el.value = v; };
+    set('docCode', ds.code); set('docName', ds.name); set('docDept', ds.dept);
+    const code = doc.querySelector('#docCode'); if (code) code.disabled = true;   // code immutable on edit
+    const t = doc.querySelector('#docFormTitle'); if (t) t.textContent = 'Edit Doctor · ' + ds.code;
+    const nm = doc.querySelector('#docName'); if (nm) nm.focus();
+  }
+  function resetDoctorForm(doc) {
+    delete doc.dataset.docEditId;
+    ['docCode', 'docName', 'docDept'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+    const code = doc.querySelector('#docCode'); if (code) code.disabled = false;
+    const t = doc.querySelector('#docFormTitle'); if (t) t.textContent = 'Add Doctor';
+  }
+  async function doSaveDoctor(doc) {
+    const code = val(doc, 'docCode'), name = val(doc, 'docName'), dept = val(doc, 'docDept');
+    if (!code || !name || !dept) { HIS.toast('Code, Name and Department are required'); return; }
+    const cmd = { doctorId: doc.dataset.docEditId ? parseInt(doc.dataset.docEditId, 10) : null, code, name, department: dept };
+    try {
+      await HIS.api.saveDoctor(cmd);
+      HIS.toast(doc.dataset.docEditId ? 'Doctor updated · ' + code : 'Doctor added · ' + code, 'bi-person-badge');
+      resetDoctorForm(doc); loadDoctorMaster(doc);
+    } catch (e) {
+      const msg = /403|permission/i.test(e.message)
+        ? 'No permission to manage masters — log in as an admin (superadmin), not billing.demo.'
+        : /409|already exists/i.test(e.message) ? `Doctor code "${code}" already exists.`
+        : 'Save failed: ' + e.message;
+      HIS.toast(msg, 'bi-exclamation-triangle');
+    }
+  }
+  async function toggleDoctor(doc, id, active) {
+    try { await HIS.api.setDoctorActive(parseInt(id, 10), active); HIS.toast(active ? 'Doctor restored' : 'Doctor deactivated'); loadDoctorMaster(doc); }
     catch (e) { HIS.toast('Failed: ' + e.message); }
   }
 

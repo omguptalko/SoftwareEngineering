@@ -47,3 +47,10 @@ IF NOT EXISTS (SELECT 1 FROM master.Module WHERE ModuleId = 'drugmaster')
     INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, SortOrder, SrsRef)
     VALUES ('drugmaster', 'diag', 'bi-capsule-pill', 'Drug Master', 1, (SELECT ISNULL(MAX(SortOrder),50)+1 FROM master.Module), '3.8');
 GO
+
+/* Doctor Master - clinical doctor catalogue admin (admin group). Feeds all F3 doctor lookups. */
+IF NOT EXISTS (SELECT 1 FROM master.Module WHERE ModuleId = 'doctormaster')
+   AND EXISTS (SELECT 1 FROM master.ModuleGroup WHERE GroupId = 'admin')
+    INSERT master.Module (ModuleId, GroupId, Icon, Label, Built, SortOrder, SrsRef)
+    VALUES ('doctormaster', 'admin', 'bi-person-badge', 'Doctor Master', 1, (SELECT ISNULL(MAX(SortOrder),50)+1 FROM master.Module), '3.1');
+GO
