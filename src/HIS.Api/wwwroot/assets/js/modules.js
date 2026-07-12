@@ -172,7 +172,7 @@ window.HIS = window.HIS || {};
             <div class="panel__body" style="display:grid;gap:6px">
               <button class="btn btn--primary" data-act="save"><i class="bi bi-save"></i> Register &amp; Generate UHID <span class="fk">F9</span></button>
               <button class="btn" id="regClear"><i class="bi bi-x-circle"></i> Clear / New</button>
-              <button class="btn"><i class="bi bi-printer"></i> Print UHID Card</button>
+              <button class="btn" id="regPrintUhid"><i class="bi bi-printer"></i> Print UHID Card</button>
             </div>
           </div>
         </div>
@@ -4664,6 +4664,79 @@ window.HIS = window.HIS || {};
     const s = doc.querySelector('#patSearch');
     if (s) { let t; s.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => loadPatients(doc), 250); }); }
     const clr = doc.querySelector('#regClear'); if (clr) clr.addEventListener('click', () => clearRegForm(doc));
+    const pr = doc.querySelector('#regPrintUhid'); if (pr) pr.addEventListener('click', () => printUhidCard(doc));
+  }
+
+  /* ---- Registration: printable UHID card (opens a new page → auto-print) ---- */
+  async function printUhidCard(doc) {
+    const g = id => (val(doc, id) || '').trim();
+    const uhid = g('regUhid');
+    if (!uhid || uhid.charAt(0) === '(') { HIS.toast('Pehle patient register karo (ya list se Edit karke load karo) — phir UHID card printable hoga', 'bi-printer'); return; }
+    // Open the window SYNCHRONOUSLY inside the click gesture (else the popup blocker kills it).
+    const w = window.open('', 'uhidCard', 'width=560,height=720');
+    if (!w) { HIS.toast('Popup block ho gaya — browser me is site ke liye popups allow karo, phir dobara Print UHID Card dabao', 'bi-printer'); return; }
+    w.document.write('<!doctype html><meta charset="utf-8"><title>UHID Card</title><body style="font-family:system-ui;color:#667;padding:28px">Preparing UHID card…</body>');
+    // Now fetch authoritative patient data (form clears after register) — fall back to form fields.
+    let p = null;
+    try { p = await HIS.api.patientByUhid(uhid); } catch (e) { /* fall back to form */ }
+    const esc = s => (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const name = (p && p.name) || g('regName') || 'Patient';
+    const age = (p && p.age != null ? p.age : g('regAge')), sex = (p && p.sex) || g('regSex');
+    const blood = (p && p.blood) || g('regBlood') || '—';
+    const mobile = (p && p.mobile) || g('regMobile') || '—';
+    const guardian = g('regGuardian');
+    const abha = p && p.abha;
+    const branch = ((typeof document !== 'undefined' && document.querySelector('#ctxBranch')) || {}).textContent || '';
+    const issued = new Date().toLocaleString();
+    // Decorative barcode strip derived from the UHID characters (pure CSS bars).
+    const bars = uhid.split('').map(ch => {
+      const bw = (ch.charCodeAt(0) % 4) + 1;
+      return `<span style="display:inline-block;width:${bw}px;height:38px;background:#000;margin-right:${(ch.charCodeAt(0) % 3) + 1}px"></span>`;
+    }).join('');
+    const row = (l, v) => `<tr><td style="color:#667;padding:3px 10px 3px 0;white-space:nowrap">${l}</td><td style="font-weight:700;color:#0b1f2a">${esc(v)}</td></tr>`;
+    // Replace the placeholder document with the finished card, then auto-print.
+    w.document.open();
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>UHID Card · ${esc(uhid)}</title>
+      <style>
+        *{box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
+        body{margin:0;background:#eef2f5;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+        .card{width:360px;background:#fff;border:1px solid #d5dde3;border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(20,40,60,.14)}
+        .hd{background:linear-gradient(135deg,#0f6e64,#12857a);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px}
+        .hd .logo{font-size:22px}.hd h1{font-size:15px;margin:0;font-weight:800;letter-spacing:.3px}
+        .hd .sub{font-size:11px;opacity:.9;margin-top:1px}
+        .body{padding:16px 18px}
+        .uhid-l{font-size:10px;letter-spacing:1.5px;color:#7a8a94;text-transform:uppercase}
+        .uhid{font:800 24px 'Consolas',monospace;color:#0b1f2a;letter-spacing:1px;margin:2px 0 10px}
+        .bc{text-align:center;padding:8px 0;border-top:1px dashed #cfd8de;border-bottom:1px dashed #cfd8de;margin:4px 0 12px;line-height:0}
+        .bc .num{display:block;line-height:1.4;margin-top:6px;font:600 11px 'Consolas',monospace;letter-spacing:2px;color:#334}
+        table{border-collapse:collapse;font-size:13px;width:100%}
+        .ft{padding:10px 18px;background:#f6f9fa;border-top:1px solid #e5ebef;font-size:10px;color:#8a97a0;text-align:center}
+        .noprint{text-align:center;margin-top:14px}
+        .noprint button{font:600 13px system-ui;padding:7px 16px;border:1px solid #12857a;background:#12857a;color:#fff;border-radius:7px;cursor:pointer}
+        @media print{body{background:#fff;padding:0}.card{box-shadow:none;border:none}.noprint{display:none}}
+      </style></head><body>
+      <div>
+        <div class="card">
+          <div class="hd"><span class="logo">🏥</span><div><h1>Finnid HIS ERP</h1><div class="sub">Patient UHID Card${branch ? ' · Branch ' + esc(branch) : ''}</div></div></div>
+          <div class="body">
+            <div class="uhid-l">UHID</div><div class="uhid">${esc(uhid)}</div>
+            <div class="bc">${bars}<span class="num">${esc(uhid)}</span></div>
+            <table>
+              ${row('Name', name)}
+              ${age || sex ? row('Age / Sex', `${age || '—'} / ${sex || '—'}`) : ''}
+              ${row('Blood Group', blood)}
+              ${row('Mobile', mobile)}
+              ${guardian ? row('Guardian', guardian) : ''}
+              ${abha ? row('ABHA', abha) : ''}
+            </table>
+          </div>
+          <div class="ft">Issued ${esc(issued)} · This card is computer-generated.</div>
+        </div>
+        <div class="noprint"><button onclick="window.print()">🖨️ Print</button></div>
+      </div>
+      <script>setTimeout(function(){try{window.focus();window.print();}catch(e){}},350);<\/script>
+      </body></html>`);
+    w.document.close();
   }
 
   /* ---- ipd: render the live bed board (with occupants) --------------- */
