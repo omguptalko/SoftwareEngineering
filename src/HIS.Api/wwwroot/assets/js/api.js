@@ -137,6 +137,8 @@ HIS.api = (function () {
     assets:          () => get('/api/assets'),
     registerAsset:   (cmd) => post('/api/assets', cmd),
     branches:        () => get('/api/masters/branches'),
+    saveBranch:      (cmd) => post('/api/masters/branches', cmd),
+    setBranchActive: (branchId, isActive) => post('/api/masters/branches/set-active', { branchId, isActive }),
     // §6.2 — ABDM / ABHA Console (consent artifacts + HFR/HPR registries)
     abdmConsents:    () => get('/api/abdm/consents'),
     abdmRequestConsent:(cmd) => post('/api/abdm/consents', cmd),

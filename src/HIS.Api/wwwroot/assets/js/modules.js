@@ -1214,8 +1214,15 @@ window.HIS = window.HIS || {};
         </div>
       </div></div>
       <div class="cols-side">
-        <div class="panel"><div class="panel__head"><i class="bi bi-bag"></i> Bags</div>
-          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+        <div class="panel"><div class="panel__head"><i class="bi bi-bag"></i> Bags <span class="ph-right hintline" id="bwCount"></span></div>
+          <div class="panel__body tight">
+            <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+              <div class="field" style="max-width:170px"><input class="ctl" id="bwq" placeholder="Search barcode…"></div>
+              <select class="ctl" id="bwfColour" style="max-width:120px"><option value="">All colours</option><option>Yellow</option><option>Red</option><option>White</option><option>Blue</option></select>
+              <select class="ctl" id="bwfHandover" style="max-width:140px"><option value="">All</option><option value="store">In store</option><option value="done">Handed over</option></select>
+              <button class="btn btn--sm" id="bwfClear"><i class="bi bi-x-circle"></i> Clear</button>
+            </div>
+            <div class="grid-wrap" style="border:0"><table class="grid">
             <thead><tr><th>Barcode</th><th>Colour</th><th class="num">Kg</th><th>Handover</th></tr></thead>
             <tbody id="bwBags">${emptyRow(4, 'Loading…')}</tbody>
           </table></div></div></div>
@@ -1455,9 +1462,18 @@ window.HIS = window.HIS || {};
       <div class="kpis" id="mbKpis"><div class="muted" style="padding:12px">Loading…</div></div>
       <div class="panel mt12"><div class="panel__head"><i class="bi bi-buildings"></i> Branches <span class="ph-right"><input class="ctl" id="mbqText" placeholder="Search code / name / city…" style="max-width:200px"></span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
-          <thead><tr><th>Code</th><th>Name</th><th>City</th><th>State</th><th>Status</th></tr></thead>
-          <tbody id="mbBranches">${emptyRow(5, 'Loading…')}</tbody>
+          <thead><tr><th>Code</th><th>Name</th><th>City</th><th>State</th><th>Status</th><th></th></tr></thead>
+          <tbody id="mbBranches">${emptyRow(6, 'Loading…')}</tbody>
         </table></div><span class="hintline" id="mbBranchCount" style="padding:8px 12px;display:block"></span></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-building-add"></i> <span id="mbFormTitle">Add Branch</span></div><div class="panel__body">
+        <div class="form-grid three">
+          <div class="f"><label>Code <span class="req">*</span></label><div class="field"><input class="ctl code" id="mbCode" maxlength="10" placeholder="e.g. BR3"></div></div>
+          <div class="f"><label>Name <span class="req">*</span></label><div class="field"><input class="ctl" id="mbName" placeholder="e.g. Indl-East"></div></div>
+          <div class="f"><label>City</label><div class="field"><input class="ctl" id="mbCity" placeholder="e.g. Dahej"></div></div>
+          <div class="f"><label>State</label><div class="field"><input class="ctl" id="mbState" placeholder="e.g. Gujarat"></div></div>
+        </div>
+        <div class="flex gap6 mt8"><button class="btn btn--primary" data-act="save"><i class="bi bi-check2-circle"></i> Save Branch <span class="fk">F9</span></button><button class="btn" id="mbReset"><i class="bi bi-arrow-counterclockwise"></i> New / Reset</button><span class="hintline">Code unique + immutable (har UHID isi se prefix hota hai). Naya DB nahi banta — same master DB me row add hoti hai, no replication lag.</span></div>
+      </div></div>
       <div class="panel"><div class="panel__head"><i class="bi bi-hdd-network"></i> Data Plane · Databases <span class="ph-right hintline" id="mbDpCount"></span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>Tenant</th><th>Fiscal Year</th><th>Kind</th><th>Database</th></tr></thead>
@@ -2267,7 +2283,7 @@ window.HIS = window.HIS || {};
     if (id === 'feedback') { initFeedback(doc); HIS.saveHandlers.feedback = () => doSubmitSurvey(doc); }
     if (id === 'compliance') initCompliance(doc);
     if (id === 'assets') { initAssets(doc); HIS.saveHandlers.assets = () => doRegisterAsset(doc); }
-    if (id === 'multibranch') initMultiBranch(doc);
+    if (id === 'multibranch') { initMultiBranch(doc); HIS.saveHandlers.multibranch = () => doSaveBranch(doc); }
     if (id === 'ai') initAi(doc);
     if (id === 'abdm') { initAbdm(doc); HIS.saveHandlers.abdm = () => doRequestConsent(doc); }
     if (id === 'paymentgw') initPaymentGw(doc);
@@ -2760,15 +2776,44 @@ window.HIS = window.HIS || {};
     } catch (e) { HIS.toast('Capture failed: ' + e.message); }
   }
 
-  function initBmwm(doc) { loadBmwm(doc); }
+  // BMWM 2016 colour-coded bag → a swatch pill in the actual bag colour.
+  function bwColourPill(c) {
+    const map = {
+      Yellow: 'background:#f2c94c;color:#4a3800;border-color:#d9ad2b',
+      Red:    'background:#e5484d;color:#fff;border-color:#c13a3f',
+      White:  'background:#fff;color:#333;border-color:#c7ced4',
+      Blue:   'background:#3b82f6;color:#fff;border-color:#2b6fd6'
+    };
+    const st = map[c] || 'background:var(--surface-2);color:var(--muted-2);border-color:var(--line-2)';
+    return `<span class="pill" style="${st};border-width:1px;border-style:solid">${c}</span>`;
+  }
+  function initBmwm(doc) {
+    loadBmwm(doc);
+    ['bwq', 'bwfColour', 'bwfHandover'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderBwBags(doc)); el.addEventListener('change', () => renderBwBags(doc)); } });
+    const clr = doc.querySelector('#bwfClear'); if (clr) clr.addEventListener('click', () => { ['bwq', 'bwfColour', 'bwfHandover'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); renderBwBags(doc); });
+  }
   async function loadBmwm(doc) {
     try {
       const d = await HIS.api.bmwm();
-      const bags = doc.querySelector('#bwBags');
-      bags.innerHTML = d.bags.length ? d.bags.map(b => `<tr><td>${b.barcode}</td><td><span class="pill pill--info">${b.colour}</span></td><td class="num">${b.weightKg ?? '—'}</td><td>${b.handedOver ? '<span class="pill pill--ok">CBWTF</span>' : '<span class="pill pill--muted">In store</span>'}</td></tr>`).join('') : emptyRow(4, 'No bags');
+      doc._bwBags = d.bags || [];
+      renderBwBags(doc);
       const fi = doc.querySelector('#bwFormIv');
-      fi.innerHTML = d.formIv.length ? d.formIv.map(f => `<tr><td>${f.colour}</td><td class="num">${f.bags}</td><td class="num">${f.weight}</td></tr>`).join('') : emptyRow(3, '—');
-    } catch (e) { doc.querySelector('#bwBags').innerHTML = emptyRow(4, 'API unavailable'); }
+      fi.innerHTML = d.formIv.length ? d.formIv.map(f => `<tr><td>${bwColourPill(f.colour)}</td><td class="num tnum">${f.bags}</td><td class="num tnum">${f.weight}</td></tr>`).join('') : emptyRow(3, '—');
+    } catch (e) { doc._bwBags = []; const t = doc.querySelector('#bwBags'); if (t) t.innerHTML = emptyRow(4, 'API unavailable'); }
+  }
+  function renderBwBags(doc) {
+    const tb = doc.querySelector('#bwBags'); if (!tb) return;
+    const all = doc._bwBags || [];
+    const q = (val(doc, 'bwq') || '').toLowerCase();
+    const colour = val(doc, 'bwfColour'), ho = val(doc, 'bwfHandover');
+    const rows = all.filter(b =>
+      (!q || (b.barcode || '').toLowerCase().includes(q)) &&
+      (!colour || b.colour === colour) &&
+      (!ho || (ho === 'done' ? b.handedOver : !b.handedOver)));
+    tb.innerHTML = rows.length ? rows.map(b =>
+      `<tr><td class="code">${b.barcode}</td><td>${bwColourPill(b.colour)}</td><td class="num tnum">${b.weightKg ?? '—'}</td><td>${b.handedOver ? '<span class="pill pill--ok">CBWTF</span>' : '<span class="pill pill--muted">In store</span>'}</td></tr>`
+    ).join('') : emptyRow(4, (q || colour || ho) ? 'No bags match the filters' : 'No bags');
+    const cnt = doc.querySelector('#bwCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length}` : '';
   }
   async function doGenerateBag(doc) {
     const bc = val(doc, 'bwBarcode');
@@ -2977,6 +3022,7 @@ window.HIS = window.HIS || {};
     loadBranches(doc); loadDataPlane(doc);
     const rf = doc.querySelector('[data-act="refresh"]'); if (rf) rf.addEventListener('click', () => { loadBranches(doc); loadDataPlane(doc); });
     const s = doc.querySelector('#mbqText'); if (s) s.addEventListener('input', () => renderBranches(doc));
+    const r = doc.querySelector('#mbReset'); if (r) r.addEventListener('click', () => resetBranchForm(doc));
   }
   async function loadBranches(doc) {
     const tb = doc.querySelector('#mbBranches'); if (!tb) return;
@@ -2989,17 +3035,52 @@ window.HIS = window.HIS || {};
          <div class="kpi"><div class="v tnum">${active}</div><div class="l">Active</div></div>
          <div class="kpi"><div class="v tnum" id="mbDbKpi">—</div><div class="l">Databases</div></div>`;
       renderBranches(doc);
-    } catch (e) { doc._mbBranches = []; tb.innerHTML = emptyRow(5, 'Branches API unavailable'); }
+    } catch (e) { doc._mbBranches = []; tb.innerHTML = emptyRow(6, 'Branches API unavailable'); }
   }
   function renderBranches(doc) {
     const tb = doc.querySelector('#mbBranches'); if (!tb) return;
     const all = doc._mbBranches || [];
     const q = (val(doc, 'mbqText') || '').toLowerCase();
     const rows = all.filter(b => !q || `${b.code} ${b.name} ${b.city || ''} ${b.state || ''}`.toLowerCase().includes(q));
-    tb.innerHTML = rows.length ? rows.map(b =>
-      `<tr><td class="code">${b.code}</td><td>${b.name}</td><td>${b.city || '—'}</td><td>${b.state || '—'}</td><td><span class="pill ${b.isActive ? 'pill--ok' : 'pill--muted'}">${b.isActive ? 'Active' : 'Inactive'}</span></td></tr>`
-    ).join('') : emptyRow(5, 'No branches');
+    tb.innerHTML = rows.length ? rows.map(b => {
+      const nm = (b.name || '').replace(/"/g, '&quot;'), cy = (b.city || '').replace(/"/g, '&quot;'), stt = (b.state || '').replace(/"/g, '&quot;');
+      const st = b.isActive ? '<span class="pill pill--ok">Active</span>' : '<span class="pill pill--muted">Inactive</span>';
+      const toggle = b.isActive ? `<button class="btn btn--sm" data-mboff="${b.branchId}">Deactivate</button>` : `<button class="btn btn--sm" data-mbon="${b.branchId}">Restore</button>`;
+      return `<tr><td class="code">${b.code}</td><td>${b.name}</td><td>${b.city || '—'}</td><td>${b.state || '—'}</td><td>${st}</td>`
+        + `<td class="flex gap6"><button class="btn btn--sm" data-mbedit="${b.branchId}" data-code="${b.code}" data-name="${nm}" data-city="${cy}" data-state="${stt}"><i class="bi bi-pencil"></i> Edit</button>${toggle}</td></tr>`;
+    }).join('') : emptyRow(6, 'No branches');
+    tb.querySelectorAll('[data-mbedit]').forEach(b => b.addEventListener('click', () => editBranch(doc, b.dataset)));
+    tb.querySelectorAll('[data-mboff]').forEach(b => b.addEventListener('click', () => toggleBranch(doc, b.dataset.mboff, false)));
+    tb.querySelectorAll('[data-mbon]').forEach(b => b.addEventListener('click', () => toggleBranch(doc, b.dataset.mbon, true)));
     const cnt = doc.querySelector('#mbBranchCount'); if (cnt) cnt.textContent = `Showing ${rows.length} of ${all.length} branch(es)`;
+  }
+  function editBranch(doc, ds) {
+    doc.dataset.mbEditId = ds.mbedit;
+    const set = (id, v) => { const el = doc.querySelector('#' + id); if (el) el.value = v || ''; };
+    set('mbCode', ds.code); set('mbName', ds.name); set('mbCity', ds.city); set('mbState', ds.state);
+    const code = doc.querySelector('#mbCode'); if (code) code.disabled = true;   // code immutable on edit
+    const t = doc.querySelector('#mbFormTitle'); if (t) t.textContent = 'Edit Branch · ' + ds.code;
+    const nm = doc.querySelector('#mbName'); if (nm) nm.focus();
+  }
+  function resetBranchForm(doc) {
+    delete doc.dataset.mbEditId;
+    ['mbCode', 'mbName', 'mbCity', 'mbState'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+    const code = doc.querySelector('#mbCode'); if (code) code.disabled = false;
+    const t = doc.querySelector('#mbFormTitle'); if (t) t.textContent = 'Add Branch';
+  }
+  async function doSaveBranch(doc) {
+    const code = val(doc, 'mbCode'), name = val(doc, 'mbName');
+    if (!code || !name) { HIS.toast('Code and Name are required'); return; }
+    const cmd = { branchId: doc.dataset.mbEditId ? parseInt(doc.dataset.mbEditId, 10) : null, code, name, city: val(doc, 'mbCity') || null, state: val(doc, 'mbState') || null };
+    try {
+      await HIS.api.saveBranch(cmd);
+      HIS.toast(doc.dataset.mbEditId ? 'Branch updated · ' + code : 'Branch added · ' + code, 'bi-buildings');
+      resetBranchForm(doc); loadBranches(doc);
+    } catch (e) { HIS.toast('Save failed: ' + e.message); }
+  }
+  async function toggleBranch(doc, id, active) {
+    try { await HIS.api.setBranchActive(parseInt(id, 10), active); HIS.toast(active ? 'Branch restored' : 'Branch deactivated'); loadBranches(doc); }
+    catch (e) { HIS.toast('Failed: ' + e.message); }
   }
   async function loadDataPlane(doc) {
     const tb = doc.querySelector('#mbDataPlane'); if (!tb) return;

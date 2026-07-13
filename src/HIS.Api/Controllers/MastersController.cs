@@ -19,6 +19,14 @@ public sealed class MastersController : ControllerBase
     [HttpGet("branches")]
     public Task<IReadOnlyList<BranchRowDto>> Branches(CancellationToken ct) => _mediator.Send(new GetBranchesQuery(), ct);
 
+    /// <summary>Create or update a branch (gated by 'masters.manage'). Returns the BranchId.</summary>
+    [HttpPost("branches")]
+    public Task<int> SaveBranch([FromBody] SaveBranchCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Deactivate / restore a branch (soft toggle — keeps its history &amp; UHID prefix).</summary>
+    [HttpPost("branches/set-active")]
+    public Task<bool> SetBranchActive([FromBody] SetBranchActiveCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
     /// <summary>Create or update a drug (gated by 'masters.manage').</summary>
     [HttpPost("drugs")]
     public Task<int> SaveDrug([FromBody] SaveDrugCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);

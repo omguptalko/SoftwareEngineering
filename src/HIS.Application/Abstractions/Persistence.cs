@@ -61,6 +61,10 @@ public interface ILookupRepository
 public interface IBranchRepository
 {
     Task<IReadOnlyList<(int BranchId, string Code, string Name, string? City, string? State, bool IsActive)>> GetAllAsync(CancellationToken ct = default);
+    Task<bool> CodeExistsAsync(string code, int? excludeBranchId, CancellationToken ct = default);
+    Task<int> InsertAsync(string code, string name, string? city, string? state, CancellationToken ct = default);
+    Task<bool> UpdateAsync(int branchId, string name, string? city, string? state, CancellationToken ct = default);
+    Task<bool> SetActiveAsync(int branchId, bool isActive, CancellationToken ct = default);
 }
 
 public interface IPatientRepository

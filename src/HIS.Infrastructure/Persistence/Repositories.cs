@@ -41,6 +41,40 @@ public sealed class BranchRepository : IBranchRepository
             "SELECT BranchId, Code, Name, City, State, IsActive FROM master.Branch ORDER BY Code", cancellationToken: ct));
         return rows.ToList();
     }
+
+    public async Task<bool> CodeExistsAsync(string code, int? excludeBranchId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(1) FROM master.Branch WHERE Code = @code AND (@excludeBranchId IS NULL OR BranchId <> @excludeBranchId)",
+            new { code, excludeBranchId }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task<int> InsertAsync(string code, string name, string? city, string? state, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.QuerySingleAsync<int>(new CommandDefinition(
+            @"INSERT INTO master.Branch (Code, Name, City, State, IsActive)
+              VALUES (@code, @name, @city, @state, 1);
+              SELECT CAST(SCOPE_IDENTITY() AS INT);",
+            new { code, name, city, state }, cancellationToken: ct));
+    }
+
+    public async Task<bool> UpdateAsync(int branchId, string name, string? city, string? state, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE master.Branch SET Name = @name, City = @city, State = @state WHERE BranchId = @branchId",
+            new { branchId, name, city, state }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task<bool> SetActiveAsync(int branchId, bool isActive, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE master.Branch SET IsActive = @isActive WHERE BranchId = @branchId",
+            new { branchId, isActive }, cancellationToken: ct)) > 0;
+    }
 }
 
 public sealed class LookupRepository : ILookupRepository

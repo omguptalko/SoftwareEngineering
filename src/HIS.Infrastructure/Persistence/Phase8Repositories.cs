@@ -41,8 +41,12 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
     public async Task UpsertAttendanceAsync(Attendance a, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);
+        // COALESCE so a later punch (e.g. only the Out time) does not wipe an already-set
+        // In time — supports the natural check-in-then-check-out flow.
         var updated = await c.ExecuteAsync(new CommandDefinition(
-            @"UPDATE hr.Attendance SET Status = @Status, InTime = @InTime, OutTime = @OutTime
+            @"UPDATE hr.Attendance SET Status = @Status,
+                     InTime = COALESCE(@InTime, InTime),
+                     OutTime = COALESCE(@OutTime, OutTime)
               WHERE StaffId = @StaffId AND WorkDate = @WorkDate", a, cancellationToken: ct));
         if (updated == 0)
             await c.ExecuteAsync(new CommandDefinition(
