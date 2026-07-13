@@ -97,16 +97,16 @@ public sealed class CreateBillHandler : MediatR.IRequestHandler<CreateBillComman
 
 // ============================ Get bill ============================
 public sealed record BillLineViewDto(string Description, decimal Qty, decimal Rate, decimal Amount);
-public sealed record BillDto(long BillId, string BillNo, decimal Gross, decimal Discount, decimal InsurancePays, decimal PatientPays, string Status, IReadOnlyList<BillLineViewDto> Lines);
+public sealed record BillDto(long BillId, string BillNo, decimal Gross, decimal Discount, decimal InsurancePays, decimal PatientPays, string Status, string? PatientUhid, string? Patient, IReadOnlyList<BillLineViewDto> Lines);
 
 public sealed record BillRowDto(long BillId, string BillNo, string Patient, decimal Gross, decimal PatientPays, decimal Paid, decimal Balance, string Status, string CreatedUtc);
-public sealed record GetBillsQuery : IQuery<IReadOnlyList<BillRowDto>>;
+public sealed record GetBillsQuery(string? Q = null, string? Status = null, DateTime? From = null, DateTime? To = null, int Take = 200) : IQuery<IReadOnlyList<BillRowDto>>;
 public sealed class GetBillsHandler : MediatR.IRequestHandler<GetBillsQuery, IReadOnlyList<BillRowDto>>
 {
     private readonly IBillingRepository _billing; private readonly IBranchContext _ctx;
     public GetBillsHandler(IBillingRepository billing, IBranchContext ctx) { _billing = billing; _ctx = ctx; }
     public async Task<IReadOnlyList<BillRowDto>> Handle(GetBillsQuery q, CancellationToken ct)
-        => (await _billing.GetBillsAsync(_ctx.BranchId ?? 0, ct)).Select(b => new BillRowDto(
+        => (await _billing.GetBillsAsync(_ctx.BranchId ?? 0, q.Q, q.Status, q.From, q.To, q.Take, ct)).Select(b => new BillRowDto(
             b.BillId, b.BillNo, b.Patient, b.Gross, b.PatientPays, b.Paid,
             b.PatientPays - b.Paid, b.Status, b.CreatedUtc.ToString("yyyy-MM-dd HH:mm"))).ToList();
 }
@@ -123,8 +123,9 @@ public sealed class GetBillHandler : MediatR.IRequestHandler<GetBillQuery, BillD
         var bill = await _billing.GetBillAsync(q.BillId, ct);
         if (bill is null) return null;
         var lines = await _billing.GetBillLinesAsync(q.BillId, ct);
+        var pref = await _billing.GetPatientRefAsync(bill.PatientId, ct);
         return new BillDto(bill.BillId, bill.BillNo, bill.GrossAmount, bill.DiscountAmount, bill.InsurancePays,
-            bill.PatientPays, bill.Status,
+            bill.PatientPays, bill.Status, pref?.Uhid, pref?.FullName,
             lines.Select(l => new BillLineViewDto(l.Description, l.Qty, l.Rate, l.Amount)).ToList());
     }
 }

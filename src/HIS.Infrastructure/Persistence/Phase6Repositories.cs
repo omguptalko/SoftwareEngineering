@@ -61,6 +61,15 @@ public sealed class BillingRepository : IBillingRepository
             "SELECT * FROM billing.Bill WHERE BillId = @billId", new { billId }, cancellationToken: ct));
     }
 
+    public async Task<(string Uhid, string FullName)?> GetPatientRefAsync(long patientId, CancellationToken ct = default)
+    {
+        if (patientId <= 0) return null;
+        using var m = await _f.OpenMasterAsync(ct);
+        var row = await m.QuerySingleOrDefaultAsync<(string Uhid, string FullName)?>(new CommandDefinition(
+            "SELECT Uhid, FullName FROM patient.Patient WHERE PatientId = @patientId", new { patientId }, cancellationToken: ct));
+        return row;
+    }
+
     public async Task<IReadOnlyList<(string, decimal, decimal, decimal)>> GetBillLinesAsync(long billId, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);
@@ -70,14 +79,37 @@ public sealed class BillingRepository : IBillingRepository
         return rows.ToList();
     }
 
-    public async Task<IReadOnlyList<(long, string, string, decimal, decimal, decimal, string, DateTime)>> GetBillsAsync(int branchId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<(long, string, string, decimal, decimal, decimal, string, DateTime)>> GetBillsAsync(int branchId, string? q, string? status, DateTime? from, DateTime? to, int take, CancellationToken ct = default)
     {
+        if (take <= 0 || take > 1000) take = 200;
+        var like = string.IsNullOrWhiteSpace(q) ? null : "%" + q.Trim() + "%";
+        // Resolve patient IDs matching the search text by name (master DB) so search covers patients too.
+        long[] pids = Array.Empty<long>();
+        if (like is not null)
+        {
+            using var m = await _f.OpenMasterAsync(ct);
+            pids = (await m.QueryAsync<long>(new CommandDefinition(
+                "SELECT PatientId FROM patient.Patient WHERE FullName LIKE @like", new { like }, cancellationToken: ct))).ToArray();
+        }
+        var dueOnly = status == "__due";
+        var statusFilter = (dueOnly || string.IsNullOrWhiteSpace(status)) ? null : status;
+        var toExclusive = to?.Date.AddDays(1);
+
         using var c = await _f.OpenDataAsync(ct);
-        var rows = (await c.QueryAsync<(long BillId, string BillNo, long? PatientId, decimal Gross, decimal PatientPays, decimal Paid, string Status, DateTime CreatedUtc)>(new CommandDefinition(
-            @"SELECT b.BillId, b.BillNo, b.PatientId, b.GrossAmount, b.PatientPays,
-                     ISNULL((SELECT SUM(p.Amount) FROM billing.Payment p WHERE p.BillId = b.BillId AND p.Status = 'Captured'), 0) AS Paid,
-                     b.Status, b.CreatedUtc
-              FROM billing.Bill b WHERE b.BranchId = @branchId ORDER BY b.BillId DESC", new { branchId }, cancellationToken: ct))).ToList();
+        const string sql = @"
+SELECT TOP (@take) b.BillId, b.BillNo, b.PatientId, b.GrossAmount, b.PatientPays,
+       ISNULL((SELECT SUM(p.Amount) FROM billing.Payment p WHERE p.BillId = b.BillId AND p.Status = 'Captured'), 0) AS Paid,
+       b.Status, b.CreatedUtc
+  FROM billing.Bill b
+ WHERE b.BranchId = @branchId
+   AND (@statusFilter IS NULL OR b.Status = @statusFilter)
+   AND (@from IS NULL OR b.CreatedUtc >= @from)
+   AND (@toExclusive IS NULL OR b.CreatedUtc < @toExclusive)
+   AND (@like IS NULL OR b.BillNo LIKE @like OR b.PatientId IN @pids)
+   AND (@dueOnly = 0 OR b.PatientPays > ISNULL((SELECT SUM(p2.Amount) FROM billing.Payment p2 WHERE p2.BillId = b.BillId AND p2.Status = 'Captured'), 0))
+ ORDER BY b.BillId DESC";
+        var rows = (await c.QueryAsync<(long BillId, string BillNo, long? PatientId, decimal Gross, decimal PatientPays, decimal Paid, string Status, DateTime CreatedUtc)>(
+            new CommandDefinition(sql, new { branchId, take, statusFilter, from, toExclusive, like, pids, dueOnly = dueOnly ? 1 : 0 }, cancellationToken: ct))).ToList();
         var pats = await MasterLookup.PatientNamesAsync(_f, rows.Where(r => r.PatientId.HasValue).Select(r => r.PatientId!.Value), ct);
         return rows.Select(r => (r.BillId, r.BillNo,
             r.PatientId.HasValue ? pats.GetValueOrDefault(r.PatientId.Value, "") : "",

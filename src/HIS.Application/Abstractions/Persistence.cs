@@ -397,8 +397,10 @@ public interface IBillingRepository
     Task<string> NextBillNoAsync(int branchId, CancellationToken ct = default);
     Task<long> CreateBillAsync(Bill bill, IReadOnlyList<BillLine> lines, CancellationToken ct = default);
     Task<Bill?> GetBillAsync(long billId, CancellationToken ct = default);
+    /// <summary>Resolve a patient's UHID + name (master DB) for a bill's PatientId.</summary>
+    Task<(string Uhid, string FullName)?> GetPatientRefAsync(long patientId, CancellationToken ct = default);
     Task<IReadOnlyList<(string Description, decimal Qty, decimal Rate, decimal Amount)>> GetBillLinesAsync(long billId, CancellationToken ct = default);
-    Task<IReadOnlyList<(long BillId, string BillNo, string Patient, decimal Gross, decimal PatientPays, decimal Paid, string Status, DateTime CreatedUtc)>> GetBillsAsync(int branchId, CancellationToken ct = default);
+    Task<IReadOnlyList<(long BillId, string BillNo, string Patient, decimal Gross, decimal PatientPays, decimal Paid, string Status, DateTime CreatedUtc)>> GetBillsAsync(int branchId, string? q, string? status, DateTime? from, DateTime? to, int take, CancellationToken ct = default);
     Task<long> InsertPaymentAsync(Payment p, CancellationToken ct = default);
     Task<IReadOnlyList<(long PaymentId, string? BillNo, string Patient, string Mode, string? Gateway, decimal Amount, string? GatewayRef, string Status, DateTime CreatedUtc)>> GetPaymentsAsync(int take, CancellationToken ct = default);
     Task<decimal> GetPaidTotalAsync(long billId, CancellationToken ct = default);

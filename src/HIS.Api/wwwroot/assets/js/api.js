@@ -146,7 +146,7 @@ HIS.api = (function () {
     createBill:      (cmd) => post('/api/billing/bills', cmd),
     getBill:         (id) => get(`/api/billing/bills/${id}`),
     pendingCharges:  (uhid) => get(`/api/billing/pending-charges?patientUhid=${encodeURIComponent(uhid)}`),
-    billsList:       () => get('/api/billing/bills'),
+    billsList:       (p) => { const s = new URLSearchParams(); if (p) { if (p.q) s.set('q', p.q); if (p.status) s.set('status', p.status); if (p.from) s.set('from', p.from); if (p.to) s.set('to', p.to); if (p.take) s.set('take', p.take); } const qs = s.toString(); return get('/api/billing/bills' + (qs ? '?' + qs : '')); },
     collectPayment:  (cmd) => post('/api/payments/collect', cmd),
     gatewayStatus:   () => get('/api/payments/gateway'),
     gatewayTxns:     (take) => get(`/api/payments${take ? `?take=${take}` : ''}`),
