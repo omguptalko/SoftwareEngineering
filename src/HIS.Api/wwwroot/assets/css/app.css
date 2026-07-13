@@ -405,6 +405,22 @@ table.grid input.gi:focus, table.grid select.gi:focus { border-color: var(--acce
    ========================================================================== */
 .overlay { position: fixed; inset: 0; background: #0c162033; backdrop-filter: blur(1px); z-index: 900; display: none; }
 .overlay.show { display: block; }
+
+/* Styled confirm dialog (HIS.confirm) */
+.confirm-dialog { position: fixed; z-index: 971; left: 50%; top: 28%; transform: translateX(-50%);
+  width: 410px; max-width: 92vw; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-3); overflow: hidden;
+  animation: cdIn .14s ease-out; }
+@keyframes cdIn { from { opacity: 0; transform: translateX(-50%) translateY(-8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+.confirm-dialog .cd-head { padding: 13px 18px; font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 9px;
+  border-top: 3px solid var(--brand); }
+.confirm-dialog .cd-head i { color: var(--brand); font-size: 17px; }
+.confirm-dialog--danger .cd-head { border-top-color: var(--danger); }
+.confirm-dialog--danger .cd-head i { color: var(--danger); }
+.confirm-dialog .cd-body { padding: 4px 18px 18px; font-size: 13px; color: var(--ink-2); line-height: 1.55; }
+.confirm-dialog .cd-body b { color: var(--ink); }
+.confirm-dialog .cd-foot { padding: 12px 18px; display: flex; justify-content: flex-end; gap: 8px;
+  background: var(--surface-2); border-top: 1px solid var(--line-2); }
 .lookup {
   position: fixed; z-index: 950; left: 50%; top: 16%; transform: translateX(-50%);
   width: min(560px, 92vw); background: #fff; border: 1px solid var(--line); border-radius: var(--radius-lg);

@@ -236,6 +236,11 @@ public interface IInventoryRepository
     Task<string> NextPoNoAsync(int branchId, CancellationToken ct = default);
     Task<long> CreatePoAsync(PurchaseOrder po, IReadOnlyList<PurchaseOrderLine> lines, CancellationToken ct = default);
     Task<IReadOnlyList<(long PoId, string PoNo, string? Supplier, int Lines, decimal Total, string Status, DateTime CreatedUtc)>> GetPurchaseOrdersAsync(int branchId, CancellationToken ct = default);
+    // PO lifecycle (Draft -> Ordered -> Received/Cancelled) + goods-receipt stock update.
+    Task<string?> GetPoStatusAsync(long poId, CancellationToken ct = default);
+    Task SetPoStatusAsync(long poId, string status, CancellationToken ct = default);
+    /// <summary>On receive, add each PO line's qty to its matching drug's stock (by DrugId, else by name). Returns items stocked.</summary>
+    Task<int> ReceivePoStockAsync(long poId, CancellationToken ct = default);
 }
 
 public interface IAssetRepository
@@ -357,7 +362,7 @@ public interface IPmjayRepository
     Task<long> UpsertBeneficiaryAsync(PmjayBeneficiary b, CancellationToken ct = default);
     Task<long> InsertCaseAsync(PmjayCase c, CancellationToken ct = default);
     Task<string> NextTmsNoAsync(int branchId, CancellationToken ct = default);
-    Task<IReadOnlyList<(string TmsCaseNo, string ClaimNo, string Patient, string Package, decimal? Amount, string Status, DateTime? SubmittedUtc)>> GetCasesAsync(int branchId, CancellationToken ct = default);
+    Task<IReadOnlyList<(long ClaimId, string TmsCaseNo, string ClaimNo, string Patient, string Package, decimal? Amount, string Status, DateTime? SubmittedUtc)>> GetCasesAsync(int branchId, CancellationToken ct = default);
 }
 
 public interface ISchemeRepository

@@ -101,7 +101,7 @@ public sealed class CreatePmjayClaimHandler : MediatR.IRequestHandler<CreatePmja
 }
 
 // ---- Submitted TMS claims list (PM-JAY page) ----
-public sealed record PmjayCaseRowDto(string TmsCaseNo, string ClaimNo, string Patient, string Package, decimal? Amount, string Status, string? SubmittedUtc);
+public sealed record PmjayCaseRowDto(long ClaimId, string TmsCaseNo, string ClaimNo, string Patient, string Package, decimal? Amount, string Status, string? SubmittedUtc);
 public sealed record GetPmjayCasesQuery : IQuery<IReadOnlyList<PmjayCaseRowDto>>;
 
 public sealed class GetPmjayCasesHandler : MediatR.IRequestHandler<GetPmjayCasesQuery, IReadOnlyList<PmjayCaseRowDto>>
@@ -114,7 +114,7 @@ public sealed class GetPmjayCasesHandler : MediatR.IRequestHandler<GetPmjayCases
     {
         var rows = await _pmjay.GetCasesAsync(_ctx.BranchId ?? 0, ct);
         return rows.Select(r => new PmjayCaseRowDto(
-            r.TmsCaseNo, r.ClaimNo, r.Patient, r.Package, r.Amount, r.Status,
+            r.ClaimId, r.TmsCaseNo, r.ClaimNo, r.Patient, r.Package, r.Amount, r.Status,
             r.SubmittedUtc?.ToString("yyyy-MM-dd"))).ToList();
     }
 }

@@ -224,6 +224,48 @@ SELECT @id;";
             return (p.PoId, p.PoNo, (string?)names.GetValueOrDefault(p.SupplierId), a.Cnt, a.Total, p.Status, p.CreatedUtc);
         }).ToList();
     }
+
+    public async Task<string?> GetPoStatusAsync(long poId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenDataAsync(ct);
+        return await c.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+            "SELECT Status FROM inventory.PurchaseOrder WHERE PoId = @poId", new { poId }, cancellationToken: ct));
+    }
+
+    public async Task SetPoStatusAsync(long poId, string status, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenDataAsync(ct);
+        await c.ExecuteAsync(new CommandDefinition(
+            "UPDATE inventory.PurchaseOrder SET Status = @status WHERE PoId = @poId", new { poId, status }, cancellationToken: ct));
+    }
+
+    public async Task<int> ReceivePoStockAsync(long poId, CancellationToken ct = default)
+    {
+        // Read the PO lines from the FY DB…
+        List<(int? DrugId, string? ItemName, int Qty)> lines;
+        using (var fy = await _f.OpenDataAsync(ct))
+            lines = (await fy.QueryAsync<(int? DrugId, string? ItemName, int Qty)>(new CommandDefinition(
+                "SELECT DrugId, ItemName, Qty FROM inventory.PurchaseOrderLine WHERE PoId = @poId", new { poId }, cancellationToken: ct))).ToList();
+        if (lines.Count == 0) return 0;
+
+        // …then add each matching drug's stock in the master DB (by DrugId, else by exact name).
+        var received = 0;
+        using var m = await _f.OpenMasterAsync(ct);
+        foreach (var l in lines)
+        {
+            int? drugId = l.DrugId;
+            if (drugId is null && !string.IsNullOrWhiteSpace(l.ItemName))
+                drugId = await m.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
+                    "SELECT TOP 1 DrugId FROM master.Drug WHERE Name = @name AND IsActive = 1", new { name = l.ItemName!.Trim() }, cancellationToken: ct));
+            if (drugId is int did && l.Qty > 0)
+            {
+                await m.ExecuteAsync(new CommandDefinition(
+                    "UPDATE master.Drug SET StockQty = StockQty + @qty WHERE DrugId = @did", new { qty = l.Qty, did }, cancellationToken: ct));
+                received++;
+            }
+        }
+        return received;
+    }
 }
 
 public sealed class AssetRepository : IAssetRepository

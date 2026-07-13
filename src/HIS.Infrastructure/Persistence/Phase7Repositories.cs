@@ -180,11 +180,11 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
             new { branchId, fy = _tenant.FiscalYearCode ?? "" }, cancellationToken: ct));
     }
 
-    public async Task<IReadOnlyList<(string, string, string, string, decimal?, string, DateTime?)>> GetCasesAsync(int branchId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<(long, string, string, string, string, decimal?, string, DateTime?)>> GetCasesAsync(int branchId, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);
-        var rows = (await c.QueryAsync<(string TmsCaseNo, string ClaimNo, long PatientId, int? PackageId, decimal? Amount, string Status, DateTime? SubmittedUtc)>(new CommandDefinition(
-            @"SELECT pc.TmsCaseNo, cl.ClaimNo, cl.PatientId, pc.PackageId, cl.PreAuthAmount, cl.Status, cl.SubmittedUtc
+        var rows = (await c.QueryAsync<(long ClaimId, string TmsCaseNo, string ClaimNo, long PatientId, int? PackageId, decimal? Amount, string Status, DateTime? SubmittedUtc)>(new CommandDefinition(
+            @"SELECT cl.ClaimId, pc.TmsCaseNo, cl.ClaimNo, cl.PatientId, pc.PackageId, cl.PreAuthAmount, cl.Status, cl.SubmittedUtc
               FROM scheme.PmjayCase pc
               JOIN insurance.Claim cl ON cl.ClaimId = pc.ClaimId
               WHERE cl.BranchId = @branchId
@@ -192,7 +192,7 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         var pats = await MasterLookup.PatientNamesAsync(_f, rows.Select(r => r.PatientId), ct);
         var pkgs = await MasterLookup.PackageNamesAsync(_f, rows.Select(r => r.PackageId), ct);
         return rows.Select(r => (
-            r.TmsCaseNo ?? "", r.ClaimNo, pats.GetValueOrDefault(r.PatientId, ""),
+            r.ClaimId, r.TmsCaseNo ?? "", r.ClaimNo, pats.GetValueOrDefault(r.PatientId, ""),
             r.PackageId.HasValue ? pkgs.GetValueOrDefault(r.PackageId.Value, "") : "",
             r.Amount, r.Status, r.SubmittedUtc)).ToList();
     }

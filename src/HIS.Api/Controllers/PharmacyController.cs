@@ -44,6 +44,13 @@ public sealed class InventoryController : ControllerBase
     [HttpPost("suppliers")]
     public Task<int> AddSupplier([FromBody] AddSupplierCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 
+    /// <summary>Advance a purchase order: Draft → Ordered → Received (receiving adds to stock) / Cancelled.</summary>
+    [HttpPost("purchase-orders/{id:long}/status")]
+    public Task<SetPoStatusResult> SetPoStatus(long id, [FromBody] PoStatusBody body, CancellationToken ct)
+        => _mediator.Send(new SetPoStatusCommand(id, body.Status), ct);
+
+    public sealed record PoStatusBody(string Status);
+
     /// <summary>Purchase orders raised (newest first).</summary>
     [HttpGet("purchase-orders")]
     public Task<IReadOnlyList<PurchaseOrderRowDto>> PurchaseOrders(CancellationToken ct) => _mediator.Send(new GetPurchaseOrdersQuery(), ct);

@@ -608,13 +608,14 @@ window.HIS = window.HIS || {};
             <tbody id="caPolicies">${emptyRow(5, 'Pick a patient (F3) to see captured policies')}</tbody>
           </table></div>
         </div></div>
-        <div class="panel"><div class="panel__head"><i class="bi bi-file-medical"></i> Pre-Authorisation</div><div class="panel__body">
-          <div class="form-grid">
+        <div class="panel"><div class="panel__head"><i class="bi bi-file-medical"></i> Pre-Authorisation <span class="ph-right hintline">Step 2</span></div><div class="panel__body">
+          <div class="form-grid one">
             <div class="f"><label>Provisional Dx</label><div class="field with-btn"><input class="ctl" id="caDx" data-lookup="icd10" placeholder="F3 ICD-10…"><button class="lk" data-lookup="icd10">F3</button></div></div>
-            <div class="f"><label>Est. Cost</label><div class="field with-unit"><input class="ctl num" id="caCost" placeholder="0"><span class="unit">₹</span></div></div>
-            <div class="f wide"><label>Clinical Notes</label><div class="field"><textarea class="ctl" id="caNotes" placeholder="Clinical justification for admission…"></textarea></div></div>
+            <div class="f"><label>Est. Cost <span class="req">*</span></label><div class="field with-unit"><input class="ctl num" id="caCost" placeholder="0"><span class="unit">₹</span></div></div>
+            <div class="f"><label>Clinical Notes</label><div class="field"><textarea class="ctl" id="caNotes" rows="3" placeholder="Clinical justification for admission…"></textarea></div></div>
           </div>
-          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-send"></i> Submit Pre-Auth <span class="fk">F9</span></button><span class="hintline">Patient + Payer + Est. Cost bharo → Submit → claim niche Dashboard me aayega.</span></div>
+          <button class="btn btn--primary mt12" style="width:100%" data-act="save"><i class="bi bi-send"></i> Submit Pre-Auth <span class="fk">F9</span></button>
+          <span class="hintline mt8" style="display:block"><i class="bi bi-info-circle"></i> Patient + Payer + Est. Cost bharo → Submit → claim niche Claim Tracking Dashboard me aayega.</span>
         </div></div>
       </div>
       <div class="panel"><div class="panel__head"><i class="bi bi-kanban"></i> Claim Tracking Dashboard <span class="ph-right hintline" id="caCount"></span></div>
@@ -676,8 +677,8 @@ window.HIS = window.HIS || {};
             <button class="btn btn--sm" id="pmqClear"><i class="bi bi-x-circle"></i> Clear</button>
           </div>
           <div class="grid-wrap" style="border:0"><table class="grid">
-          <thead><tr><th>TMS Case #</th><th>Claim #</th><th>Date</th><th>Patient</th><th>Package</th><th class="num">Amount ₹</th><th>Status</th></tr></thead>
-          <tbody id="pmCases">${emptyRow(7, 'Loading…')}</tbody>
+          <thead><tr><th>TMS Case #</th><th>Claim #</th><th>Date</th><th>Patient</th><th>Package</th><th class="num">Amount ₹</th><th>Status</th><th>TMS Response</th></tr></thead>
+          <tbody id="pmCases">${emptyRow(8, 'Loading…')}</tbody>
         </table></div></div>
       </div>
     </div>`;
@@ -795,8 +796,8 @@ window.HIS = window.HIS || {};
             <button class="btn btn--sm" id="cmqClear"><i class="bi bi-x-circle"></i> Clear</button>
           </div>
           <div class="grid-wrap" style="border:0"><table class="grid">
-          <thead><tr><th>Claim #</th><th>Date</th><th>Patient</th><th>Payer</th><th class="num">Pre-Auth ₹</th><th class="num">Approved ₹</th><th>Status</th></tr></thead>
-          <tbody id="cmClaims">${emptyRow(7, 'Loading…')}</tbody>
+          <thead><tr><th>Claim #</th><th>Date</th><th>Patient</th><th>Payer</th><th class="num">Pre-Auth ₹</th><th class="num">Approved ₹</th><th>Status</th><th>Quick action</th></tr></thead>
+          <tbody id="cmClaims">${emptyRow(8, 'Loading…')}</tbody>
         </table></div></div>
       </div>
       <div class="cols-side">
@@ -811,13 +812,14 @@ window.HIS = window.HIS || {};
           <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-send"></i> Post Update <span class="fk">F9</span></button><span class="hintline">Approval/FinalBill/Settlement me amount bharo.</span></div>
           <div class="mt8" id="cmEventNote"></div>
         </div></div>
-        <div class="panel"><div class="panel__head"><i class="bi bi-bank"></i> Settlement Reconciliation</div><div class="panel__body">
-          <div class="form-grid">
-            <div class="f"><label>Claim</label><div class="field"><input class="ctl code" id="cmReconClaim" placeholder="select a claim" readonly></div></div>
+        <div class="panel"><div class="panel__head"><i class="bi bi-bank"></i> Settlement Reconciliation <span class="ph-right hintline">Bank UTR match</span></div><div class="panel__body">
+          <div class="form-grid one">
+            <div class="f"><label>Claim</label><div class="field"><input class="ctl code ro" id="cmReconClaim" placeholder="select a claim above" readonly tabindex="-1"></div></div>
             <div class="f"><label>Bank UTR <span class="req">*</span></label><div class="field"><input class="ctl code" id="cmUtr" placeholder="UTR / NEFT ref"></div></div>
             <div class="f"><label>Bank Amount <span class="req">*</span></label><div class="field with-unit"><input class="ctl num" id="cmBank" placeholder="0"><span class="unit">₹</span></div></div>
           </div>
-          <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" id="cmReconBtn"><i class="bi bi-check2-square"></i> Reconcile</button><span class="hintline">Bank amount, claim ke settled amount se match hona chahiye.</span></div>
+          <button class="btn btn--primary mt12" style="width:100%" id="cmReconBtn"><i class="bi bi-check2-square"></i> Reconcile Settlement</button>
+          <span class="hintline mt8" style="display:block"><i class="bi bi-info-circle"></i> Bank amount claim ke <b>settled amount</b> se match hona chahiye — mismatch pe flag hota hai.</span>
           <div class="mt8" id="cmReconNote"></div>
         </div></div>
       </div>
@@ -886,10 +888,26 @@ window.HIS = window.HIS || {};
       return true;
     });
     const pill = s => ({ Settled: 'pill--purple', Approved: 'pill--ok', Denied: 'pill--danger', Query: 'pill--warn', Shortfall: 'pill--danger' }[s] || 'pill--info');
-    tb.innerHTML = rows.length ? rows.map(r =>
-      `<tr data-cid="${r.claimId}" data-cno="${r.claimNo}" style="cursor:pointer"><td>${r.claimNo}</td><td>${r.submittedUtc ?? '—'}</td><td>${r.patient}</td><td>${r.payer}</td><td class="num">${r.preAuth ?? '—'}</td><td class="num">${r.approved ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td></tr>`
-    ).join('') : emptyRow(7, 'No matching claims');
-    const cnt = doc.querySelector('#cmCount'); if (cnt) cnt.textContent = `showing ${rows.length} of ${all.length} · click a row to action`;
+    const notApproved = ['PreAuth', 'Query', 'Shortfall', 'Enhancement'];
+    tb.innerHTML = rows.length ? rows.map(r => {
+      const preAuth = r.preAuth ?? 0, approved = r.approved ?? r.preAuth ?? 0;
+      let act = '—';
+      if (notApproved.includes(r.status))
+        act = `<button class="btn btn--sm btn--primary" data-cm-ev="Approval" data-cid="${r.claimId}" data-amt="${preAuth}"><i class="bi bi-check2"></i> Approve</button> <button class="btn btn--sm" data-cm-ev="Denial" data-cid="${r.claimId}" data-amt="0"><i class="bi bi-x"></i> Deny</button>`;
+      else if (r.status === 'Approved' || r.status === 'FinalBill')
+        act = `<button class="btn btn--sm btn--primary" data-cm-ev="Settlement" data-cid="${r.claimId}" data-amt="${approved}"><i class="bi bi-cash-coin"></i> Settle</button>`;
+      return `<tr data-cid="${r.claimId}" data-cno="${r.claimNo}" style="cursor:pointer"><td>${r.claimNo}</td><td>${r.submittedUtc ?? '—'}</td><td>${r.patient}</td><td>${r.payer}</td><td class="num tnum">${r.preAuth ?? '—'}</td><td class="num tnum">${r.approved ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td><td style="white-space:nowrap">${act}</td></tr>`;
+    }).join('') : emptyRow(8, 'No matching claims');
+    const cnt = doc.querySelector('#cmCount'); if (cnt) cnt.textContent = `showing ${rows.length} of ${all.length} · quick-action here, or click a row for the workflow panel`;
+    tb.querySelectorAll('[data-cm-ev]').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); doCmAdvance(doc, b.dataset.cid, b.dataset.cmEv, parseFloat(b.dataset.amt) || 0); }));
+  }
+  async function doCmAdvance(doc, claimId, eventType, amount) {
+    try {
+      await HIS.api.claimEvent(parseInt(claimId, 10), { eventType, amount: amount || null, notes: 'Quick ' + eventType });
+      const map = { Approval: 'approved', Denial: 'denied', Settlement: 'settled' };
+      HIS.toast('Claim ' + (map[eventType] || eventType), 'bi-check2-circle');
+      loadClaimsMisFull(doc);
+    } catch (e) { HIS.toast('Update failed: ' + e.message); }
   }
   async function doPostClaimEvent(doc) {
     const cid = doc.dataset.cmClaimId;
@@ -1004,8 +1022,15 @@ window.HIS = window.HIS || {};
               <div class="f wide"><label>Vaccination Notes</label><div class="field"><input class="ctl" id="ohVacc" placeholder="e.g. Tetanus booster"></div></div>
             </div>
           </div></div>
-          <div class="panel"><div class="panel__head"><i class="bi bi-list-check"></i> Recent Examinations</div>
-            <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <div class="panel"><div class="panel__head"><i class="bi bi-list-check"></i> Recent Examinations <span class="ph-right hintline" id="ohExamCount"></span></div>
+            <div class="panel__body tight">
+              <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+                <div class="field" style="max-width:190px"><input class="ctl" id="ohq" placeholder="Search worker / company…"></div>
+                <select class="ctl" id="ohfType" style="max-width:120px"><option value="">All types</option><option>PEME</option><option>PME</option><option>Periodic</option><option>Exit</option></select>
+                <select class="ctl" id="ohfFitness" style="max-width:150px"><option value="">All fitness</option><option>Fit</option><option>Fit-with-conditions</option><option>Unfit</option></select>
+                <button class="btn btn--sm" id="ohfClear"><i class="bi bi-x-circle"></i> Clear</button>
+              </div>
+              <div class="grid-wrap" style="border:0"><table class="grid">
               <thead><tr><th>Worker</th><th>Company</th><th>Type</th><th>Date</th><th>Fitness</th></tr></thead>
               <tbody id="ohExams">${emptyRow(5, 'Loading…')}</tbody>
             </table></div></div>
@@ -1111,7 +1136,13 @@ window.HIS = window.HIS || {};
           <div class="flex gap6 mt8" style="padding:8px 0"><button class="btn btn--primary" data-act="save"><i class="bi bi-clipboard2-check"></i> Order Diet <span class="fk">F9</span></button><span class="hintline">Admitted patient chuno → diet type + cost → Order. Kitchen worklist me aa jayega.</span></div>
         </div></div>
         <div class="panel"><div class="panel__head"><i class="bi bi-egg-fried"></i> Kitchen Worklist <span class="ph-right hintline" id="dtCount"></span></div>
-          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <div class="panel__body tight">
+            <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+              <div class="field" style="max-width:150px"><input class="ctl" id="dtq" placeholder="Search patient…"></div>
+              <select class="ctl" id="dtfType" style="max-width:130px"><option value="">All diet types</option><option>Normal</option><option>Diabetic</option><option>Renal</option><option>Cardiac / Low-salt</option><option>Soft</option><option>Liquid</option><option>High-protein</option><option>Low-fat</option><option>NPO (Nil by mouth)</option></select>
+              <button class="btn btn--sm" id="dtfClear"><i class="bi bi-x-circle"></i> Clear</button>
+            </div>
+            <div class="grid-wrap" style="border:0"><table class="grid">
             <thead><tr><th>#</th><th>Patient</th><th>Diet Type</th><th class="num">Cost ₹</th></tr></thead>
             <tbody id="dtOrders">${emptyRow(4, 'Loading…')}</tbody>
           </table></div></div>
@@ -1758,8 +1789,8 @@ window.HIS = window.HIS || {};
             <button class="btn btn--sm" id="pofClear"><i class="bi bi-x-circle"></i> Clear</button>
           </div>
           <div class="grid-wrap" style="border:0"><table class="grid">
-          <thead><tr><th>PO No.</th><th>Supplier</th><th class="num">Items</th><th class="num">Total ₹</th><th>Status</th><th>Raised</th></tr></thead>
-          <tbody id="poList">${emptyRow(6, 'Loading…')}</tbody>
+          <thead><tr><th>PO No.</th><th>Supplier</th><th class="num">Items</th><th class="num">Total ₹</th><th>Status</th><th>Raised</th><th>Actions</th></tr></thead>
+          <tbody id="poList">${emptyRow(7, 'Loading…')}</tbody>
         </table></div></div></div>
       <div class="panel"><div class="panel__head"><i class="bi bi-cart-plus"></i> Create Purchase Order
         <span class="ph-right"><button class="btn btn--sm" data-addrow="poGrid"><i class="bi bi-plus-lg"></i> Add Line</button></span></div>
@@ -1798,8 +1829,16 @@ window.HIS = window.HIS || {};
             <button class="btn btn--sm btn--primary" id="bbAddBtn"><i class="bi bi-plus-lg"></i> Add Units</button>
           </div>
         </div></div>
-      <div class="panel"><div class="panel__head"><i class="bi bi-receipt"></i> Blood Requests <span class="ph-right muted" id="bbReqCount"></span></div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+      <div class="panel"><div class="panel__head"><i class="bi bi-receipt"></i> Blood Requests <span class="ph-right hintline" id="bbReqCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:200px"><input class="ctl" id="bbq" placeholder="Search patient / req #…"></div>
+            <select class="ctl" id="bbfGroup" style="max-width:110px"><option value="">All groups</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select>
+            <select class="ctl" id="bbfPriority" style="max-width:130px"><option value="">All priority</option><option value="emg">Emergency</option><option value="rtn">Routine</option></select>
+            <select class="ctl" id="bbfStatus" style="max-width:130px"><option value="">All statuses</option><option value="pending">Pending</option><option value="Fulfilled">Fulfilled</option></select>
+            <button class="btn btn--sm" id="bbfClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>Req #</th><th>Patient</th><th>Group</th><th class="num">Units</th><th>Priority</th><th>Status</th><th>Raised</th><th></th></tr></thead>
           <tbody id="bbReqList">${emptyRow(8, 'Loading…')}</tbody>
         </table></div></div></div>
@@ -2606,16 +2645,26 @@ window.HIS = window.HIS || {};
             `<option value="${a.admissionId}">${a.patient} · ${a.ward || ''} ${a.bedNo || ''}</option>`).join('')
         : '<option value="">No admitted patients</option>';
     } catch (e) { /* ignore */ }
+    ['dtq', 'dtfType'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderDietOrders(doc)); el.addEventListener('change', () => renderDietOrders(doc)); } });
+    const clr = doc.querySelector('#dtfClear'); if (clr) clr.addEventListener('click', () => { ['dtq', 'dtfType'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); renderDietOrders(doc); });
   }
   async function loadDietOrders(doc) {
     const tb = doc.querySelector('#dtOrders'); if (!tb) return;
-    try {
-      const rows = await HIS.api.dietList();
-      tb.innerHTML = rows.length ? rows.map(d =>
-        `<tr><td>${d.dietOrderId}</td><td>${d.patient}</td><td><span class="pill pill--info">${d.dietType}</span></td><td class="num">${d.cost ?? '—'}</td></tr>`
-      ).join('') : emptyRow(4, 'No diet orders yet');
-      const cnt = doc.querySelector('#dtCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} order(s)` : '';
-    } catch (e) { tb.innerHTML = emptyRow(4, 'Diet API unavailable'); }
+    try { doc._diet = await HIS.api.dietList() || []; renderDietOrders(doc); }
+    catch (e) { doc._diet = []; tb.innerHTML = emptyRow(4, 'Diet API unavailable'); }
+  }
+  function renderDietOrders(doc) {
+    const tb = doc.querySelector('#dtOrders'); if (!tb) return;
+    const all = doc._diet || [];
+    const q = (val(doc, 'dtq') || '').toLowerCase();
+    const type = val(doc, 'dtfType');
+    const rows = all.filter(d =>
+      (!q || (d.patient || '').toLowerCase().includes(q)) &&
+      (!type || d.dietType === type));
+    tb.innerHTML = rows.length ? rows.map(d =>
+      `<tr><td class="tnum">${d.dietOrderId}</td><td>${d.patient}</td><td><span class="pill pill--info">${d.dietType}</span></td><td class="num tnum">${d.cost ?? '—'}</td></tr>`
+    ).join('') : emptyRow(4, (q || type) ? 'No orders match the filters' : 'No diet orders yet');
+    const cnt = doc.querySelector('#dtCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length}` : '';
   }
   async function doOrderDiet(doc) {
     const adm = val(doc, 'dtAdmission');
@@ -2977,16 +3026,28 @@ window.HIS = window.HIS || {};
     } catch (e) { /* ignore */ }
     loadExams(doc); loadInjuries(doc);
     const ib = doc.querySelector('#btnRecordInjury'); if (ib) ib.addEventListener('click', () => doRecordInjury(doc));
+    ['ohq', 'ohfType', 'ohfFitness'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderExams(doc)); el.addEventListener('change', () => renderExams(doc)); } });
+    const clr = doc.querySelector('#ohfClear'); if (clr) clr.addEventListener('click', () => { ['ohq', 'ohfType', 'ohfFitness'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); renderExams(doc); });
   }
   async function loadExams(doc) {
     const tb = doc.querySelector('#ohExams'); if (!tb) return;
-    try {
-      const rows = await HIS.api.occExams();
-      const pill = f => f === 'Unfit' ? 'pill--danger' : f === 'Fit-with-conditions' ? 'pill--warn' : 'pill--ok';
-      tb.innerHTML = rows.length ? rows.map(e =>
-        `<tr><td>${e.patient}</td><td>${e.company || '—'}</td><td>${e.examType}</td><td>${e.examDate}</td><td>${e.fitness ? `<span class="pill ${pill(e.fitness)}">${e.fitness}</span>` : '—'}</td></tr>`
-      ).join('') : emptyRow(5, 'No examinations yet');
-    } catch (e) { tb.innerHTML = emptyRow(5, 'Exams API unavailable'); }
+    try { doc._ohExams = await HIS.api.occExams() || []; renderExams(doc); }
+    catch (e) { doc._ohExams = []; tb.innerHTML = emptyRow(5, 'Exams API unavailable'); }
+  }
+  function renderExams(doc) {
+    const tb = doc.querySelector('#ohExams'); if (!tb) return;
+    const all = doc._ohExams || [];
+    const q = (val(doc, 'ohq') || '').toLowerCase();
+    const type = val(doc, 'ohfType'), fit = val(doc, 'ohfFitness');
+    const rows = all.filter(e =>
+      (!q || `${e.patient || ''} ${e.company || ''}`.toLowerCase().includes(q)) &&
+      (!type || e.examType === type) &&
+      (!fit || e.fitness === fit));
+    const pill = f => f === 'Unfit' ? 'pill--danger' : f === 'Fit-with-conditions' ? 'pill--warn' : 'pill--ok';
+    tb.innerHTML = rows.length ? rows.map(e =>
+      `<tr><td>${e.patient}</td><td>${e.company || '—'}</td><td>${e.examType}</td><td class="tnum">${e.examDate}</td><td>${e.fitness ? `<span class="pill ${pill(e.fitness)}">${e.fitness}</span>` : '—'}</td></tr>`
+    ).join('') : emptyRow(5, (q || type || fit) ? 'No examinations match the filters' : 'No examinations yet');
+    const cnt = doc.querySelector('#ohExamCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length}` : '';
   }
   async function doConductExam(doc) {
     const uhid = pickedUhid(doc, 'ohPatient');
@@ -3339,10 +3400,26 @@ window.HIS = window.HIS || {};
       return true;
     });
     const pill = s => ({ Settled: 'pill--purple', Approved: 'pill--ok', Denied: 'pill--danger', Query: 'pill--warn' }[s] || 'pill--info');
-    tb.innerHTML = rows.length ? rows.map(r =>
-      `<tr><td class="code">${r.tmsCaseNo || '—'}</td><td>${r.claimNo}</td><td>${r.submittedUtc ?? '—'}</td><td>${r.patient}</td><td>${r.package || '—'}</td><td class="num">${r.amount ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td></tr>`
-    ).join('') : emptyRow(7, 'No matching TMS claims');
+    tb.innerHTML = rows.length ? rows.map(r => {
+      const amt = r.amount ?? 0;
+      let act = '—';
+      // Simulate the TMS portal responding: advance the claim's status via claim events.
+      if (r.status === 'PreAuth' || r.status === 'Query')
+        act = `<button class="btn btn--sm btn--primary" data-pm-ev="Approval" data-cid="${r.claimId}" data-amt="${amt}"><i class="bi bi-check2"></i> Approve</button> <button class="btn btn--sm" data-pm-ev="Denial" data-cid="${r.claimId}" data-amt="0"><i class="bi bi-x"></i> Deny</button>`;
+      else if (r.status === 'Approved')
+        act = `<button class="btn btn--sm btn--primary" data-pm-ev="Settlement" data-cid="${r.claimId}" data-amt="${amt}"><i class="bi bi-cash-coin"></i> Settle</button>`;
+      return `<tr><td class="code">${r.tmsCaseNo || '—'}</td><td>${r.claimNo}</td><td>${r.submittedUtc ?? '—'}</td><td>${r.patient}</td><td>${r.package || '—'}</td><td class="num tnum">${r.amount ?? '—'}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td><td style="white-space:nowrap">${act}</td></tr>`;
+    }).join('') : emptyRow(8, 'No matching TMS claims');
     const cnt = doc.querySelector('#pmCount'); if (cnt) cnt.textContent = all.length ? `showing ${rows.length} of ${all.length}` : '';
+    tb.querySelectorAll('[data-pm-ev]').forEach(b => b.addEventListener('click', () => doPmAdvance(doc, b.dataset.cid, b.dataset.pmEv, parseFloat(b.dataset.amt) || 0)));
+  }
+  async function doPmAdvance(doc, claimId, eventType, amount) {
+    try {
+      await HIS.api.claimEvent(parseInt(claimId, 10), { eventType, amount: amount || null, notes: 'PM-JAY TMS ' + eventType });
+      const map = { Approval: 'approved', Denial: 'denied', Settlement: 'settled' };
+      HIS.toast('TMS response recorded — claim ' + (map[eventType] || eventType), 'bi-check2-circle');
+      loadPmjayCases(doc);
+    } catch (e) { HIS.toast('Update failed: ' + e.message); }
   }
   // Extract the UHID from an F3-filled "UHID — Name" field (split on em-dash only; UHIDs have hyphens).
   function pickedUhid(doc, id) {
@@ -3372,6 +3449,9 @@ window.HIS = window.HIS || {};
       const tms = doc.querySelector('#pmTms'); if (tms) tms.textContent = r.tmsCaseNo;
       const stage = doc.querySelector('#pmStage'); if (stage) { stage.textContent = 'Pre-Auth submitted'; stage.className = 'pill pill--info'; }
       HIS.toast('Submitted to TMS · ' + r.tmsCaseNo + ' · ₹' + r.packageRate, 'bi-send');
+      // Clear the form for the next claim; the new case auto-appears in the list below.
+      ['pmPatient', 'pmPackage', 'pmId', 'pmMitra'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+      const note = doc.querySelector('#pmVerifyNote'); if (note) note.innerHTML = '';
       loadPmjayCases(doc);
     } catch (e) { HIS.toast('TMS submit failed: ' + e.message); }
   }
@@ -4127,12 +4207,35 @@ window.HIS = window.HIS || {};
       (!q || `${r.poNo || ''} ${r.supplier || ''}`.toLowerCase().includes(q)) &&
       (!status || r.status === status) &&
       (!from || day(r) >= from) && (!to || day(r) <= to));
+    const pill = s => ({ Received: 'pill--ok', Ordered: 'pill--info', Cancelled: 'pill--muted', Draft: 'pill--warn' }[s] || 'pill--info');
     tb.innerHTML = rows.length ? rows.map(r => {
       const when = (r.createdUtc || '').replace('T', ' ').slice(0, 16);
-      const cls = r.status === 'Received' ? 'pill--ok' : r.status === 'Cancelled' ? 'pill--muted' : 'pill--warn';
-      return `<tr><td><b>${r.poNo}</b></td><td>${r.supplier || '—'}</td><td class="num tnum">${r.lines}</td><td class="num tnum">${(r.total || 0).toFixed(2)}</td><td><span class="pill ${cls}">${r.status}</span></td><td class="tnum">${when}</td></tr>`;
-    }).join('') : emptyRow(6, (q || status || from || to) ? 'No purchase orders match the filters' : 'No purchase orders yet');
+      let act = '';
+      if (r.status === 'Draft') act = `<button class="btn btn--sm btn--primary" data-po-ordered="${r.poId}"><i class="bi bi-send"></i> Mark Ordered</button> <button class="btn btn--sm" data-po-cancel="${r.poId}"><i class="bi bi-x"></i></button>`;
+      else if (r.status === 'Ordered') act = `<button class="btn btn--sm btn--primary" data-po-received="${r.poId}"><i class="bi bi-box-arrow-in-down"></i> Mark Received</button> <button class="btn btn--sm" data-po-cancel="${r.poId}"><i class="bi bi-x"></i></button>`;
+      else act = '—';
+      return `<tr><td><b>${r.poNo}</b></td><td>${r.supplier || '—'}</td><td class="num tnum">${r.lines}</td><td class="num tnum">${(r.total || 0).toFixed(2)}</td><td><span class="pill ${pill(r.status)}">${r.status}</span></td><td class="tnum">${when}</td><td style="white-space:nowrap">${act}</td></tr>`;
+    }).join('') : emptyRow(7, (q || status || from || to) ? 'No purchase orders match the filters' : 'No purchase orders yet');
     const cnt = doc.querySelector('#poCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length} order(s)` : '';
+    tb.querySelectorAll('[data-po-ordered]').forEach(b => b.addEventListener('click', () => doSetPoStatus(doc, b.dataset.poOrdered, 'Ordered')));
+    tb.querySelectorAll('[data-po-received]').forEach(b => b.addEventListener('click', () => doSetPoStatus(doc, b.dataset.poReceived, 'Received')));
+    tb.querySelectorAll('[data-po-cancel]').forEach(b => b.addEventListener('click', async () => {
+      const poNo = b.closest('tr')?.querySelector('td b')?.textContent || 'this order';
+      const ok = await HIS.confirm({ title: 'Cancel purchase order?', danger: true, confirmLabel: 'Yes, cancel PO', cancelLabel: 'Keep',
+        message: `Purchase order <b>${poNo}</b> ko cancel karna hai? Ye action wapas nahi hoga.` });
+      if (ok) doSetPoStatus(doc, b.dataset.poCancel, 'Cancelled');
+    }));
+  }
+  async function doSetPoStatus(doc, poId, status) {
+    try {
+      const r = await HIS.api.setPoStatus(poId, status);
+      const msg = status === 'Received'
+        ? `PO received · ${r.stockItemsReceived} item(s) added to stock`
+        : status === 'Ordered' ? 'PO marked Ordered' : 'PO cancelled';
+      HIS.toast(msg, status === 'Received' ? 'bi-box-arrow-in-down' : 'bi-check2');
+      loadPurchaseOrders(doc);
+      if (status === 'Received') loadInvStock(doc);   // stock changed → refresh stock levels
+    } catch (e) { HIS.toast('Update failed: ' + e.message); }
   }
   async function loadInvStock(doc) {
     const tb = doc.querySelector('#invStock'); if (!tb) return;
@@ -4176,6 +4279,8 @@ window.HIS = window.HIS || {};
     loadBloodStock(doc);
     loadBloodRequests(doc);
     const a = doc.querySelector('#bbAddBtn'); if (a) a.addEventListener('click', () => doAddBloodStock(doc));
+    ['bbq', 'bbfGroup', 'bbfPriority', 'bbfStatus'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderBloodRequests(doc)); el.addEventListener('change', () => renderBloodRequests(doc)); } });
+    const clr = doc.querySelector('#bbfClear'); if (clr) clr.addEventListener('click', () => { ['bbq', 'bbfGroup', 'bbfPriority', 'bbfStatus'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); renderBloodRequests(doc); });
   }
   async function doAddBloodStock(doc) {
     const group = val(doc, 'bbAddGroup'), units = intOrNull(val(doc, 'bbAddUnits'));
@@ -4196,18 +4301,28 @@ window.HIS = window.HIS || {};
   }
   async function loadBloodRequests(doc) {
     const tb = doc.querySelector('#bbReqList'); if (!tb) return;
-    try {
-      const rows = await HIS.api.bloodRequests();
-      const cnt = doc.querySelector('#bbReqCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' requests' : '';
-      tb.innerHTML = rows.length ? rows.map(r => {
-        const when = (r.requestedUtc || '').replace('T', ' ').slice(0, 16);
-        const pr = r.isEmergency ? '<span class="pill pill--warn">Emergency</span>' : '<span class="pill pill--muted">Routine</span>';
-        const cls = r.status === 'Fulfilled' ? 'pill--ok' : 'pill--warn';
-        const act = r.status === 'Fulfilled' ? '' : `<button class="btn btn--sm btn--primary" data-issue="${r.requestId}"><i class="bi bi-droplet-half"></i> Issue</button>`;
-        return `<tr><td><b>#${r.requestId}</b></td><td>${r.patient || '—'}</td><td><b>${r.bloodGroup}</b></td><td class="num">${r.units}</td><td>${pr}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${when}</td><td>${act}</td></tr>`;
-      }).join('') : emptyRow(8, 'No blood requests yet');
-      tb.querySelectorAll('[data-issue]').forEach(b => b.addEventListener('click', () => doIssueBlood(doc, b.dataset.issue)));
-    } catch (e) { tb.innerHTML = emptyRow(8, 'Requests API unavailable'); }
+    try { doc._bbReqs = await HIS.api.bloodRequests() || []; renderBloodRequests(doc); }
+    catch (e) { doc._bbReqs = []; tb.innerHTML = emptyRow(8, 'Requests API unavailable'); }
+  }
+  function renderBloodRequests(doc) {
+    const tb = doc.querySelector('#bbReqList'); if (!tb) return;
+    const all = doc._bbReqs || [];
+    const q = (val(doc, 'bbq') || '').toLowerCase();
+    const group = val(doc, 'bbfGroup'), pri = val(doc, 'bbfPriority'), status = val(doc, 'bbfStatus');
+    const rows = all.filter(r =>
+      (!q || `#${r.requestId} ${r.patient || ''}`.toLowerCase().includes(q)) &&
+      (!group || r.bloodGroup === group) &&
+      (!pri || (pri === 'emg' ? r.isEmergency : !r.isEmergency)) &&
+      (!status || (status === 'pending' ? r.status !== 'Fulfilled' : r.status === status)));
+    tb.innerHTML = rows.length ? rows.map(r => {
+      const when = (r.requestedUtc || '').replace('T', ' ').slice(0, 16);
+      const pr = r.isEmergency ? '<span class="pill pill--warn">Emergency</span>' : '<span class="pill pill--muted">Routine</span>';
+      const cls = r.status === 'Fulfilled' ? 'pill--ok' : 'pill--warn';
+      const act = r.status === 'Fulfilled' ? '' : `<button class="btn btn--sm btn--primary" data-issue="${r.requestId}"><i class="bi bi-droplet-half"></i> Issue</button>`;
+      return `<tr><td><b>#${r.requestId}</b></td><td>${r.patient || '—'}</td><td><b>${r.bloodGroup}</b></td><td class="num tnum">${r.units}</td><td>${pr}</td><td><span class="pill ${cls}">${r.status}</span></td><td class="tnum">${when}</td><td>${act}</td></tr>`;
+    }).join('') : emptyRow(8, (q || group || pri || status) ? 'No requests match the filters' : 'No blood requests yet');
+    const cnt = doc.querySelector('#bbReqCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length} request(s)` : '';
+    tb.querySelectorAll('[data-issue]').forEach(b => b.addEventListener('click', () => doIssueBlood(doc, b.dataset.issue)));
   }
   async function loadBloodStock(doc) {
     const tb = doc.querySelector('#bbStock'); if (!tb) return;

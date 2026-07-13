@@ -332,6 +332,34 @@ window.HIS = window.HIS || {};
   }
   HIS.toast = toast;
 
+  /* ===================== Styled confirm dialog ======================== */
+  // HIS.confirm({title, message, confirmLabel, cancelLabel, danger, icon}) -> Promise<bool>
+  HIS.confirm = function (opts) {
+    opts = opts || {};
+    return new Promise(resolve => {
+      const ov = document.createElement('div'); ov.className = 'overlay show'; ov.style.zIndex = '970';
+      const dlg = document.createElement('div');
+      dlg.className = 'confirm-dialog' + (opts.danger ? ' confirm-dialog--danger' : '');
+      dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true');
+      const icon = opts.icon || (opts.danger ? 'bi-exclamation-triangle-fill' : 'bi-question-circle-fill');
+      dlg.innerHTML =
+        `<div class="cd-head"><i class="bi ${icon}"></i> ${opts.title || 'Please confirm'}</div>
+         <div class="cd-body">${opts.message || 'Are you sure?'}</div>
+         <div class="cd-foot">
+           <button class="btn" data-cd-cancel>${opts.cancelLabel || 'Cancel'}</button>
+           <button class="btn ${opts.danger ? 'btn--danger' : 'btn--primary'}" data-cd-ok>${opts.confirmLabel || 'Confirm'}</button>
+         </div>`;
+      document.body.appendChild(ov); document.body.appendChild(dlg);
+      const close = val => { document.removeEventListener('keydown', onKey); ov.remove(); dlg.remove(); resolve(val); };
+      const onKey = e => { if (e.key === 'Escape') close(false); else if (e.key === 'Enter') close(true); };
+      dlg.querySelector('[data-cd-ok]').addEventListener('click', () => close(true));
+      dlg.querySelector('[data-cd-cancel]').addEventListener('click', () => close(false));
+      ov.addEventListener('click', () => close(false));
+      document.addEventListener('keydown', onKey);
+      dlg.querySelector('[data-cd-ok]').focus();
+    });
+  };
+
   /* ===================== Status bar ==================================== */
   function setStatus(txt) { $('#sbRec').textContent = txt; }
   function setLegend(id) {

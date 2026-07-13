@@ -130,6 +130,54 @@ public sealed class CreatePurchaseOrderHandler : MediatR.IRequestHandler<CreateP
     }
 }
 
+// ---- Purchase-order lifecycle: Draft -> Ordered -> Received/Cancelled ----
+public sealed record SetPoStatusCommand(long PoId, string Status) : ICommand<SetPoStatusResult>, IAuditable
+{
+    public string AuditEntity => "PurchaseOrder";
+    public string? AuditEntityId => PoId.ToString();
+}
+public sealed record SetPoStatusResult(string Status, int StockItemsReceived);
+
+public sealed class SetPoStatusValidator : AbstractValidator<SetPoStatusCommand>
+{
+    public SetPoStatusValidator()
+    {
+        RuleFor(x => x.PoId).GreaterThan(0);
+        RuleFor(x => x.Status).Must(s => s is "Ordered" or "Received" or "Cancelled")
+            .WithMessage("Status must be Ordered, Received or Cancelled.");
+    }
+}
+
+public sealed class SetPoStatusHandler : MediatR.IRequestHandler<SetPoStatusCommand, SetPoStatusResult>
+{
+    private readonly IInventoryRepository _inv;
+    public SetPoStatusHandler(IInventoryRepository inv) { _inv = inv; }
+
+    public async Task<SetPoStatusResult> Handle(SetPoStatusCommand c, CancellationToken ct)
+    {
+        var current = await _inv.GetPoStatusAsync(c.PoId, ct)
+            ?? throw new InvalidOperationException($"Purchase order {c.PoId} not found.");
+        var allowed = (current, c.Status) switch
+        {
+            ("Draft", "Ordered") => true,
+            ("Draft", "Cancelled") => true,
+            ("Ordered", "Received") => true,
+            ("Ordered", "Cancelled") => true,
+            _ => false
+        };
+        if (!allowed)
+            throw new InvalidOperationException($"Can't move a '{current}' purchase order to '{c.Status}'.");
+
+        // Goods receipt: receiving the order adds the ordered quantities back into stock.
+        var received = 0;
+        if (c.Status == "Received")
+            received = await _inv.ReceivePoStockAsync(c.PoId, ct);
+
+        await _inv.SetPoStatusAsync(c.PoId, c.Status, ct);
+        return new SetPoStatusResult(c.Status, received);
+    }
+}
+
 // ============================ Assets (SRS §3.19) ============================
 public sealed record AssetDto(long AssetId, string AssetTag, string Name, string? Category, string? AmcExpiry, string? NextMaintenance, string Status, bool AmcDue, bool MaintenanceDue);
 public sealed record GetAssetsQuery : IQuery<IReadOnlyList<AssetDto>>;
