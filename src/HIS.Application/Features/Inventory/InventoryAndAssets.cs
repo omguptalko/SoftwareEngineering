@@ -53,6 +53,30 @@ public sealed class GetSuppliersHandler : MediatR.IRequestHandler<GetSuppliersQu
     }
 }
 
+// ---- Add a supplier (dynamic supplier master) ----
+public sealed record AddSupplierCommand(string Name, string? Gstin) : ICommand<int>, IAuditable
+{
+    public string AuditEntity => "Supplier";
+    public string? AuditEntityId => Name;
+}
+
+public sealed class AddSupplierValidator : AbstractValidator<AddSupplierCommand>
+{
+    public AddSupplierValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(160);
+        RuleFor(x => x.Gstin).MaximumLength(20);
+    }
+}
+
+public sealed class AddSupplierHandler : MediatR.IRequestHandler<AddSupplierCommand, int>
+{
+    private readonly IInventoryRepository _inv;
+    public AddSupplierHandler(IInventoryRepository inv) { _inv = inv; }
+    public Task<int> Handle(AddSupplierCommand c, CancellationToken ct)
+        => _inv.InsertSupplierAsync(c.Name.Trim(), string.IsNullOrWhiteSpace(c.Gstin) ? null : c.Gstin.Trim(), ct);
+}
+
 // ---- Purchase-order list ----
 public sealed record PurchaseOrderRowDto(long PoId, string PoNo, string? Supplier, int Lines, decimal Total, string Status, DateTime CreatedUtc);
 public sealed record GetPurchaseOrdersQuery : IQuery<IReadOnlyList<PurchaseOrderRowDto>>;

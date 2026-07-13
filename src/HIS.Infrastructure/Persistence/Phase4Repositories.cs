@@ -153,6 +153,21 @@ public sealed class InventoryRepository : IInventoryRepository
             "SELECT SupplierId, Name, Gstin, IsActive FROM master.Supplier WHERE IsActive = 1 ORDER BY Name", cancellationToken: ct))).ToList();
     }
 
+    public async Task<int> InsertSupplierAsync(string name, string? gstin, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        // Reuse an active supplier of the same name (idempotent), else create it.
+        const string sql = @"
+DECLARE @id INT = (SELECT TOP 1 SupplierId FROM master.Supplier WHERE Name = @name AND IsActive = 1);
+IF @id IS NULL
+BEGIN
+    INSERT master.Supplier (Name, Gstin, IsActive) VALUES (@name, @gstin, 1);
+    SET @id = CAST(SCOPE_IDENTITY() AS INT);
+END
+SELECT @id;";
+        return await c.QuerySingleAsync<int>(new CommandDefinition(sql, new { name, gstin }, cancellationToken: ct));
+    }
+
     public async Task<string> NextPoNoAsync(int branchId, CancellationToken ct = default)
     {
         using var c = await _f.OpenDataAsync(ct);

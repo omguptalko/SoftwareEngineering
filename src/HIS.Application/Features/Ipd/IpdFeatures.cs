@@ -199,6 +199,72 @@ public sealed class GetBedBoardHandler : MediatR.IRequestHandler<GetBedBoardQuer
     }
 }
 
+// ==================== Ward / bed management (dynamic, SRS §3.4) ====================
+public sealed record WardDto(int WardId, string Name);
+public sealed record GetWardsQuery : IQuery<IReadOnlyList<WardDto>>, IRequireAuthentication;
+
+public sealed class GetWardsHandler : MediatR.IRequestHandler<GetWardsQuery, IReadOnlyList<WardDto>>
+{
+    private readonly IAdmissionRepository _adm;
+    private readonly IBranchContext _ctx;
+    public GetWardsHandler(IAdmissionRepository adm, IBranchContext ctx) { _adm = adm; _ctx = ctx; }
+    public async Task<IReadOnlyList<WardDto>> Handle(GetWardsQuery q, CancellationToken ct)
+        => (await _adm.GetWardsAsync(_ctx.BranchId ?? 0, ct)).Select(w => new WardDto(w.WardId, w.Name)).ToList();
+}
+
+public sealed record AddWardCommand(string Name) : ICommand<int>, IAuditable
+{
+    public string AuditEntity => "Ward";
+    public string? AuditEntityId => Name;
+}
+public sealed class AddWardValidator : AbstractValidator<AddWardCommand>
+{
+    public AddWardValidator() => RuleFor(x => x.Name).NotEmpty().MaximumLength(80);
+}
+public sealed class AddWardHandler : MediatR.IRequestHandler<AddWardCommand, int>
+{
+    private readonly IAdmissionRepository _adm;
+    private readonly IBranchContext _ctx;
+    public AddWardHandler(IAdmissionRepository adm, IBranchContext ctx) { _adm = adm; _ctx = ctx; }
+    public Task<int> Handle(AddWardCommand c, CancellationToken ct)
+    {
+        var branchId = _ctx.BranchId ?? throw new InvalidOperationException("Branch context required.");
+        return _adm.AddWardAsync(branchId, c.Name.Trim(), ct);
+    }
+}
+
+public sealed record AddBedCommand(int WardId, string BedNo) : ICommand<int>, IAuditable
+{
+    public string AuditEntity => "Bed";
+    public string? AuditEntityId => BedNo;
+}
+public sealed class AddBedValidator : AbstractValidator<AddBedCommand>
+{
+    public AddBedValidator()
+    {
+        RuleFor(x => x.WardId).GreaterThan(0);
+        RuleFor(x => x.BedNo).NotEmpty().MaximumLength(20);
+    }
+}
+public sealed class AddBedHandler : MediatR.IRequestHandler<AddBedCommand, int>
+{
+    private readonly IAdmissionRepository _adm;
+    private readonly IBranchContext _ctx;
+    public AddBedHandler(IAdmissionRepository adm, IBranchContext ctx) { _adm = adm; _ctx = ctx; }
+    public async Task<int> Handle(AddBedCommand c, CancellationToken ct)
+    {
+        var branchId = _ctx.BranchId ?? throw new InvalidOperationException("Branch context required.");
+        // Ensure the ward is in the caller's branch (tenant/branch isolation).
+        if (!await _adm.WardBelongsToBranchAsync(c.WardId, branchId, ct))
+            throw new InvalidOperationException("Selected ward does not belong to this branch.");
+        var bedNo = c.BedNo.Trim();
+        // Bed numbers are unique within a branch.
+        if (await _adm.GetBedByNoAsync(branchId, bedNo, ct) is not null)
+            throw new InvalidOperationException($"Bed '{bedNo}' already exists in this branch.");
+        return await _adm.AddBedAsync(c.WardId, bedNo, ct);
+    }
+}
+
 // ==================== Admitted patients (who is in which bed) ====================
 public sealed record AdmittedPatientDto(long AdmissionId, string AdmissionNo, string Patient, string Uhid, string Ward, string BedNo, string? Consultant, DateTime AdmittedUtc);
 public sealed record GetAdmittedPatientsQuery : IQuery<IReadOnlyList<AdmittedPatientDto>>;

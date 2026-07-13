@@ -179,9 +179,17 @@ window.HIS = window.HIS || {};
       </div>
 
       <div class="panel">
-        <div class="panel__head"><i class="bi bi-people"></i> Registered Patients — this hospital
-          <span class="ph-right"><input class="ctl" id="patSearch" placeholder="Search UHID / name / mobile…" style="width:220px;display:inline-block"></span></div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+        <div class="panel__head"><i class="bi bi-people"></i> Registered Patients — this hospital <span class="ph-right hintline" id="patCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:230px"><input class="ctl" id="patSearch" placeholder="Search UHID / name / mobile…"></div>
+            <select class="ctl" id="patfSex" style="max-width:120px"><option value="">All sex</option><option>Male</option><option>Female</option><option>Other</option></select>
+            <select class="ctl" id="patfBlood" style="max-width:110px"><option value="">All blood</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select>
+            <div class="field with-unit"><input class="ctl" id="patfFrom" type="date"><span class="unit">from</span></div>
+            <div class="field with-unit"><input class="ctl" id="patfTo" type="date"><span class="unit">to</span></div>
+            <button class="btn btn--sm" id="patfClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>UHID</th><th>Name</th><th>Age/Sex</th><th>Blood</th><th>Mobile</th><th>Registered</th><th></th></tr></thead>
           <tbody id="patientsBody">${emptyRow(7, 'Loading…')}</tbody>
         </table></div></div>
@@ -398,6 +406,19 @@ window.HIS = window.HIS || {};
           <button class="btn btn--primary mt8" style="width:100%" data-act="save"><i class="bi bi-hospital"></i> Confirm Admission <span class="fk">F9</span></button>
         </div></div>
       </div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-plus-square"></i> Manage Beds &amp; Wards</div><div class="panel__body">
+        <div class="form-grid three">
+          <div class="f"><label>Ward <span class="req">*</span></label><div class="field"><select class="ctl" id="bmWard"><option value="">Loading…</option></select></div></div>
+          <div class="f"><label>Bed No <span class="req">*</span></label><div class="field"><input class="ctl code" id="bmBedNo" placeholder="e.g. GM-13"></div></div>
+          <div class="f"><label>&nbsp;</label><button class="btn btn--primary" id="bmAddBed" style="width:100%"><i class="bi bi-plus-lg"></i> Add Bed</button></div>
+        </div>
+        <div class="flex gap6 mt8" style="align-items:center;flex-wrap:wrap">
+          <span class="hintline">Naya ward chahiye?</span>
+          <div class="field" style="max-width:220px"><input class="ctl" id="bmNewWard" placeholder="New ward name (e.g. HDU)"></div>
+          <button class="btn btn--sm" id="bmAddWard"><i class="bi bi-plus-lg"></i> Add Ward</button>
+          <span class="hintline"><i class="bi bi-info-circle"></i> Naya bed <b>free</b> status me add hota hai — turant Bed Board pe aa jaata hai.</span>
+        </div>
+      </div></div>
       <div class="panel"><div class="panel__head"><i class="bi bi-clipboard2-heart"></i> Admitted Patients — who is in which bed
         <span class="ph-right muted" id="ipdAdmCount"></span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
@@ -521,8 +542,15 @@ window.HIS = window.HIS || {};
       </div></div>
       <div class="cols-side">
         <div>
-          <div class="panel"><div class="panel__head"><i class="bi bi-list-task"></i> Order Worklist <span class="ph-right muted" id="labSel">no order selected</span></div>
-            <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+          <div class="panel"><div class="panel__head"><i class="bi bi-list-task"></i> Order Worklist <span class="ph-right hintline" id="labSel">no order selected</span></div>
+            <div class="panel__body tight">
+              <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+                <div class="field" style="max-width:200px"><input class="ctl" id="labq" placeholder="Search barcode / patient / test…"></div>
+                <select class="ctl" id="labfStatus" style="max-width:150px"><option value="">All statuses</option><option>Received</option><option>Released</option></select>
+                <button class="btn btn--sm" id="labfClear"><i class="bi bi-x-circle"></i> Clear</button>
+                <span class="ph-right hintline" id="labCount"></span>
+              </div>
+              <div class="grid-wrap" style="border:0"><table class="grid">
               <thead><tr><th>Barcode</th><th>Patient</th><th>Test</th><th>Status</th></tr></thead>
               <tbody id="labWorklist">${emptyRow(4, 'Loading…')}</tbody>
             </table></div></div>
@@ -1015,8 +1043,16 @@ window.HIS = window.HIS || {};
         </div>
         <p class="hintline">Per TPG 2020, patient consent must be captured before an e-prescription can be signed.</p>
       </div></div>
-      <div class="panel"><div class="panel__head"><i class="bi bi-camera-video"></i> Sessions</div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+      <div class="panel"><div class="panel__head"><i class="bi bi-camera-video"></i> Sessions <span class="ph-right hintline" id="tmCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:220px"><input class="ctl" id="tmq" placeholder="Search patient / doctor…"></div>
+            <select class="ctl" id="tmfType" style="max-width:150px"><option value="">All types</option><option>Video</option><option>Audio</option><option>Tele-ICU</option><option>Tele-Radiology</option></select>
+            <select class="ctl" id="tmfStatus" style="max-width:140px"><option value="">All statuses</option><option>Scheduled</option><option>Completed</option></select>
+            <div class="field with-unit"><input class="ctl" id="tmfDate" type="date"><span class="unit">on</span></div>
+            <button class="btn btn--sm" id="tmfClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>#</th><th>Patient</th><th>Doctor</th><th>Type</th><th>Scheduled</th><th>Consent</th><th>e-Rx</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="tmList">${emptyRow(9, 'Loading…')}</tbody>
         </table></div></div>
@@ -1210,24 +1246,35 @@ window.HIS = window.HIS || {};
     return `<div class="screen">
       ${head('bi-chat-square-heart', 'Feedback &amp; Grievance', 'NABH surveys · grievance SLA',
         `<button class="btn btn--primary btn--sm" data-act="save"><i class="bi bi-send"></i> Submit Survey <span class="fk">F9</span></button>`)}
-      <div class="cols-side">
-        <div class="panel"><div class="panel__head"><i class="bi bi-star"></i> Satisfaction Survey</div><div class="panel__body">
-          <div class="form-grid one" style="gap:6px">
-            <div class="f"><label>Patient</label><div class="field with-btn"><input class="ctl" id="fbPatient" data-lookup="patient" placeholder="F3 patient (optional)…"><button class="lk" data-lookup="patient">F3</button></div></div>
-            <div class="f"><label>Score (1–5)</label><div class="field"><select class="ctl" id="fbScore"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div></div>
-            <div class="f"><label>Comments</label><div class="field"><textarea class="ctl" id="fbComments"></textarea></div></div>
+      <div class="panel"><div class="panel__head"><i class="bi bi-star"></i> Satisfaction Survey &amp; Log Grievance</div><div class="panel__body">
+        <div class="form-grid three">
+          <div class="f"><label>Patient</label><div class="field with-btn"><input class="ctl" id="fbPatient" data-lookup="patient" placeholder="F3 patient (optional)…"><button class="lk" data-lookup="patient">F3</button></div></div>
+          <div class="f"><label>Score (1–5)</label><div class="field"><select class="ctl" id="fbScore"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div></div>
+          <div class="f"><label>&nbsp;</label><button class="btn btn--primary" data-act="save" style="width:100%"><i class="bi bi-send"></i> Submit Survey</button></div>
+          <div class="f wide"><label>Comments</label><div class="field"><textarea class="ctl" id="fbComments" placeholder="Patient feedback…"></textarea></div></div>
+        </div>
+        <div class="subhead mt12">Log a Grievance</div>
+        <div class="form-grid three">
+          <div class="f wide"><label>Category</label><div class="field"><input class="ctl" id="grCategory" placeholder="e.g. Billing delay / Long wait / Staff behaviour"></div></div>
+          <div class="f"><label>&nbsp;</label><button class="btn" id="btnLogGrievance" style="width:100%"><i class="bi bi-exclamation-circle"></i> Log Grievance</button></div>
+        </div>
+        <span class="hintline"><i class="bi bi-info-circle"></i> Grievance SLA config se aata hai — logged grievance neeche register me aa jaata hai.</span>
+      </div></div>
+
+      <div class="kpis" id="grKpis"><div class="muted" style="padding:12px">Loading…</div></div>
+
+      <div class="panel"><div class="panel__head"><i class="bi bi-list-task"></i> Grievance Register <span class="ph-right hintline" id="grCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:260px"><input class="ctl" id="grq" placeholder="Search category…"></div>
+            <select class="ctl" id="grfStatus" style="max-width:160px"><option value="">All statuses</option><option value="Open">Open (unresolved)</option><option value="Resolved">Resolved</option></select>
+            <button class="btn btn--sm" id="grfClear"><i class="bi bi-x-circle"></i> Clear</button>
           </div>
-          <div class="subhead mt12">Log Grievance</div>
-          <div class="form-grid one" style="gap:6px">
-            <div class="f"><label>Category</label><div class="field"><input class="ctl" id="grCategory" placeholder="e.g. Billing delay"></div></div>
-          </div>
-          <button class="btn mt8" id="btnLogGrievance" style="width:100%"><i class="bi bi-exclamation-circle"></i> Log Grievance (SLA from config)</button>
-        </div></div>
-        <div class="panel"><div class="panel__head"><i class="bi bi-list-task"></i> Grievances <span class="ph-right hintline" id="grCount"></span></div>
-          <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
-            <thead><tr><th>Category</th><th>Status</th><th>Created</th><th></th></tr></thead>
-            <tbody id="grList">${emptyRow(4, 'Loading…')}</tbody>
-          </table></div></div></div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
+            <thead><tr><th>#</th><th>Category</th><th>Status</th><th>Logged</th><th></th></tr></thead>
+            <tbody id="grList">${emptyRow(5, 'Loading…')}</tbody>
+          </table></div>
+        </div>
       </div>
     </div>`;
   }
@@ -1528,8 +1575,16 @@ window.HIS = window.HIS || {};
   function ot() {
     return `<div class="screen">
       ${head('bi-scissors', 'Operation Theatre (OT)', 'Schedule surgery · theatre board · post-op', '')}
-      <div class="panel"><div class="panel__head"><i class="bi bi-calendar2-week"></i> OT Board <span class="ph-right muted" id="otCount"></span></div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+      <div class="panel"><div class="panel__head"><i class="bi bi-calendar2-week"></i> OT Board <span class="ph-right hintline" id="otCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:230px"><input class="ctl" id="otq" placeholder="Search patient / procedure / surgeon…"></div>
+            <select class="ctl" id="otfStatus" style="max-width:150px"><option value="">All statuses</option><option value="Scheduled">Scheduled</option><option value="InProgress">In progress</option><option value="Completed">Completed</option></select>
+            <select class="ctl" id="otfTheatre" style="max-width:150px"><option value="">All theatres</option><option>OT-1</option><option>OT-2</option><option>OT-3</option><option>Emergency OT</option></select>
+            <div class="field with-unit"><input class="ctl" id="otfDate" type="date"><span class="unit">on</span></div>
+            <button class="btn btn--sm" id="otfClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>Scheduled</th><th>Patient</th><th>Procedure</th><th>Surgeon</th><th>Theatre</th><th>Status</th><th></th></tr></thead>
           <tbody id="otBoard">${emptyRow(7, 'Loading…')}</tbody>
         </table></div></div></div>
@@ -1693,15 +1748,31 @@ window.HIS = window.HIS || {};
           <thead><tr><th>Code</th><th>Item</th><th class="num">Stock</th><th class="num">Reorder</th><th>Status</th></tr></thead>
           <tbody id="invStock">${emptyRow(5, 'Loading…')}</tbody>
         </table></div></div></div>
-      <div class="panel"><div class="panel__head"><i class="bi bi-receipt"></i> Purchase Orders <span class="ph-right muted" id="poCount"></span></div>
-        <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
+      <div class="panel"><div class="panel__head"><i class="bi bi-receipt"></i> Purchase Orders <span class="ph-right hintline" id="poCount"></span></div>
+        <div class="panel__body tight">
+          <div class="flex gap6 mb8" style="flex-wrap:wrap;align-items:center;padding:4px 0">
+            <div class="field" style="max-width:230px"><input class="ctl" id="poq" placeholder="Search PO no / supplier…"></div>
+            <select class="ctl" id="pofStatus" style="max-width:150px"><option value="">All statuses</option><option>Draft</option><option>Ordered</option><option>Received</option><option>Cancelled</option></select>
+            <div class="field with-unit"><input class="ctl" id="pofFrom" type="date"><span class="unit">from</span></div>
+            <div class="field with-unit"><input class="ctl" id="pofTo" type="date"><span class="unit">to</span></div>
+            <button class="btn btn--sm" id="pofClear"><i class="bi bi-x-circle"></i> Clear</button>
+          </div>
+          <div class="grid-wrap" style="border:0"><table class="grid">
           <thead><tr><th>PO No.</th><th>Supplier</th><th class="num">Items</th><th class="num">Total ₹</th><th>Status</th><th>Raised</th></tr></thead>
           <tbody id="poList">${emptyRow(6, 'Loading…')}</tbody>
         </table></div></div></div>
       <div class="panel"><div class="panel__head"><i class="bi bi-cart-plus"></i> Create Purchase Order
         <span class="ph-right"><button class="btn btn--sm" data-addrow="poGrid"><i class="bi bi-plus-lg"></i> Add Line</button></span></div>
         <div class="panel__body">
-          <div class="form-grid"><div class="f"><label>Supplier <span class="req">*</span></label><div class="field"><select class="ctl" id="poSupplier"><option value="">— select —</option></select></div></div></div>
+          <div class="form-grid three">
+            <div class="f wide"><label>Supplier <span class="req">*</span></label><div class="field"><select class="ctl" id="poSupplier"><option value="">— select —</option></select></div></div>
+          </div>
+          <div class="flex gap6 mt8" style="align-items:center;flex-wrap:wrap">
+            <span class="hintline" style="margin-right:2px">Naya supplier?</span>
+            <div class="field" style="max-width:200px"><input class="ctl" id="poNewSupName" placeholder="Supplier name"></div>
+            <div class="field" style="max-width:170px"><input class="ctl code" id="poNewSupGstin" placeholder="GSTIN (optional)"></div>
+            <button class="btn btn--sm" id="poAddSupplier"><i class="bi bi-plus-lg"></i> Add Supplier</button>
+          </div>
           <div class="grid-wrap grid--editable" style="border:0;margin-top:8px"><table class="grid" id="poGrid">
             <thead><tr><th style="width:55%">Item</th><th class="num">Qty</th><th class="num">Unit Price ₹</th><th></th></tr></thead>
             <tbody id="poBody"><tr>${TPL.poBody}</tr></tbody>
@@ -2129,6 +2200,11 @@ window.HIS = window.HIS || {};
       // Show who is about to be admitted as soon as a patient is picked (F3).
       const pf = doc.querySelector('#ipdPatient');
       if (pf) { pf.addEventListener('change', () => showIpdPatient(doc)); pf.addEventListener('blur', () => showIpdPatient(doc)); }
+      // Dynamic bed/ward management.
+      loadWards(doc);
+      const ab = doc.querySelector('#bmAddBed'); if (ab) ab.addEventListener('click', () => doAddBed(doc));
+      const aw = doc.querySelector('#bmAddWard'); if (aw) aw.addEventListener('click', () => doAddWard(doc));
+      const bn = doc.querySelector('#bmBedNo'); if (bn) bn.addEventListener('keydown', e => { if (e.key === 'Enter') doAddBed(doc); });
     }
     if (id === 'appointments') { initAppointments(doc); HIS.saveHandlers.appointments = () => doBookAppointment(doc); }
     if (id === 'opd') { initOpd(doc); HIS.saveHandlers.opd = () => doSaveConsultation(doc); }
@@ -2757,17 +2833,38 @@ window.HIS = window.HIS || {};
   function initFeedback(doc) {
     loadGrievances(doc);
     const b = doc.querySelector('#btnLogGrievance'); if (b) b.addEventListener('click', () => doLogGrievance(doc));
+    ['grq', 'grfStatus'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderGrievances(doc)); el.addEventListener('change', () => renderGrievances(doc)); } });
+    const clr = doc.querySelector('#grfClear'); if (clr) clr.addEventListener('click', () => { ['grq', 'grfStatus'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); renderGrievances(doc); });
   }
   async function loadGrievances(doc) {
     const tb = doc.querySelector('#grList'); if (!tb) return;
-    try { const rows = await HIS.api.grievances();
-      const cnt = doc.querySelector('#grCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} · ${rows.filter(g => g.status !== 'Resolved').length} open` : '';
-      tb.innerHTML = rows.length ? rows.map(g => {
-        const done = g.status === 'Resolved';
-        return `<tr><td>${g.category || '—'}</td><td><span class="pill ${done ? 'pill--ok' : 'pill--warn'}">${g.status}</span></td><td>${g.created}</td><td>${done ? '✓' : `<button class="btn btn--sm" data-resolve="${g.grievanceId}"><i class="bi bi-check2"></i> Resolve</button>`}</td></tr>`;
-      }).join('') : emptyRow(4, 'No grievances');
-      tb.querySelectorAll('[data-resolve]').forEach(b => b.addEventListener('click', () => doResolveGrievance(doc, b.dataset.resolve)));
-    } catch (e) { tb.innerHTML = emptyRow(4, 'API unavailable'); }
+    try { doc._grievances = await HIS.api.grievances() || []; renderGrievances(doc); }
+    catch (e) { doc._grievances = []; tb.innerHTML = emptyRow(5, 'API unavailable'); }
+  }
+  function renderGrievances(doc) {
+    const tb = doc.querySelector('#grList'); if (!tb) return;
+    const all = doc._grievances || [];
+    const q = (val(doc, 'grq') || '').toLowerCase();
+    const status = val(doc, 'grfStatus');
+    const rows = all.filter(g =>
+      (!q || (g.category || '').toLowerCase().includes(q)) &&
+      (!status || (status === 'Open' ? g.status !== 'Resolved' : g.status === status)));
+    tb.innerHTML = rows.length ? rows.map(g => {
+      const done = g.status === 'Resolved';
+      return `<tr><td class="tnum">${g.grievanceId}</td><td>${g.category || '—'}</td><td><span class="pill ${done ? 'pill--ok' : 'pill--warn'}">${g.status}</span></td><td class="tnum">${g.created}</td><td class="right">${done ? '<i class="bi bi-check-circle-fill" style="color:var(--ok)"></i>' : `<button class="btn btn--sm btn--primary" data-resolve="${g.grievanceId}"><i class="bi bi-check2"></i> Resolve</button>`}</td></tr>`;
+    }).join('') : emptyRow(5, (q || status) ? 'No grievances match the filters' : 'No grievances');
+    // KPI strip (from the full set, not the filtered view).
+    const kp = doc.querySelector('#grKpis');
+    if (kp) {
+      const open = all.filter(g => g.status !== 'Resolved').length, resolved = all.length - open;
+      kp.innerHTML =
+        `<div class="kpi"><div class="v tnum">${all.length}</div><div class="l">Total grievances</div></div>
+         <div class="kpi"><div class="v tnum" style="color:var(--warn)">${open}</div><div class="l">Open</div></div>
+         <div class="kpi"><div class="v tnum" style="color:var(--ok)">${resolved}</div><div class="l">Resolved</div></div>
+         <div class="kpi"><div class="v tnum">${all.length ? Math.round(resolved / all.length * 100) : 0}%</div><div class="l">Resolution rate</div></div>`;
+    }
+    const cnt = doc.querySelector('#grCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length}` : '';
+    tb.querySelectorAll('[data-resolve]').forEach(b => b.addEventListener('click', () => doResolveGrievance(doc, b.dataset.resolve)));
   }
   async function doSubmitSurvey(doc) {
     try {
@@ -2930,26 +3027,39 @@ window.HIS = window.HIS || {};
   function initTele(doc) {
     loadTele(doc);
     const sb = doc.querySelector('#btnSchedTele'); if (sb) sb.addEventListener('click', () => doScheduleTele(doc));
+    ['tmq', 'tmfType', 'tmfStatus', 'tmfDate'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderTele(doc)); el.addEventListener('change', () => renderTele(doc)); } });
+    const clr = doc.querySelector('#tmfClear'); if (clr) clr.addEventListener('click', () => { ['tmq', 'tmfType', 'tmfStatus', 'tmfDate'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); renderTele(doc); });
   }
   async function loadTele(doc) {
     const tb = doc.querySelector('#tmList'); if (!tb) return;
-    try {
-      const rows = await HIS.api.teleList();
-      const yn = b => b ? '<span class="pill pill--ok">✓</span>' : '<span class="pill pill--muted">—</span>';
-      tb.innerHTML = rows.length ? rows.map(t => {
-        let actions = '';
-        if (t.status !== 'Completed') {
-          if (!t.consent) actions += `<button class="btn btn--sm" data-tele-consent="${t.teleId}">Consent</button> `;
-          else if (!t.signed) actions += `<button class="btn btn--sm" data-tele-sign="${t.teleId}">Sign e-Rx</button> `;
-          actions += `<button class="btn btn--sm" data-tele-complete="${t.teleId}">Complete</button>`;
-        } else actions = '✓';
-        return `<tr><td>${t.teleId}</td><td>${t.patient}</td><td>${t.doctor || '—'}</td><td>${t.consultType || '—'}</td><td>${t.scheduled || '—'}</td>
-          <td>${yn(t.consent)}</td><td>${yn(t.signed)}</td><td><span class="pill ${t.status === 'Completed' ? 'pill--purple' : 'pill--info'}">${t.status}</span></td><td>${actions}</td></tr>`;
-      }).join('') : emptyRow(9, 'No sessions yet');
-      tb.querySelectorAll('[data-tele-consent]').forEach(b => b.addEventListener('click', () => teleAct(doc, 'consent', b.dataset.teleConsent)));
-      tb.querySelectorAll('[data-tele-sign]').forEach(b => b.addEventListener('click', () => teleAct(doc, 'sign', b.dataset.teleSign)));
-      tb.querySelectorAll('[data-tele-complete]').forEach(b => b.addEventListener('click', () => teleAct(doc, 'complete', b.dataset.teleComplete)));
-    } catch (e) { tb.innerHTML = emptyRow(9, 'Telemedicine API unavailable'); }
+    try { doc._tele = await HIS.api.teleList() || []; renderTele(doc); }
+    catch (e) { doc._tele = []; tb.innerHTML = emptyRow(9, 'Telemedicine API unavailable'); }
+  }
+  function renderTele(doc) {
+    const tb = doc.querySelector('#tmList'); if (!tb) return;
+    const all = doc._tele || [];
+    const q = (val(doc, 'tmq') || '').toLowerCase();
+    const type = val(doc, 'tmfType'), status = val(doc, 'tmfStatus'), date = val(doc, 'tmfDate');
+    const rows = all.filter(t =>
+      (!q || `${t.patient || ''} ${t.doctor || ''}`.toLowerCase().includes(q)) &&
+      (!type || t.consultType === type) &&
+      (!status || t.status === status) &&
+      (!date || (t.scheduled || '').slice(0, 10) === date));
+    const yn = b => b ? '<span class="pill pill--ok">✓</span>' : '<span class="pill pill--muted">—</span>';
+    tb.innerHTML = rows.length ? rows.map(t => {
+      let actions = '';
+      if (t.status !== 'Completed') {
+        if (!t.consent) actions += `<button class="btn btn--sm" data-tele-consent="${t.teleId}">Consent</button> `;
+        else if (!t.signed) actions += `<button class="btn btn--sm" data-tele-sign="${t.teleId}">Sign e-Rx</button> `;
+        actions += `<button class="btn btn--sm" data-tele-complete="${t.teleId}">Complete</button>`;
+      } else actions = '✓';
+      return `<tr><td class="tnum">${t.teleId}</td><td>${t.patient}</td><td>${t.doctor || '—'}</td><td>${t.consultType || '—'}</td><td class="tnum">${t.scheduled || '—'}</td>
+        <td>${yn(t.consent)}</td><td>${yn(t.signed)}</td><td><span class="pill ${t.status === 'Completed' ? 'pill--purple' : 'pill--info'}">${t.status}</span></td><td>${actions}</td></tr>`;
+    }).join('') : emptyRow(9, (q || type || status || date) ? 'No sessions match the filters' : 'No sessions yet');
+    const cnt = doc.querySelector('#tmCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length} session(s)` : '';
+    tb.querySelectorAll('[data-tele-consent]').forEach(b => b.addEventListener('click', () => teleAct(doc, 'consent', b.dataset.teleConsent)));
+    tb.querySelectorAll('[data-tele-sign]').forEach(b => b.addEventListener('click', () => teleAct(doc, 'sign', b.dataset.teleSign)));
+    tb.querySelectorAll('[data-tele-complete]').forEach(b => b.addEventListener('click', () => teleAct(doc, 'complete', b.dataset.teleComplete)));
   }
   async function teleAct(doc, action, id) {
     try {
@@ -3401,6 +3511,39 @@ window.HIS = window.HIS || {};
     } catch (e) { HIS.toast('Admit failed: ' + e.message); }
   }
   // Who is admitted in which bed/room — tenant/branch-scoped.
+  /* ---- IPD: dynamic ward/bed management ------------------------------ */
+  async function loadWards(doc) {
+    const sel = doc.querySelector('#bmWard'); if (!sel) return;
+    try {
+      const wards = await HIS.api.wards();
+      sel.innerHTML = wards.length
+        ? wards.map(w => `<option value="${w.wardId}">${w.name}</option>`).join('')
+        : '<option value="">No wards — add one first</option>';
+    } catch (e) { sel.innerHTML = '<option value="">Wards API unavailable</option>'; }
+  }
+  async function doAddBed(doc) {
+    const wardId = val(doc, 'bmWard'); const bedNo = val(doc, 'bmBedNo');
+    if (!wardId) { HIS.toast('Select a ward (ya pehle ward add karo)'); return; }
+    if (!bedNo) { HIS.toast('Enter a bed number'); return; }
+    try {
+      await HIS.api.addBed({ wardId: parseInt(wardId, 10), bedNo });
+      HIS.toast('Bed added · ' + bedNo + ' (free)', 'bi-plus-square');
+      const b = doc.querySelector('#bmBedNo'); if (b) b.value = '';
+      loadBedBoard(doc);   // naya bed turant board pe
+    } catch (e) { HIS.toast(/already exists/i.test(e.message) ? `Bed "${bedNo}" pehle se hai is branch me` : 'Add failed: ' + e.message); }
+  }
+  async function doAddWard(doc) {
+    const name = val(doc, 'bmNewWard');
+    if (!name) { HIS.toast('Enter a ward name'); return; }
+    try {
+      await HIS.api.addWard({ name });
+      HIS.toast('Ward added · ' + name, 'bi-plus-square');
+      const w = doc.querySelector('#bmNewWard'); if (w) w.value = '';
+      await loadWards(doc);
+      const sel = doc.querySelector('#bmWard'); if (sel) { const opt = Array.from(sel.options).find(o => o.textContent === name); if (opt) sel.value = opt.value; }
+    } catch (e) { HIS.toast('Add ward failed: ' + e.message); }
+  }
+
   async function loadAdmissions(doc) {
     const tb = doc.querySelector('#ipdAdmitted'); if (!tb) return;
     try {
@@ -3586,29 +3729,41 @@ window.HIS = window.HIS || {};
     loadOtBoard(doc);
     const w = doc.querySelector('#otWhen'); if (w) w.value = new Date(Date.now() + 3600000).toISOString().slice(0, 16);
     const b = doc.querySelector('#otCompleteBtn'); if (b) b.addEventListener('click', () => doCompleteSurgery(doc));
+    ['otq', 'otfStatus', 'otfTheatre', 'otfDate'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderOtBoard(doc)); el.addEventListener('change', () => renderOtBoard(doc)); } });
+    const clr = doc.querySelector('#otfClear'); if (clr) clr.addEventListener('click', () => { ['otq', 'otfStatus', 'otfTheatre', 'otfDate'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); renderOtBoard(doc); });
   }
   async function loadOtBoard(doc) {
     const tb = doc.querySelector('#otBoard'); if (!tb) return;
-    try {
-      const rows = await HIS.api.otBoard();
-      const cnt = doc.querySelector('#otCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' cases' : '';
-      tb.innerHTML = rows.length ? rows.map(r => {
-        const when = (r.scheduledUtc || '').replace('T', ' ').slice(0, 16);
-        const cls = r.status === 'Completed' ? 'pill--muted' : r.status === 'InProgress' ? 'pill--warn' : 'pill--ok';
-        const label = r.status === 'InProgress' ? 'In progress' : r.status;
-        let act = '';
-        if (r.status === 'Scheduled') act = `<button class="btn btn--sm btn--primary" data-otstart="${r.otId}" data-patient="${r.patient}"><i class="bi bi-play-fill"></i> Start</button>`;
-        else if (r.status === 'InProgress') act = `<button class="btn btn--sm" data-otcomplete="${r.otId}" data-patient="${r.patient}"><i class="bi bi-check2-circle"></i> Complete</button>`;
-        return `<tr><td>${when}</td><td>${r.patient}</td><td>${r.procedure || ''}</td><td>${r.surgeon || '—'}</td><td>${r.theatre || ''}</td><td><span class="pill ${cls}">${label}</span></td><td>${act}</td></tr>`;
-      }).join('') : emptyRow(7, 'No cases scheduled');
-      tb.querySelectorAll('[data-otstart]').forEach(b => b.addEventListener('click', () => doStartSurgery(doc, b.dataset.otstart, b.dataset.patient)));
-      tb.querySelectorAll('[data-otcomplete]').forEach(b => b.addEventListener('click', () => {
-        doc.dataset.otId = b.dataset.otcomplete;
-        const who = doc.querySelector('#otPostWho'); if (who) who.textContent = b.dataset.patient;
-        const cb = doc.querySelector('#otCompleteBtn'); if (cb && cb.closest('.panel')) cb.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        HIS.toast('Selected ' + b.dataset.patient + ' — add post-op notes, then Complete', 'bi-clipboard2-check');
-      }));
-    } catch (e) { tb.innerHTML = emptyRow(7, 'OT board API unavailable'); }
+    try { doc._otRows = await HIS.api.otBoard() || []; renderOtBoard(doc); }
+    catch (e) { doc._otRows = []; tb.innerHTML = emptyRow(7, 'OT board API unavailable'); }
+  }
+  function renderOtBoard(doc) {
+    const tb = doc.querySelector('#otBoard'); if (!tb) return;
+    const all = doc._otRows || [];
+    const q = (val(doc, 'otq') || '').toLowerCase();
+    const status = val(doc, 'otfStatus'), theatre = val(doc, 'otfTheatre'), date = val(doc, 'otfDate');
+    const rows = all.filter(r =>
+      (!q || `${r.patient || ''} ${r.procedure || ''} ${r.surgeon || ''}`.toLowerCase().includes(q)) &&
+      (!status || r.status === status) &&
+      (!theatre || r.theatre === theatre) &&
+      (!date || (r.scheduledUtc || '').slice(0, 10) === date));
+    tb.innerHTML = rows.length ? rows.map(r => {
+      const when = (r.scheduledUtc || '').replace('T', ' ').slice(0, 16);
+      const cls = r.status === 'Completed' ? 'pill--muted' : r.status === 'InProgress' ? 'pill--warn' : 'pill--ok';
+      const label = r.status === 'InProgress' ? 'In progress' : r.status;
+      let act = '';
+      if (r.status === 'Scheduled') act = `<button class="btn btn--sm btn--primary" data-otstart="${r.otId}" data-patient="${r.patient}"><i class="bi bi-play-fill"></i> Start</button>`;
+      else if (r.status === 'InProgress') act = `<button class="btn btn--sm" data-otcomplete="${r.otId}" data-patient="${r.patient}"><i class="bi bi-check2-circle"></i> Complete</button>`;
+      return `<tr><td class="tnum">${when}</td><td>${r.patient}</td><td>${r.procedure || ''}</td><td>${r.surgeon || '—'}</td><td>${r.theatre || ''}</td><td><span class="pill ${cls}">${label}</span></td><td>${act}</td></tr>`;
+    }).join('') : emptyRow(7, (q || status || theatre || date) ? 'No cases match the filters' : 'No cases scheduled');
+    const cnt = doc.querySelector('#otCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length} case(s)` : '';
+    tb.querySelectorAll('[data-otstart]').forEach(b => b.addEventListener('click', () => doStartSurgery(doc, b.dataset.otstart, b.dataset.patient)));
+    tb.querySelectorAll('[data-otcomplete]').forEach(b => b.addEventListener('click', () => {
+      doc.dataset.otId = b.dataset.otcomplete;
+      const who = doc.querySelector('#otPostWho'); if (who) who.textContent = b.dataset.patient;
+      const cb = doc.querySelector('#otCompleteBtn'); if (cb && cb.closest('.panel')) cb.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      HIS.toast('Selected ' + b.dataset.patient + ' — add post-op notes, then Complete', 'bi-clipboard2-check');
+    }));
   }
   async function doScheduleSurgery(doc) {
     const uhid = val(doc, 'otPatient');
@@ -3941,18 +4096,43 @@ window.HIS = window.HIS || {};
     loadInvStock(doc);
     loadPoSuppliers(doc);
     loadPurchaseOrders(doc);
+    ['poq', 'pofStatus', 'pofFrom', 'pofTo'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderPurchaseOrders(doc)); el.addEventListener('change', () => renderPurchaseOrders(doc)); } });
+    const clr = doc.querySelector('#pofClear'); if (clr) clr.addEventListener('click', () => { ['poq', 'pofStatus', 'pofFrom', 'pofTo'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); renderPurchaseOrders(doc); });
+    const as = doc.querySelector('#poAddSupplier'); if (as) as.addEventListener('click', () => doAddSupplier(doc));
+    const nsg = doc.querySelector('#poNewSupGstin'); if (nsg) nsg.addEventListener('keydown', e => { if (e.key === 'Enter') doAddSupplier(doc); });
+  }
+  async function doAddSupplier(doc) {
+    const name = val(doc, 'poNewSupName');
+    if (!name) { HIS.toast('Enter a supplier name'); return; }
+    try {
+      const id = await HIS.api.addSupplier({ name, gstin: val(doc, 'poNewSupGstin') || null });
+      HIS.toast('Supplier added · ' + name, 'bi-truck');
+      ['poNewSupName', 'poNewSupGstin'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; });
+      await loadPoSuppliers(doc);
+      const sel = doc.querySelector('#poSupplier'); if (sel && id) sel.value = String(id);   // auto-select the new supplier
+    } catch (e) { HIS.toast('Add supplier failed: ' + e.message); }
   }
   async function loadPurchaseOrders(doc) {
     const tb = doc.querySelector('#poList'); if (!tb) return;
-    try {
-      const rows = await HIS.api.purchaseOrders();
-      const cnt = doc.querySelector('#poCount'); if (cnt) cnt.textContent = rows.length ? rows.length + ' orders' : '';
-      tb.innerHTML = rows.length ? rows.map(r => {
-        const when = (r.createdUtc || '').replace('T', ' ').slice(0, 16);
-        const cls = r.status === 'Received' ? 'pill--ok' : r.status === 'Cancelled' ? 'pill--muted' : 'pill--warn';
-        return `<tr><td><b>${r.poNo}</b></td><td>${r.supplier || '—'}</td><td class="num">${r.lines}</td><td class="num">${(r.total || 0).toFixed(2)}</td><td><span class="pill ${cls}">${r.status}</span></td><td>${when}</td></tr>`;
-      }).join('') : emptyRow(6, 'No purchase orders yet');
-    } catch (e) { tb.innerHTML = emptyRow(6, 'PO list API unavailable'); }
+    try { doc._pos = await HIS.api.purchaseOrders() || []; renderPurchaseOrders(doc); }
+    catch (e) { doc._pos = []; tb.innerHTML = emptyRow(6, 'PO list API unavailable'); }
+  }
+  function renderPurchaseOrders(doc) {
+    const tb = doc.querySelector('#poList'); if (!tb) return;
+    const all = doc._pos || [];
+    const q = (val(doc, 'poq') || '').toLowerCase();
+    const status = val(doc, 'pofStatus'), from = val(doc, 'pofFrom'), to = val(doc, 'pofTo');
+    const day = r => (r.createdUtc || '').slice(0, 10);
+    const rows = all.filter(r =>
+      (!q || `${r.poNo || ''} ${r.supplier || ''}`.toLowerCase().includes(q)) &&
+      (!status || r.status === status) &&
+      (!from || day(r) >= from) && (!to || day(r) <= to));
+    tb.innerHTML = rows.length ? rows.map(r => {
+      const when = (r.createdUtc || '').replace('T', ' ').slice(0, 16);
+      const cls = r.status === 'Received' ? 'pill--ok' : r.status === 'Cancelled' ? 'pill--muted' : 'pill--warn';
+      return `<tr><td><b>${r.poNo}</b></td><td>${r.supplier || '—'}</td><td class="num tnum">${r.lines}</td><td class="num tnum">${(r.total || 0).toFixed(2)}</td><td><span class="pill ${cls}">${r.status}</span></td><td class="tnum">${when}</td></tr>`;
+    }).join('') : emptyRow(6, (q || status || from || to) ? 'No purchase orders match the filters' : 'No purchase orders yet');
+    const cnt = doc.querySelector('#poCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length} order(s)` : '';
   }
   async function loadInvStock(doc) {
     const tb = doc.querySelector('#invStock'); if (!tb) return;
@@ -4120,22 +4300,33 @@ window.HIS = window.HIS || {};
     ['btnLabOrder', 'btnLabOrder2'].forEach(id => {
       const b = doc.querySelector('#' + id); if (b) b.addEventListener('click', create);
     });
+    ['labq', 'labfStatus'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderLabWorklist(doc)); el.addEventListener('change', () => renderLabWorklist(doc)); } });
+    const clr = doc.querySelector('#labfClear'); if (clr) clr.addEventListener('click', () => { ['labq', 'labfStatus'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); renderLabWorklist(doc); });
   }
   async function loadLabWorklist(doc) {
     const tb = doc.querySelector('#labWorklist'); if (!tb) return;
-    try {
-      const rows = await HIS.api.labWorklist();
-      tb.innerHTML = rows.length ? rows.map(r =>
-        `<tr data-order="${r.labOrderId}" style="cursor:pointer"><td><b>${r.barcode}</b></td><td>${r.patient}</td><td>${r.test}</td>
-          <td><span class="pill ${r.status === 'Released' ? 'pill--ok' : 'pill--warn'}">${r.status}</span></td></tr>`
-      ).join('') : emptyRow(4, 'No lab orders yet — create one above');
-      tb.querySelectorAll('[data-order]').forEach(tr => tr.addEventListener('click', () => {
-        tb.querySelectorAll('tr').forEach(x => x.classList.remove('sel'));
-        tr.classList.add('sel'); doc.dataset.labOrder = tr.dataset.order;
-        const s = doc.querySelector('#labSel'); if (s) s.textContent = 'order #' + tr.dataset.order + ' selected';
-        HIS.toast('Order #' + tr.dataset.order + ' selected — enter results');
-      }));
-    } catch (e) { tb.innerHTML = emptyRow(4, 'Worklist API unavailable'); }
+    try { doc._labOrders = await HIS.api.labWorklist() || []; renderLabWorklist(doc); }
+    catch (e) { doc._labOrders = []; tb.innerHTML = emptyRow(4, 'Worklist API unavailable'); }
+  }
+  function renderLabWorklist(doc) {
+    const tb = doc.querySelector('#labWorklist'); if (!tb) return;
+    const all = doc._labOrders || [];
+    const q = (val(doc, 'labq') || '').toLowerCase();
+    const status = val(doc, 'labfStatus');
+    const rows = all.filter(r =>
+      (!q || `${r.barcode || ''} ${r.patient || ''} ${r.test || ''}`.toLowerCase().includes(q)) &&
+      (!status || r.status === status));
+    tb.innerHTML = rows.length ? rows.map(r =>
+      `<tr data-order="${r.labOrderId}" style="cursor:pointer"><td><b>${r.barcode}</b></td><td>${r.patient}</td><td>${r.test}</td>
+        <td><span class="pill ${r.status === 'Released' ? 'pill--ok' : 'pill--warn'}">${r.status}</span></td></tr>`
+    ).join('') : emptyRow(4, (q || status) ? 'No orders match the filters' : 'No lab orders yet — create one above');
+    const cnt = doc.querySelector('#labCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length}` : '';
+    tb.querySelectorAll('[data-order]').forEach(tr => tr.addEventListener('click', () => {
+      tb.querySelectorAll('tr').forEach(x => x.classList.remove('sel'));
+      tr.classList.add('sel'); doc.dataset.labOrder = tr.dataset.order;
+      const s = doc.querySelector('#labSel'); if (s) s.textContent = 'order #' + tr.dataset.order + ' selected';
+      HIS.toast('Order #' + tr.dataset.order + ' selected — enter results');
+    }));
   }
   async function doCreateLabOrder(doc) {
     const uhid = val(doc, 'labPatient'), test = val(doc, 'labTest');
@@ -4206,18 +4397,29 @@ window.HIS = window.HIS || {};
   /* ---- Registration: this hospital's patients + CRUD (tenant-scoped) ---- */
   async function loadPatients(doc) {
     const tb = doc.querySelector('#patientsBody'); if (!tb) return;
-    try {
-      const rows = await HIS.api.listPatients(val(doc, 'patSearch') || null);
-      tb.innerHTML = rows.length ? rows.map(p =>
-        `<tr><td><b>${p.uhid}</b></td><td>${p.fullName}</td><td>${p.ageYears ?? ''}/${(p.sex || '').slice(0, 1)}</td><td>${p.bloodGroup || ''}</td><td>${p.mobile || ''}</td><td>${(p.registeredAtUtc || '').slice(0, 10)}</td>
-          <td style="white-space:nowrap"><button class="btn btn--sm" title="History" data-hist="${p.uhid}" data-name="${p.fullName}"><i class="bi bi-clock-history"></i></button>
-          <button class="btn btn--sm" title="Edit" data-edit='${encodeURIComponent(JSON.stringify(p))}'><i class="bi bi-pencil"></i></button>
-          <button class="btn btn--sm" title="Deactivate" data-deact="${p.uhid}" data-name="${p.fullName}"><i class="bi bi-person-x"></i></button></td></tr>`
-      ).join('') : emptyRow(7, 'No patients yet — register one above');
-      tb.querySelectorAll('[data-hist]').forEach(b => b.addEventListener('click', () => showPatientHistory(doc, b.dataset.hist, b.dataset.name)));
-      tb.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editPatient(doc, JSON.parse(decodeURIComponent(b.dataset.edit)))));
-      tb.querySelectorAll('[data-deact]').forEach(b => b.addEventListener('click', () => deactivatePatient(doc, b.dataset.deact, b.dataset.name)));
-    } catch (e) { tb.innerHTML = emptyRow(7, 'Patients API unavailable'); }
+    try { doc._patients = await HIS.api.listPatients(val(doc, 'patSearch') || null) || []; renderPatients(doc); }
+    catch (e) { doc._patients = []; tb.innerHTML = emptyRow(7, 'Patients API unavailable'); }
+  }
+  // Search is server-side (patSearch); sex / blood / registered-date are client-side on the result.
+  function renderPatients(doc) {
+    const tb = doc.querySelector('#patientsBody'); if (!tb) return;
+    const all = doc._patients || [];
+    const sex = val(doc, 'patfSex'), blood = val(doc, 'patfBlood'), from = val(doc, 'patfFrom'), to = val(doc, 'patfTo');
+    const day = p => (p.registeredAtUtc || '').slice(0, 10);
+    const rows = all.filter(p =>
+      (!sex || p.sex === sex) &&
+      (!blood || p.bloodGroup === blood) &&
+      (!from || day(p) >= from) && (!to || day(p) <= to));
+    tb.innerHTML = rows.length ? rows.map(p =>
+      `<tr><td><b>${p.uhid}</b></td><td>${p.fullName}</td><td>${p.ageYears ?? ''}/${(p.sex || '').slice(0, 1)}</td><td>${p.bloodGroup || ''}</td><td>${p.mobile || ''}</td><td>${(p.registeredAtUtc || '').slice(0, 10)}</td>
+        <td style="white-space:nowrap"><button class="btn btn--sm" title="History" data-hist="${p.uhid}" data-name="${p.fullName}"><i class="bi bi-clock-history"></i></button>
+        <button class="btn btn--sm" title="Edit" data-edit='${encodeURIComponent(JSON.stringify(p))}'><i class="bi bi-pencil"></i></button>
+        <button class="btn btn--sm" title="Deactivate" data-deact="${p.uhid}" data-name="${p.fullName}"><i class="bi bi-person-x"></i></button></td></tr>`
+    ).join('') : emptyRow(7, (sex || blood || from || to || val(doc, 'patSearch')) ? 'No patients match the filters' : 'No patients yet — register one above');
+    const cnt = doc.querySelector('#patCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length} patient(s)` : '';
+    tb.querySelectorAll('[data-hist]').forEach(b => b.addEventListener('click', () => showPatientHistory(doc, b.dataset.hist, b.dataset.name)));
+    tb.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editPatient(doc, JSON.parse(decodeURIComponent(b.dataset.edit)))));
+    tb.querySelectorAll('[data-deact]').forEach(b => b.addEventListener('click', () => deactivatePatient(doc, b.dataset.deact, b.dataset.name)));
   }
   function editPatient(doc, p) {
     doc.dataset.editUhid = p.uhid; doc._editPatient = p;
@@ -4682,6 +4884,9 @@ window.HIS = window.HIS || {};
     loadPatients(doc);
     const s = doc.querySelector('#patSearch');
     if (s) { let t; s.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => loadPatients(doc), 250); }); }
+    // Client-side filters (sex / blood / registered-date) on the loaded set.
+    ['patfSex', 'patfBlood', 'patfFrom', 'patfTo'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) { el.addEventListener('input', () => renderPatients(doc)); el.addEventListener('change', () => renderPatients(doc)); } });
+    const pfc = doc.querySelector('#patfClear'); if (pfc) pfc.addEventListener('click', () => { ['patSearch', 'patfSex', 'patfBlood', 'patfFrom', 'patfTo'].forEach(fid => { const el = doc.querySelector('#' + fid); if (el) el.value = ''; }); loadPatients(doc); });
     const clr = doc.querySelector('#regClear'); if (clr) clr.addEventListener('click', () => clearRegForm(doc));
     const pr = doc.querySelector('#regPrintUhid'); if (pr) pr.addEventListener('click', () => printUhidCard(doc));
   }

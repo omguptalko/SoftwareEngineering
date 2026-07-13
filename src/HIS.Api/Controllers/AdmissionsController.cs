@@ -32,4 +32,16 @@ public sealed class AdmissionsController : ControllerBase
     /// so beds recycle after discharge (SRS §3.4).</summary>
     [HttpPost("beds/{bedNo}/ready")]
     public Task<bool> MarkBedReady(string bedNo, CancellationToken ct) => _mediator.Send(new MarkBedReadyCommand(bedNo), ct);
+
+    /// <summary>Wards for this branch (for the Add-Bed ward picker).</summary>
+    [HttpGet("wards")]
+    public Task<IReadOnlyList<WardDto>> Wards(CancellationToken ct) => _mediator.Send(new GetWardsQuery(), ct);
+
+    /// <summary>Add a ward to this branch (idempotent by name).</summary>
+    [HttpPost("wards")]
+    public Task<int> AddWard([FromBody] AddWardCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
+    /// <summary>Add a bed to a ward (dynamic bed management, SRS §3.4).</summary>
+    [HttpPost("beds")]
+    public Task<int> AddBed([FromBody] AddBedCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
 }

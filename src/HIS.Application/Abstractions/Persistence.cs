@@ -132,6 +132,11 @@ public interface IAdmissionRepository
     Task<int?> GetDoctorIdByCodeAsync(string code, CancellationToken ct = default);
     Task<(int BedId, string Status)?> GetBedByNoAsync(int branchId, string bedNo, CancellationToken ct = default);
     Task SetBedStatusAsync(int bedId, string status, CancellationToken ct = default);
+    // Dynamic ward/bed management (SRS §3.4)
+    Task<IReadOnlyList<(int WardId, string Name)>> GetWardsAsync(int branchId, CancellationToken ct = default);
+    Task<int> AddWardAsync(int branchId, string name, CancellationToken ct = default);
+    Task<bool> WardBelongsToBranchAsync(int wardId, int branchId, CancellationToken ct = default);
+    Task<int> AddBedAsync(int wardId, string bedNo, CancellationToken ct = default);
     Task<string> NextAdmissionNoAsync(int branchId, CancellationToken ct = default);
     Task<long> InsertAsync(Admission a, CancellationToken ct = default);
     Task<Admission?> GetAsync(long admissionId, CancellationToken ct = default);
@@ -227,6 +232,7 @@ public interface IInventoryRepository
     /// <summary>All active stock items + their reorder levels (for demand forecasting, Phase 11.4).</summary>
     Task<IReadOnlyList<(string Code, string Name, int Stock, int ReorderLevel)>> GetStockLevelsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<Supplier>> GetSuppliersAsync(CancellationToken ct = default);
+    Task<int> InsertSupplierAsync(string name, string? gstin, CancellationToken ct = default);
     Task<string> NextPoNoAsync(int branchId, CancellationToken ct = default);
     Task<long> CreatePoAsync(PurchaseOrder po, IReadOnlyList<PurchaseOrderLine> lines, CancellationToken ct = default);
     Task<IReadOnlyList<(long PoId, string PoNo, string? Supplier, int Lines, decimal Total, string Status, DateTime CreatedUtc)>> GetPurchaseOrdersAsync(int branchId, CancellationToken ct = default);

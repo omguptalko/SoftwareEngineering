@@ -40,6 +40,10 @@ public sealed class InventoryController : ControllerBase
     [HttpGet("suppliers")]
     public Task<IReadOnlyList<SupplierDto>> Suppliers(CancellationToken ct) => _mediator.Send(new GetSuppliersQuery(), ct);
 
+    /// <summary>Add a supplier (dynamic supplier master, idempotent by name).</summary>
+    [HttpPost("suppliers")]
+    public Task<int> AddSupplier([FromBody] AddSupplierCommand cmd, CancellationToken ct) => _mediator.Send(cmd, ct);
+
     /// <summary>Purchase orders raised (newest first).</summary>
     [HttpGet("purchase-orders")]
     public Task<IReadOnlyList<PurchaseOrderRowDto>> PurchaseOrders(CancellationToken ct) => _mediator.Send(new GetPurchaseOrdersQuery(), ct);

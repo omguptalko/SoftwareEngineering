@@ -41,6 +41,43 @@ public sealed class AdmissionRepository : IAdmissionRepository
             "UPDATE master.Bed SET Status = @status WHERE BedId = @bedId", new { bedId, status }, cancellationToken: ct));
     }
 
+    public async Task<IReadOnlyList<(int, string)>> GetWardsAsync(int branchId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return (await c.QueryAsync<(int WardId, string Name)>(new CommandDefinition(
+            "SELECT WardId, Name FROM master.Ward WHERE BranchId = @branchId ORDER BY Name", new { branchId }, cancellationToken: ct))).ToList();
+    }
+
+    public async Task<int> AddWardAsync(int branchId, string name, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        // Reuse an existing ward of the same name in this branch (idempotent), else create it.
+        const string sql = @"
+DECLARE @id INT = (SELECT TOP 1 WardId FROM master.Ward WHERE BranchId = @branchId AND Name = @name);
+IF @id IS NULL
+BEGIN
+    INSERT master.Ward (BranchId, Name) VALUES (@branchId, @name);
+    SET @id = CAST(SCOPE_IDENTITY() AS INT);
+END
+SELECT @id;";
+        return await c.QuerySingleAsync<int>(new CommandDefinition(sql, new { branchId, name }, cancellationToken: ct));
+    }
+
+    public async Task<bool> WardBelongsToBranchAsync(int wardId, int branchId, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(1) FROM master.Ward WHERE WardId = @wardId AND BranchId = @branchId", new { wardId, branchId }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task<int> AddBedAsync(int wardId, string bedNo, CancellationToken ct = default)
+    {
+        using var c = await _f.OpenMasterAsync(ct);
+        return await c.QuerySingleAsync<int>(new CommandDefinition(
+            @"INSERT master.Bed (WardId, BedNo, Status) VALUES (@wardId, @bedNo, 'free');
+              SELECT CAST(SCOPE_IDENTITY() AS INT);", new { wardId, bedNo }, cancellationToken: ct));
+    }
+
     public async Task<string> NextAdmissionNoAsync(int branchId, CancellationToken ct = default)
     {
         using var c = await _f.OpenMasterAsync(ct);

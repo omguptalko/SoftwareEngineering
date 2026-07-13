@@ -89,6 +89,9 @@ HIS.api = (function () {
     transferBed:     (cmd) => post('/api/ipd/transfer', cmd),
     dischargePatient:(cmd) => post('/api/ipd/discharge', cmd),
     markBedReady:    (bedNo) => post(`/api/ipd/beds/${encodeURIComponent(bedNo)}/ready`, {}),
+    wards:           () => get('/api/ipd/wards'),
+    addWard:         (cmd) => post('/api/ipd/wards', cmd),
+    addBed:          (cmd) => post('/api/ipd/beds', cmd),
     // ICU & Emergency Trauma
     triageBoard:     () => get('/api/emergency/triage'),
     registerTriage:  (cmd) => post('/api/emergency/triage', cmd),
@@ -121,6 +124,7 @@ HIS.api = (function () {
     lowStock:        () => get('/api/inventory/lowstock'),
     inventoryStock:  () => get('/api/inventory/stock'),
     inventorySuppliers:() => get('/api/inventory/suppliers'),
+    addSupplier:     (cmd) => post('/api/inventory/suppliers', cmd),
     createPurchaseOrder:(cmd) => post('/api/inventory/purchase-orders', cmd),
     purchaseOrders:  () => get('/api/inventory/purchase-orders'),
     drugMaster:      () => get('/api/masters/drugs'),
