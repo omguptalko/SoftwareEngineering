@@ -450,7 +450,7 @@
 
   // ---- OPD department templates (admin-configurable, per hospital) ----
   const COMMON_DEPTS = ['General Medicine', 'Cardiology', 'Orthopaedics', 'Surgery', 'Pulmonology', 'Dermatology', 'Emergency Medicine', 'Radiology', 'Occupational Health'];
-  const esc = s => (s || '').replace(/"/g, '&quot;');
+  // (esc() is already defined once above — reusing it here; a second declaration would break the whole script.)
   function tplRowHtml(f) {
     f = f || { label: '', fieldType: 'text', options: [] };
     const opt = t => `<option value="${t}"${(f.fieldType || 'text') === t ? ' selected' : ''}>${t}</option>`;
