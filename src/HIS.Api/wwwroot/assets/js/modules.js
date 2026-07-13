@@ -1777,9 +1777,10 @@ window.HIS = window.HIS || {};
           <div class="f"><label>Code <span class="req">*</span></label><div class="field"><input class="ctl code" id="docCode" placeholder="e.g. DR009"></div></div>
           <div class="f"><label>Name <span class="req">*</span></label><div class="field"><input class="ctl" id="docName" placeholder="e.g. Dr. N. Sharma"></div></div>
           <div class="f"><label>Consultation Fee (₹)</label><div class="field"><input class="ctl num" id="docFee" type="number" min="0" step="0.01" placeholder="e.g. 800 (blank = default tariff)"></div></div>
-          <div class="f"><label>Department <span class="req">*</span></label><div class="field"><input class="ctl" id="docDept" list="docDeptList" placeholder="e.g. Nephrology"><datalist id="docDeptList">
-            <option>General Medicine</option><option>Cardiology</option><option>Orthopaedics</option><option>Pulmonology</option><option>Emergency Medicine</option><option>Surgery</option><option>Occupational Health</option><option>Radiology</option><option>Nephrology</option><option>Paediatrics</option><option>Gynaecology</option><option>Anaesthesia</option><option>Dermatology</option><option>ENT</option><option>Ophthalmology</option><option>Psychiatry</option><option>Neurology</option><option>Oncology</option>
-          </datalist></div></div>
+          <div class="f"><label>Department <span class="req">*</span></label><div class="field"><select class="ctl" id="docDept">
+            <option value="">— Select department —</option>
+            <option>Anaesthesia</option><option>Cardiology</option><option>Dermatology</option><option>Emergency Medicine</option><option>ENT</option><option>General Medicine</option><option>Gynaecology</option><option>Nephrology</option><option>Neurology</option><option>Occupational Health</option><option>Oncology</option><option>Ophthalmology</option><option>Orthopaedics</option><option>Paediatrics</option><option>Psychiatry</option><option>Pulmonology</option><option>Radiology</option><option>Surgery</option>
+          </select></div></div>
         </div>
         <div class="flex gap6 mt8"><button class="btn btn--primary" data-act="save"><i class="bi bi-check2-circle"></i> Save Doctor <span class="fk">F9</span></button><button class="btn" id="docReset"><i class="bi bi-arrow-counterclockwise"></i> New / Reset</button><span class="hintline">Code unique hona chahiye (edit pe locked). Save karte hi F3 doctor lookups me aa jayega.</span></div>
       </div></div>
@@ -4220,7 +4221,14 @@ window.HIS = window.HIS || {};
   function editDoctor(doc, ds) {
     doc.dataset.docEditId = ds.docedit;
     const set = (id, v) => { const el = doc.querySelector('#' + id); if (el) el.value = v; };
-    set('docCode', ds.code); set('docName', ds.name); set('docDept', ds.dept); set('docFee', ds.fee || '');
+    set('docCode', ds.code); set('docName', ds.name); set('docFee', ds.fee || '');
+    // Department is a themed <select>; a legacy/custom dept outside the fixed list is
+    // injected as an option so editing an existing doctor never silently loses it.
+    const deptSel = doc.querySelector('#docDept');
+    if (deptSel) {
+      if (ds.dept && ![...deptSel.options].some(o => o.value === ds.dept)) deptSel.add(new Option(ds.dept, ds.dept));
+      deptSel.value = ds.dept || '';
+    }
     const code = doc.querySelector('#docCode'); if (code) code.disabled = true;   // code immutable on edit
     const t = doc.querySelector('#docFormTitle'); if (t) t.textContent = 'Edit Doctor · ' + ds.code;
     const nm = doc.querySelector('#docName'); if (nm) nm.focus();
