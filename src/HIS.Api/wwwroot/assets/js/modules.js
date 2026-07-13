@@ -4789,6 +4789,7 @@ window.HIS = window.HIS || {};
     doc.addEventListener('input', e => {
       if (e.target.closest('#chargeBody') || ['billDiscount', 'billInsurance'].includes(e.target.id)) recalc();
     });
+    doc._recalcBill = recalc;   // let loadBillPending refresh totals after injecting accrued rows
     recalc();
   }
 
@@ -4796,7 +4797,7 @@ window.HIS = window.HIS || {};
   async function doCreateBill(doc) {
     const uhid = pickedUhid(doc, 'billPatient');
     if (!uhid) { HIS.toast('Select a patient (F3) first'); return; }
-    const lines = Array.from(doc.querySelectorAll('#chargeBody tr')).map(tr => {
+    const lines = Array.from(doc.querySelectorAll('#chargeBody tr:not([data-accrued])')).map(tr => {
       const svc = tr.querySelector('.svc') ? tr.querySelector('.svc').value.trim() : (tr.children[0] ? tr.children[0].textContent.trim() : '');
       const qty = parseFloat(tr.querySelector('.qty') ? tr.querySelector('.qty').value : '1') || 1;
       const rate = parseFloat((tr.querySelector('.rate') ? tr.querySelector('.rate').value : '0').replace(/,/g, '')) || 0;
@@ -4875,22 +4876,32 @@ window.HIS = window.HIS || {};
     try { const p = await HIS.api.patientByUhid(uhid); if (p && b) b.innerHTML = banner(p); } catch (e) {}
     loadBillPending(doc, uhid);
   }
-  // Show accrued-but-unbilled charges (doctor fees etc.) that Create Bill will auto-add.
+  // Show accrued-but-unbilled charges (doctor fees etc.) as read-only rows in the charges
+  // table, so the live Summary total already includes them. The server still pulls them at
+  // bill time (these rows are excluded from the submitted lines to avoid double-billing).
   async function loadBillPending(doc, uhid) {
-    const host = doc.querySelector('#billPending'); if (!host) return;
-    if (!uhid) { host.innerHTML = ''; doc._billPending = []; return; }
+    const host = doc.querySelector('#billPending');
+    const cb = doc.querySelector('#chargeBody');
+    // clear any previously-injected accrued rows + note
+    if (cb) cb.querySelectorAll('tr[data-accrued]').forEach(tr => tr.remove());
+    if (host) host.innerHTML = '';
+    doc._billPending = [];
+    if (!uhid) { if (doc._recalcBill) doc._recalcBill(); return; }
     try {
       const rows = await HIS.api.pendingCharges(uhid);
       doc._billPending = rows;
-      if (!rows.length) { host.innerHTML = ''; return; }
-      const total = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
-      host.innerHTML =
-        `<div class="assess-rec" style="margin-top:0"><i class="bi bi-magic"></i><div>
-          <b>Auto-added on Create Bill (${rows.length})</b>
-          ${rows.map(r => `<div style="display:flex;justify-content:space-between;gap:10px"><span>${r.description}${r.admissionId ? ' <span class="pill pill--info">IPD</span>' : ''}</span><span class="tnum">₹${Number(r.amount).toLocaleString('en-IN')}</span></div>`).join('')}
-          <div style="display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line-2);margin-top:4px;padding-top:4px;font-weight:800"><span>Accrued total</span><span class="tnum">₹${total.toLocaleString('en-IN')}</span></div>
-        </div></div>`;
-    } catch (e) { host.innerHTML = ''; }
+      if (rows.length && cb) {
+        const html = rows.map(r => {
+          const amt = Number(r.amount || 0).toFixed(2);
+          const tag = r.admissionId ? '<span class="pill pill--info">IPD</span> ' : '';
+          return `<tr data-accrued="1" style="background:var(--surface-2)"><td>${tag}${r.description} <span class="pill pill--ok">auto</span></td><td class="center">1</td><td class="num tnum">${amt}</td><td class="num tnum">${amt}</td><td></td></tr>`;
+        }).join('');
+        cb.insertAdjacentHTML('afterbegin', html);
+        const total = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
+        if (host) host.innerHTML = `<span class="hintline"><i class="bi bi-magic"></i> ${rows.length} consultation/consultant fee auto-added above (₹${total.toLocaleString('en-IN')}) — included in the total below.</span>`;
+      }
+    } catch (e) { /* ignore */ }
+    if (doc._recalcBill) doc._recalcBill();
   }
   // Reset the billing form for a fresh bill (keeps the Recent Bills list).
   function resetBillingForm(doc) {
@@ -4911,9 +4922,11 @@ window.HIS = window.HIS || {};
     try {
       const rows = await HIS.api.billsList();
       const pill = s => ({ Paid: 'pill--ok', Settled: 'pill--ok', Cancelled: 'pill--danger', Open: 'pill--warn' }[s] || 'pill--info');
-      tb.innerHTML = rows.length ? rows.map(b =>
-        `<tr><td><b>${b.billNo}</b></td><td>${b.createdUtc}</td><td>${b.patient || '—'}</td><td class="num">${b.gross.toFixed(2)}</td><td class="num">${b.patientPays.toFixed(2)}</td><td class="num">${b.paid.toFixed(2)}</td><td class="num">${b.balance.toFixed(2)}</td><td><span class="pill ${pill(b.status)}">${b.status}</span></td><td><button class="btn btn--sm" data-print-bill="${b.billId}" data-pat="${(b.patient || '').replace(/"/g, '')}"><i class="bi bi-printer"></i></button></td></tr>`
-      ).join('') : emptyRow(9, 'No bills yet');
+      tb.innerHTML = rows.length ? rows.map(b => {
+        const payBtn = b.balance > 0.009
+          ? `<button class="btn btn--sm btn--primary" data-pay-bill="${b.billId}" data-billno="${b.billNo}" data-balance="${b.balance}"><i class="bi bi-cash-coin"></i> Pay</button> ` : '';
+        return `<tr><td><b>${b.billNo}</b></td><td>${b.createdUtc}</td><td>${b.patient || '—'}</td><td class="num">${b.gross.toFixed(2)}</td><td class="num">${b.patientPays.toFixed(2)}</td><td class="num">${b.paid.toFixed(2)}</td><td class="num">${b.balance.toFixed(2)}</td><td><span class="pill ${pill(b.status)}">${b.status}</span></td><td style="white-space:nowrap">${payBtn}<button class="btn btn--sm" data-print-bill="${b.billId}" data-pat="${(b.patient || '').replace(/"/g, '')}"><i class="bi bi-printer"></i></button></td></tr>`;
+      }).join('') : emptyRow(9, 'No bills yet');
       const cnt = doc.querySelector('#billCount'); if (cnt) cnt.textContent = rows.length ? `${rows.length} bill(s)` : '';
       tb.querySelectorAll('[data-print-bill]').forEach(btn => btn.addEventListener('click', async () => {
         const win = window.open('', '_blank');
@@ -4921,7 +4934,20 @@ window.HIS = window.HIS || {};
         try { const bill = await HIS.api.getBill(btn.dataset.printBill); writeBillInvoice(win, bill, { name: btn.dataset.pat }); }
         catch (e) { if (win) win.close(); HIS.toast('Print failed: ' + e.message); }
       }));
+      tb.querySelectorAll('[data-pay-bill]').forEach(btn => btn.addEventListener('click', () =>
+        loadBillForPayment(doc, btn.dataset.payBill, btn.dataset.billno, btn.dataset.balance)));
     } catch (e) { tb.innerHTML = emptyRow(9, 'Bills API unavailable'); }
+  }
+  // Load an existing (Open) bill from the Recent Bills list into the Payment panel so its
+  // outstanding balance can be collected. Server resolves the patient from the bill.
+  async function loadBillForPayment(doc, billId, billNo, balance) {
+    doc.dataset.billId = billId; delete doc.dataset.billUhid;
+    const ref = doc.querySelector('#payBillRef'); if (ref) ref.textContent = billNo;
+    const pa = doc.querySelector('#payAmount'); if (pa) pa.value = Number(balance || 0).toFixed(2);
+    await renderBill(doc, billId);   // show the bill's lines + totals for context
+    const bp = doc.querySelector('#btnCollectPay');
+    if (bp && bp.closest('.panel')) bp.closest('.panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    HIS.toast(`Bill ${billNo} loaded · balance ₹${Number(balance || 0).toLocaleString('en-IN')} — pick mode & Collect Payment`, 'bi-wallet2');
   }
   async function renderBill(doc, billId) {
     try {

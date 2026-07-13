@@ -217,6 +217,9 @@ window.HIS = window.HIS || {};
       // fill companion field if declared: data-for points to an element id to receive col index data-col
       const comp = document.getElementById(inputEl.dataset.fill || '');
       if (comp) comp.value = row[inputEl.dataset.fillCol || 1];
+      // Notify screen listeners (banners, pending charges, etc.) — a programmatic
+      // .value set does not fire input/change on its own.
+      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
       toast(`Selected: ${row[1] || row[0]}`);
       HIS.advanceField && HIS.advanceField(1);
     });

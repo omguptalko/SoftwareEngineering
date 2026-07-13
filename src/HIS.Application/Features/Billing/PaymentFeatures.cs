@@ -7,7 +7,7 @@ using HIS.Shared.Context;
 namespace HIS.Application.Features.Billing;
 
 // ============================ Collect payment (SRS §5) ============================
-public sealed record CollectPaymentCommand(long? BillId, string PatientUhid, string Mode, decimal Amount)
+public sealed record CollectPaymentCommand(long? BillId, string? PatientUhid, string Mode, decimal Amount)
     : ICommand<CollectPaymentResult>, IAuditable
 {
     public string AuditEntity => "Payment";
@@ -19,7 +19,8 @@ public sealed class CollectPaymentValidator : AbstractValidator<CollectPaymentCo
 {
     public CollectPaymentValidator()
     {
-        RuleFor(x => x.PatientUhid).NotEmpty();
+        RuleFor(x => x.PatientUhid).NotEmpty().When(x => x.BillId is null)
+            .WithMessage("Patient is required when no bill is specified.");
         RuleFor(x => x.Mode).NotEmpty();
         RuleFor(x => x.Amount).GreaterThan(0);
     }
@@ -36,8 +37,21 @@ public sealed class CollectPaymentHandler : MediatR.IRequestHandler<CollectPayme
 
     public async Task<CollectPaymentResult> Handle(CollectPaymentCommand c, CancellationToken ct)
     {
-        var patient = await _patients.GetByUhidAsync(LookupCode.Parse(c.PatientUhid), ct)
-            ?? throw new InvalidOperationException($"Unknown patient '{c.PatientUhid}'.");
+        // Resolve the patient from the bill when a bill is supplied (lets any existing Open
+        // bill be paid by BillId alone — e.g. from the Recent Bills list); else by UHID.
+        long patientId;
+        if (c.BillId is long resolveBillId)
+        {
+            var existing = await _billing.GetBillAsync(resolveBillId, ct)
+                ?? throw new InvalidOperationException($"Bill {resolveBillId} not found.");
+            patientId = existing.PatientId;
+        }
+        else
+        {
+            var patient = await _patients.GetByUhidAsync(LookupCode.Parse(c.PatientUhid!), ct)
+                ?? throw new InvalidOperationException($"Unknown patient '{c.PatientUhid}'.");
+            patientId = patient.PatientId;
+        }
 
         // Cash settles directly; everything else goes through the configured gateway.
         GatewayChargeResult charge = string.Equals(c.Mode, "Cash", StringComparison.OrdinalIgnoreCase)
@@ -46,7 +60,7 @@ public sealed class CollectPaymentHandler : MediatR.IRequestHandler<CollectPayme
 
         var paymentId = await _billing.InsertPaymentAsync(new Payment
         {
-            BillId = c.BillId, PatientId = patient.PatientId, Mode = c.Mode,
+            BillId = c.BillId, PatientId = patientId, Mode = c.Mode,
             Gateway = charge.Provider, Amount = c.Amount, GatewayRef = charge.Reference,
             Status = charge.Success ? charge.Status : "Failed", CreatedUtc = DateTime.UtcNow
         }, ct);
