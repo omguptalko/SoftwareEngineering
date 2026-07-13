@@ -145,6 +145,7 @@ HIS.api = (function () {
     // Phase 6 — Billing & Payments
     createBill:      (cmd) => post('/api/billing/bills', cmd),
     getBill:         (id) => get(`/api/billing/bills/${id}`),
+    pendingCharges:  (uhid) => get(`/api/billing/pending-charges?patientUhid=${encodeURIComponent(uhid)}`),
     billsList:       () => get('/api/billing/bills'),
     collectPayment:  (cmd) => post('/api/payments/collect', cmd),
     gatewayStatus:   () => get('/api/payments/gateway'),

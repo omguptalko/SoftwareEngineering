@@ -49,5 +49,6 @@ public sealed class Doctor
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
     public string Department { get; set; } = "";
+    public decimal? ConsultationFee { get; set; }   // per-doctor OPD fee (billing Phase 1); null → OPD-CONS tariff fallback
     public bool IsActive { get; set; } = true;
 }

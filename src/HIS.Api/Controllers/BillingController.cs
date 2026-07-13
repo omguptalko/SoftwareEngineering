@@ -23,6 +23,11 @@ public sealed class BillingController : ControllerBase
         var dto = await _mediator.Send(new GetBillQuery(billId), ct);
         return dto is null ? NotFound() : Ok(dto);
     }
+
+    /// <summary>Accrued-but-unbilled charges for a patient (auto-pulled into the next bill).</summary>
+    [HttpGet("pending-charges")]
+    public Task<IReadOnlyList<PendingChargeDto>> PendingCharges([FromQuery] string patientUhid, CancellationToken ct)
+        => _mediator.Send(new GetPendingChargesQuery(patientUhid), ct);
 }
 
 [ApiController]

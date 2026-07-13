@@ -50,12 +50,13 @@ public sealed class SaveConsultationHandler : MediatR.IRequestHandler<SaveConsul
     private readonly IEncounterRepository _enc;
     private readonly IPatientRepository _patients;
     private readonly IAppointmentRepository _appts;
+    private readonly IPendingChargeRepository _pending;
     private readonly MediatR.ISender _sender;
     private readonly IBranchContext _ctx;
 
-    public SaveConsultationHandler(IEncounterRepository enc, IPatientRepository patients, IAppointmentRepository appts, MediatR.ISender sender, IBranchContext ctx)
+    public SaveConsultationHandler(IEncounterRepository enc, IPatientRepository patients, IAppointmentRepository appts, IPendingChargeRepository pending, MediatR.ISender sender, IBranchContext ctx)
     {
-        _enc = enc; _patients = patients; _appts = appts; _sender = sender; _ctx = ctx;
+        _enc = enc; _patients = patients; _appts = appts; _pending = pending; _sender = sender; _ctx = ctx;
     }
 
     public async Task<SaveConsultationResult> Handle(SaveConsultationCommand c, CancellationToken ct)
@@ -150,6 +151,11 @@ public sealed class SaveConsultationHandler : MediatR.IRequestHandler<SaveConsul
                 CreatedUtc = DateTime.UtcNow
             }, ct);
         }
+
+        // Billing Phase 2: accrue the doctor's OPD consultation fee (fee snapshotted now).
+        // Pulled into the patient's bill later; never blocks saving the consultation.
+        if (doctorId is int feeDoctorId)
+            await _pending.AccrueDoctorFeeAsync(branchId, patient.PatientId, null, feeDoctorId, "Consultation", ct);
 
         return new SaveConsultationResult(encounterId, prescriptionId, followUpApptId, followUpToken, followUpOn);
     }

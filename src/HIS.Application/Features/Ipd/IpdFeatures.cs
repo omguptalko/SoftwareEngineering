@@ -31,10 +31,11 @@ public sealed class AdmitPatientHandler : MediatR.IRequestHandler<AdmitPatientCo
 {
     private readonly IAdmissionRepository _adm;
     private readonly IPatientRepository _patients;
+    private readonly IPendingChargeRepository _pending;
     private readonly IBranchContext _ctx;
 
-    public AdmitPatientHandler(IAdmissionRepository adm, IPatientRepository patients, IBranchContext ctx)
-    { _adm = adm; _patients = patients; _ctx = ctx; }
+    public AdmitPatientHandler(IAdmissionRepository adm, IPatientRepository patients, IPendingChargeRepository pending, IBranchContext ctx)
+    { _adm = adm; _patients = patients; _pending = pending; _ctx = ctx; }
 
     public async Task<AdmitPatientResult> Handle(AdmitPatientCommand c, CancellationToken ct)
     {
@@ -68,6 +69,12 @@ public sealed class AdmitPatientHandler : MediatR.IRequestHandler<AdmitPatientCo
         }, ct);
 
         await _adm.SetBedStatusAsync(bed.BedId, "occ", ct);
+
+        // Billing Phase 2: accrue the consultant's fee against this admission (fee snapshotted now).
+        // Pulled into the discharge bill later so it is never missed.
+        if (consultantId is int feeConsultantId)
+            await _pending.AccrueDoctorFeeAsync(branchId, patient.PatientId, id, feeConsultantId, "IPD Consultant", ct);
+
         return new AdmitPatientResult(id, admissionNo, bedNo);
     }
 }

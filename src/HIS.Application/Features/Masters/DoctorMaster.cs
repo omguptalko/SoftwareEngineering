@@ -5,7 +5,7 @@ using HIS.Domain.Entities;
 namespace HIS.Application.Features.Masters;
 
 // ============================ Doctor master admin (doctor list) ============================
-public sealed record DoctorDto(int DoctorId, string Code, string Name, string Department, bool IsActive);
+public sealed record DoctorDto(int DoctorId, string Code, string Name, string Department, decimal? ConsultationFee, bool IsActive);
 
 public sealed record GetDoctorsAdminQuery : IQuery<IReadOnlyList<DoctorDto>>, IRequireAuthentication;
 
@@ -17,13 +17,13 @@ public sealed class GetDoctorsAdminHandler : MediatR.IRequestHandler<GetDoctorsA
     public async Task<IReadOnlyList<DoctorDto>> Handle(GetDoctorsAdminQuery q, CancellationToken ct)
     {
         var rows = await _lk.GetAllDoctorsAsync(ct);
-        return rows.Select(d => new DoctorDto(d.DoctorId, d.Code, d.Name, d.Department, d.IsActive)).ToList();
+        return rows.Select(d => new DoctorDto(d.DoctorId, d.Code, d.Name, d.Department, d.ConsultationFee, d.IsActive)).ToList();
     }
 }
 
 // ============================ Add / update a doctor ============================
 /// <summary>Create (DoctorId null/0) or update a doctor in the master. Code is immutable on update.</summary>
-public sealed record SaveDoctorCommand(int? DoctorId, string Code, string Name, string Department)
+public sealed record SaveDoctorCommand(int? DoctorId, string Code, string Name, string Department, decimal? ConsultationFee)
     : ICommand<int>, IAuditable, IAuthorizable
 {
     public string AuditEntity => "Doctor";
@@ -39,6 +39,8 @@ public sealed class SaveDoctorValidator : AbstractValidator<SaveDoctorCommand>
             .WithMessage("Code may use letters, digits and - only.");
         RuleFor(x => x.Name).NotEmpty().MaximumLength(120);
         RuleFor(x => x.Department).NotEmpty().MaximumLength(80);
+        RuleFor(x => x.ConsultationFee).GreaterThanOrEqualTo(0).When(x => x.ConsultationFee.HasValue)
+            .WithMessage("Consultation fee cannot be negative.");
     }
 }
 
@@ -56,10 +58,10 @@ public sealed class SaveDoctorHandler : MediatR.IRequestHandler<SaveDoctorComman
         if (isNew)
             return await _lk.InsertDoctorAsync(new Doctor
             {
-                Code = c.Code, Name = c.Name, Department = c.Department, IsActive = true
+                Code = c.Code, Name = c.Name, Department = c.Department, ConsultationFee = c.ConsultationFee, IsActive = true
             }, ct);
 
-        await _lk.UpdateDoctorAsync(new Doctor { DoctorId = c.DoctorId!.Value, Name = c.Name, Department = c.Department }, ct);
+        await _lk.UpdateDoctorAsync(new Doctor { DoctorId = c.DoctorId!.Value, Name = c.Name, Department = c.Department, ConsultationFee = c.ConsultationFee }, ct);
         return c.DoctorId.Value;
     }
 }

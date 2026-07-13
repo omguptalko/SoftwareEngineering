@@ -38,8 +38,13 @@ CREATE TABLE master.Doctor (
     Code       NVARCHAR(20)  NOT NULL CONSTRAINT UQ_m_Doctor_Code UNIQUE,
     Name       NVARCHAR(120) NOT NULL,
     Department NVARCHAR(80)  NOT NULL,
+    ConsultationFee DECIMAL(10,2) NULL,   -- per-doctor/specialisation OPD fee (billing Phase 1); NULL → falls back to the OPD-CONS tariff
     IsActive   BIT NOT NULL CONSTRAINT DF_m_Doctor_Active DEFAULT(1)
 );
+GO
+-- Idempotent add for tenants provisioned before ConsultationFee existed.
+IF COL_LENGTH('master.Doctor', 'ConsultationFee') IS NULL
+    ALTER TABLE master.Doctor ADD ConsultationFee DECIMAL(10,2) NULL;
 GO
 
 IF OBJECT_ID('master.Drug') IS NULL

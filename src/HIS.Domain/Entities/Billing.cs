@@ -41,6 +41,25 @@ public sealed class BillLine
 }
 
 /// <summary>Payment against a bill — SRS §5. Gateway keys live in config/Key Vault.</summary>
+/// <summary>Accrued-but-unbilled charge (billing Phase 2) — e.g. a doctor's consultation fee
+/// captured at consult/admission time; pulled into a bill later (BilledBillId set).</summary>
+public sealed class PendingCharge
+{
+    public long ChargeId { get; set; }
+    public int? BranchId { get; set; }
+    public long PatientId { get; set; }
+    public long? AdmissionId { get; set; }
+    public string Source { get; set; } = "";
+    public string Description { get; set; } = "";
+    public int? DoctorId { get; set; }
+    public int? TariffId { get; set; }
+    public decimal Qty { get; set; } = 1;
+    public decimal Rate { get; set; }
+    public decimal Amount { get; set; }
+    public DateTime CreatedUtc { get; set; }
+    public long? BilledBillId { get; set; }
+}
+
 public sealed class Payment
 {
     public long PaymentId { get; set; }

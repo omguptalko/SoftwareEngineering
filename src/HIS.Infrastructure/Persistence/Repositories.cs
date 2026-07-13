@@ -67,7 +67,7 @@ public sealed class LookupRepository : ILookupRepository
     {
         using var c = await _f.OpenMasterAsync(ct);
         return (await c.QueryAsync<Doctor>(new CommandDefinition(
-            "SELECT DoctorId, Code, Name, Department, IsActive FROM master.Doctor ORDER BY Name",
+            "SELECT DoctorId, Code, Name, Department, ConsultationFee, IsActive FROM master.Doctor ORDER BY Name",
             cancellationToken: ct))).ToList();
     }
 
@@ -83,8 +83,8 @@ public sealed class LookupRepository : ILookupRepository
     {
         using var c = await _f.OpenMasterAsync(ct);
         return await c.QuerySingleAsync<int>(new CommandDefinition(
-            @"INSERT INTO master.Doctor (Code, Name, Department, IsActive)
-              VALUES (@Code, @Name, @Department, @IsActive);
+            @"INSERT INTO master.Doctor (Code, Name, Department, ConsultationFee, IsActive)
+              VALUES (@Code, @Name, @Department, @ConsultationFee, @IsActive);
               SELECT CAST(SCOPE_IDENTITY() AS INT);", d, cancellationToken: ct));
     }
 
@@ -92,7 +92,7 @@ public sealed class LookupRepository : ILookupRepository
     {
         using var c = await _f.OpenMasterAsync(ct);
         return await c.ExecuteAsync(new CommandDefinition(
-            "UPDATE master.Doctor SET Name = @Name, Department = @Department WHERE DoctorId = @DoctorId",
+            "UPDATE master.Doctor SET Name = @Name, Department = @Department, ConsultationFee = @ConsultationFee WHERE DoctorId = @DoctorId",
             d, cancellationToken: ct)) > 0;
     }
 

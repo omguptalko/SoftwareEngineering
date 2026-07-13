@@ -361,6 +361,20 @@ public interface ISchemeRepository
     Task<IReadOnlyList<(string Patient, string MemberNo, string? SecondaryRef, bool Verified, DateTime? ValidTo)>> GetMembershipsAsync(string schemeType, CancellationToken ct = default);
 }
 
+/// <summary>Accrued-but-unbilled charges (billing Phase 2). Accrual resolves the doctor's
+/// consultation fee (master.Doctor.ConsultationFee, falling back to the OPD-CONS tariff).</summary>
+public interface IPendingChargeRepository
+{
+    /// <summary>Accrue a doctor's consultation fee for a patient (OPD) or admission (IPD).
+    /// Returns the accrued amount, or null if the doctor has no fee and no fallback tariff exists.</summary>
+    Task<decimal?> AccrueDoctorFeeAsync(int? branchId, long patientId, long? admissionId, int doctorId, string source, CancellationToken ct = default);
+    /// <summary>Unbilled charges to pull into a bill: admission-scoped when admissionId is set, else OPD (AdmissionId IS NULL).</summary>
+    Task<IReadOnlyList<PendingCharge>> GetUnbilledForBillAsync(long patientId, long? admissionId, CancellationToken ct = default);
+    /// <summary>All unbilled charges for a patient (display).</summary>
+    Task<IReadOnlyList<PendingCharge>> GetUnbilledByPatientAsync(long patientId, CancellationToken ct = default);
+    Task MarkBilledAsync(IEnumerable<long> chargeIds, long billId, CancellationToken ct = default);
+}
+
 public interface IAbdmRepository
 {
     // Consent artifacts (HIP/HIU) — abdm.AbdmConsent (master DB, longitudinal).

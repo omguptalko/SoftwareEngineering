@@ -426,6 +426,7 @@ window.HIS = window.HIS || {};
             <tfoot><tr><td colspan="3">Gross Total</td><td class="num" id="grossTot">0.00</td><td></td></tr></tfoot>
           </table></div>
           <p class="hintline" style="padding:8px 12px">Add lines from the tariff master · totals compute live.</p>
+          <div id="billPending" style="padding:0 12px 10px"></div>
           </div>
         </div>
         <div>
@@ -1653,13 +1654,14 @@ window.HIS = window.HIS || {};
       ${head('bi-person-badge', 'Doctor Master', 'Manage clinical doctors — used across all F3 doctor lookups', '')}
       <div class="panel"><div class="panel__head"><i class="bi bi-people"></i> Doctors <span class="ph-right"><input class="ctl" id="docq" placeholder="Search code / name / dept…" style="max-width:220px"></span></div>
         <div class="panel__body tight"><div class="grid-wrap" style="border:0"><table class="grid">
-          <thead><tr><th>Code</th><th>Name</th><th>Department</th><th>Status</th><th></th></tr></thead>
-          <tbody id="docList">${emptyRow(5, 'Loading…')}</tbody>
+          <thead><tr><th>Code</th><th>Name</th><th>Department</th><th class="num">Consult Fee</th><th>Status</th><th></th></tr></thead>
+          <tbody id="docList">${emptyRow(6, 'Loading…')}</tbody>
         </table></div><span class="hintline" id="docCount" style="padding:8px 12px;display:block"></span></div></div>
       <div class="panel"><div class="panel__head"><i class="bi bi-person-plus"></i> <span id="docFormTitle">Add Doctor</span></div><div class="panel__body">
         <div class="form-grid three">
           <div class="f"><label>Code <span class="req">*</span></label><div class="field"><input class="ctl code" id="docCode" placeholder="e.g. DR009"></div></div>
           <div class="f"><label>Name <span class="req">*</span></label><div class="field"><input class="ctl" id="docName" placeholder="e.g. Dr. N. Sharma"></div></div>
+          <div class="f"><label>Consultation Fee (₹)</label><div class="field"><input class="ctl num" id="docFee" type="number" min="0" step="0.01" placeholder="e.g. 800 (blank = default tariff)"></div></div>
           <div class="f"><label>Department <span class="req">*</span></label><div class="field"><input class="ctl" id="docDept" list="docDeptList" placeholder="e.g. Nephrology"><datalist id="docDeptList">
             <option>General Medicine</option><option>Cardiology</option><option>Orthopaedics</option><option>Pulmonology</option><option>Emergency Medicine</option><option>Surgery</option><option>Occupational Health</option><option>Radiology</option><option>Nephrology</option><option>Paediatrics</option><option>Gynaecology</option><option>Anaesthesia</option><option>Dermatology</option><option>ENT</option><option>Ophthalmology</option><option>Psychiatry</option><option>Neurology</option><option>Oncology</option>
           </datalist></div></div>
@@ -3873,10 +3875,11 @@ window.HIS = window.HIS || {};
       const st = d.isActive ? '<span class="pill pill--ok">Active</span>' : '<span class="pill pill--muted">Inactive</span>';
       const nm = (d.name || '').replace(/"/g, '&quot;');
       const dp = (d.department || '').replace(/"/g, '&quot;');
+      const fee = d.consultationFee != null ? '₹' + Number(d.consultationFee).toLocaleString('en-IN') : '<span class="muted">tariff</span>';
       const toggle = d.isActive ? `<button class="btn btn--sm" data-docoff="${d.doctorId}">Deactivate</button>` : `<button class="btn btn--sm" data-docon="${d.doctorId}">Restore</button>`;
-      return `<tr><td><b>${d.code}</b></td><td><span class="av-sm">${initials(d.name)}</span>${d.name}</td><td><span class="pill pill--info">${d.department}</span></td><td>${st}</td>`
-        + `<td class="flex gap6"><button class="btn btn--sm" data-docedit="${d.doctorId}" data-code="${d.code}" data-name="${nm}" data-dept="${dp}"><i class="bi bi-pencil"></i> Edit</button>${toggle}</td></tr>`;
-    }).join('') : emptyRow(5, q ? 'No matching doctors' : 'No doctors — add one below');
+      return `<tr><td><b>${d.code}</b></td><td><span class="av-sm">${initials(d.name)}</span>${d.name}</td><td><span class="pill pill--info">${d.department}</span></td><td class="num tnum">${fee}</td><td>${st}</td>`
+        + `<td class="flex gap6"><button class="btn btn--sm" data-docedit="${d.doctorId}" data-code="${d.code}" data-name="${nm}" data-dept="${dp}" data-fee="${d.consultationFee != null ? d.consultationFee : ''}"><i class="bi bi-pencil"></i> Edit</button>${toggle}</td></tr>`;
+    }).join('') : emptyRow(6, q ? 'No matching doctors' : 'No doctors — add one below');
     const cnt = doc.querySelector('#docCount'); if (cnt) cnt.textContent = all.length ? `${rows.length} of ${all.length} doctor(s)` : '';
     tb.querySelectorAll('[data-docedit]').forEach(b => b.addEventListener('click', () => editDoctor(doc, b.dataset)));
     tb.querySelectorAll('[data-docoff]').forEach(b => b.addEventListener('click', () => toggleDoctor(doc, b.dataset.docoff, false)));
@@ -3885,21 +3888,21 @@ window.HIS = window.HIS || {};
   function editDoctor(doc, ds) {
     doc.dataset.docEditId = ds.docedit;
     const set = (id, v) => { const el = doc.querySelector('#' + id); if (el) el.value = v; };
-    set('docCode', ds.code); set('docName', ds.name); set('docDept', ds.dept);
+    set('docCode', ds.code); set('docName', ds.name); set('docDept', ds.dept); set('docFee', ds.fee || '');
     const code = doc.querySelector('#docCode'); if (code) code.disabled = true;   // code immutable on edit
     const t = doc.querySelector('#docFormTitle'); if (t) t.textContent = 'Edit Doctor · ' + ds.code;
     const nm = doc.querySelector('#docName'); if (nm) nm.focus();
   }
   function resetDoctorForm(doc) {
     delete doc.dataset.docEditId;
-    ['docCode', 'docName', 'docDept'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
+    ['docCode', 'docName', 'docDept', 'docFee'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = ''; });
     const code = doc.querySelector('#docCode'); if (code) code.disabled = false;
     const t = doc.querySelector('#docFormTitle'); if (t) t.textContent = 'Add Doctor';
   }
   async function doSaveDoctor(doc) {
     const code = val(doc, 'docCode'), name = val(doc, 'docName'), dept = val(doc, 'docDept');
     if (!code || !name || !dept) { HIS.toast('Code, Name and Department are required'); return; }
-    const cmd = { doctorId: doc.dataset.docEditId ? parseInt(doc.dataset.docEditId, 10) : null, code, name, department: dept };
+    const cmd = { doctorId: doc.dataset.docEditId ? parseInt(doc.dataset.docEditId, 10) : null, code, name, department: dept, consultationFee: numOrNull(val(doc, 'docFee')) };
     try {
       await HIS.api.saveDoctor(cmd);
       HIS.toast(doc.dataset.docEditId ? 'Doctor updated · ' + code : 'Doctor added · ' + code, 'bi-person-badge');
@@ -4800,7 +4803,8 @@ window.HIS = window.HIS || {};
       const hasCode = svc.includes('—');
       return { tariffCode: hasCode ? svc : null, description: hasCode ? '' : svc, qty, rate };
     }).filter(l => l.tariffCode || l.description);
-    if (!lines.length) { HIS.toast('Add at least one charge line'); return; }
+    const hasAccrued = doc._billPending && doc._billPending.length > 0;
+    if (!lines.length && !hasAccrued) { HIS.toast('Add at least one charge line'); return; }
     const cmd = {
       patientUhid: uhid,
       discountAmount: parseFloat(val(doc, 'billDiscount')) || 0,
@@ -4818,6 +4822,7 @@ window.HIS = window.HIS || {};
       HIS.toast('Bill ' + r.billNo + ' · payable ₹' + r.patientPays, 'bi-receipt');
       await renderBill(doc, r.billId);
       loadBills(doc);
+      loadBillPending(doc, uhid);   // accrued charges were consumed → refresh the panel
       // Render the printable invoice into the new tab.
       try {
         const [bill, patient] = await Promise.all([HIS.api.getBill(r.billId), HIS.api.patientByUhid(uhid).catch(() => null)]);
@@ -4866,8 +4871,26 @@ window.HIS = window.HIS || {};
   }
   async function showBillPatient(doc) {
     const uhid = pickedUhid(doc, 'billPatient'); const b = doc.querySelector('#billBanner');
-    if (!uhid) { if (b) b.innerHTML = banner(null); return; }
+    if (!uhid) { if (b) b.innerHTML = banner(null); loadBillPending(doc, null); return; }
     try { const p = await HIS.api.patientByUhid(uhid); if (p && b) b.innerHTML = banner(p); } catch (e) {}
+    loadBillPending(doc, uhid);
+  }
+  // Show accrued-but-unbilled charges (doctor fees etc.) that Create Bill will auto-add.
+  async function loadBillPending(doc, uhid) {
+    const host = doc.querySelector('#billPending'); if (!host) return;
+    if (!uhid) { host.innerHTML = ''; doc._billPending = []; return; }
+    try {
+      const rows = await HIS.api.pendingCharges(uhid);
+      doc._billPending = rows;
+      if (!rows.length) { host.innerHTML = ''; return; }
+      const total = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
+      host.innerHTML =
+        `<div class="assess-rec" style="margin-top:0"><i class="bi bi-magic"></i><div>
+          <b>Auto-added on Create Bill (${rows.length})</b>
+          ${rows.map(r => `<div style="display:flex;justify-content:space-between;gap:10px"><span>${r.description}${r.admissionId ? ' <span class="pill pill--info">IPD</span>' : ''}</span><span class="tnum">₹${Number(r.amount).toLocaleString('en-IN')}</span></div>`).join('')}
+          <div style="display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line-2);margin-top:4px;padding-top:4px;font-weight:800"><span>Accrued total</span><span class="tnum">₹${total.toLocaleString('en-IN')}</span></div>
+        </div></div>`;
+    } catch (e) { host.innerHTML = ''; }
   }
   // Reset the billing form for a fresh bill (keeps the Recent Bills list).
   function resetBillingForm(doc) {
@@ -4875,6 +4898,7 @@ window.HIS = window.HIS || {};
     const pf = doc.querySelector('#billPatient'); if (pf) pf.value = '';
     const bn = doc.querySelector('#billBanner'); if (bn) bn.innerHTML = banner(null);
     const cb = doc.querySelector('#chargeBody'); if (cb) cb.innerHTML = '<tr>' + TPL.chargeBody + '</tr>';
+    const bp = doc.querySelector('#billPending'); if (bp) bp.innerHTML = ''; doc._billPending = [];
     ['billDiscount', 'billInsurance'].forEach(id => { const el = doc.querySelector('#' + id); if (el) el.value = '0'; });
     const pa = doc.querySelector('#payAmount'); if (pa) pa.value = '0.00';
     const ref = doc.querySelector('#payBillRef'); if (ref) ref.textContent = 'no bill';

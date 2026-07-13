@@ -23,7 +23,8 @@ public sealed class CreateBillValidator : AbstractValidator<CreateBillCommand>
     public CreateBillValidator()
     {
         RuleFor(x => x.PatientUhid).NotEmpty();
-        RuleFor(x => x.Lines).NotEmpty().WithMessage("At least one charge line is required.");
+        // Lines may be empty when the only charges are auto-accrued (e.g. a pure consultation
+        // bill). The handler still rejects a bill that ends up with no lines at all.
         RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.InsurancePays).GreaterThanOrEqualTo(0);
     }
@@ -33,10 +34,11 @@ public sealed class CreateBillHandler : MediatR.IRequestHandler<CreateBillComman
 {
     private readonly IBillingRepository _billing;
     private readonly IPatientRepository _patients;
+    private readonly IPendingChargeRepository _pending;
     private readonly IBranchContext _ctx;
 
-    public CreateBillHandler(IBillingRepository billing, IPatientRepository patients, IBranchContext ctx)
-    { _billing = billing; _patients = patients; _ctx = ctx; }
+    public CreateBillHandler(IBillingRepository billing, IPatientRepository patients, IPendingChargeRepository pending, IBranchContext ctx)
+    { _billing = billing; _patients = patients; _pending = pending; _ctx = ctx; }
 
     public async Task<CreateBillResult> Handle(CreateBillCommand c, CancellationToken ct)
     {
@@ -63,6 +65,15 @@ public sealed class CreateBillHandler : MediatR.IRequestHandler<CreateBillComman
             lines.Add(new BillLine { TariffId = tariffId, Description = desc, Qty = l.Qty <= 0 ? 1 : l.Qty, Rate = rate });
         }
 
+        // Billing Phase 2: auto-pull this patient's accrued-but-unbilled charges (doctor fees, etc.)
+        // into the bill. Admission bills pull that admission's charges; plain bills pull OPD charges.
+        var accrued = await _pending.GetUnbilledForBillAsync(patient.PatientId, c.AdmissionId, ct);
+        foreach (var a in accrued)
+            lines.Add(new BillLine { TariffId = a.TariffId, Description = a.Description, Qty = a.Qty, Rate = a.Rate });
+
+        if (lines.Count == 0)
+            throw new InvalidOperationException("No charges to bill — add a line or accrue a consultation/consultant fee first.");
+
         var gross = lines.Sum(l => l.Qty * l.Rate);
         var patientPays = Math.Max(0, gross - c.DiscountAmount - c.InsurancePays);
 
@@ -75,6 +86,11 @@ public sealed class CreateBillHandler : MediatR.IRequestHandler<CreateBillComman
         };
 
         var id = await _billing.CreateBillAsync(bill, lines, ct);
+
+        // Stamp the accrued charges as billed so they are never pulled into a second bill.
+        if (accrued.Count > 0)
+            await _pending.MarkBilledAsync(accrued.Select(a => a.ChargeId), id, ct);
+
         return new CreateBillResult(id, billNo, gross, patientPays);
     }
 }

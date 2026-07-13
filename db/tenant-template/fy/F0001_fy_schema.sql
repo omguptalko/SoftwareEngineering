@@ -76,6 +76,30 @@ CREATE TABLE billing.PatientDeposit (
 );
 GO
 
+/* Accrued-but-unbilled charges (billing Phase 2). Doctor consultation fees accrue here
+   as OPD consults / IPD admissions happen; CreateBill pulls the unbilled ones into the
+   bill and stamps BilledBillId, so the discharge bill is always complete. */
+IF OBJECT_ID('billing.PendingCharge') IS NULL
+CREATE TABLE billing.PendingCharge (
+    ChargeId BIGINT IDENTITY(1,1) CONSTRAINT PK_f_PendingCharge PRIMARY KEY,
+    BranchId INT NULL,               -- master.Branch (cross-DB, by convention)
+    PatientId BIGINT NOT NULL,       -- patient.Patient (cross-DB)
+    AdmissionId BIGINT NULL,         -- clinical.Admission (cross-DB) — set for IPD accrual
+    Source NVARCHAR(40) NOT NULL,    -- 'Consultation' / 'IPD Consultant'
+    Description NVARCHAR(200) NOT NULL,
+    DoctorId INT NULL,               -- master.Doctor (cross-DB)
+    TariffId INT NULL,               -- master.Tariff (cross-DB) — set when fee came from the fallback tariff
+    Qty DECIMAL(9,2) NOT NULL CONSTRAINT DF_f_PendCharge_Qty DEFAULT(1),
+    Rate DECIMAL(12,2) NOT NULL,
+    Amount AS (Qty * Rate) PERSISTED,
+    CreatedUtc DATETIME2(3) NOT NULL CONSTRAINT DF_f_PendCharge_Created DEFAULT(SYSUTCDATETIME()),
+    BilledBillId BIGINT NULL CONSTRAINT FK_f_PendCharge_Bill REFERENCES billing.Bill(BillId)
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_f_PendCharge_Unbilled')
+    CREATE INDEX IX_f_PendCharge_Unbilled ON billing.PendingCharge (PatientId, BilledBillId);
+GO
+
 /* ---- insurance / cashless (§3.15 / §7) ----------------------------- */
 IF OBJECT_ID('insurance.InsurancePolicy') IS NULL
 CREATE TABLE insurance.InsurancePolicy (
