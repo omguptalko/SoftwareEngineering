@@ -112,6 +112,7 @@
           <div><label>Common-domain alias</label><input id="ob_common" placeholder="acme.app.finnid.in (optional)"></div>
           <div class="actions"><button class="btn" id="onboardBtn"><i class="bi bi-rocket-takeoff"></i> Provision &amp; onboard</button></div>
         </div>
+        <p class="muted" id="ob_hint" style="margin:12px 0 0"></p>
         <pre id="ob_result" class="muted" style="white-space:pre-wrap;margin:14px 0 0"></pre>
       </div>
     </section>
@@ -268,13 +269,24 @@
   // Current FY start year (Apr–Mar per Decision D1): before April, still the prior year.
   function fyBaseYear() { const n = new Date(); return n.getUTCMonth() + 1 >= 4 ? n.getUTCFullYear() : n.getUTCFullYear() - 1; }
   function fyLabel(y) { return `FY ${y}-${String((y + 1) % 100).padStart(2, '0')}`; }
+  // Decision D1: fiscal year runs 01 Apr → 31 Mar (matches OnboardTenantHandler FyMonth=4/FyDay=1).
+  function fyRange(y) { return `01 Apr ${y} – 31 Mar ${y + 1}`; }
 
-  // Onboard year list is a static current ± few (brand-new tenant, no history to derive from).
+  // Onboard year list is DYNAMIC: computed live from today's date. A brand-new hospital is
+  // onboarded into the current FY or a future one (never a past/closed year), each labelled
+  // with its real date range; the current FY is marked and pre-selected.
+  function updateObHint() {
+    const y = +$('#ob_year').value, hint = $('#ob_hint');
+    if (hint) hint.textContent = y ? `${fyLabel(y)} · ${fyRange(y)} — is FY ki master + data DB provision hogi.` : '';
+  }
   (function fillOnboardYears() {
-    const base = fyBaseYear(); const opts = [];
-    for (let y = base - 1; y <= base + 3; y++) opts.push(`<option value="${y}"${y === base ? ' selected' : ''}>${fyLabel(y)}</option>`);
+    const base = fyBaseYear(), opts = [];
+    for (let y = base; y <= base + 5; y++)   // current FY + next 5 (…→ FY2031-32 for base 2026)
+      opts.push(`<option value="${y}"${y === base ? ' selected' : ''}>${fyLabel(y)}${y === base ? ' · current' : ''}</option>`);
     $('#ob_year').innerHTML = opts.join('');
+    updateObHint();
   })();
+  $('#ob_year').addEventListener('change', updateObHint);
 
   // The year-shift form is DYNAMIC: tenant list + the next-openable FY are derived from live data.
   let FY_MODEL = {};   // tenantCode → { name, years:[fyStartYear,…] }
