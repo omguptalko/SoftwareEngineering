@@ -199,6 +199,13 @@
       <h1>Control-plane audit</h1><p class="sub">Every onboarding, year-shift, RBAC change and login attempt.</p>
       <div class="card">
         <h2><i class="bi bi-list-check"></i> Recent events <button class="btn ghost sm" id="reloadAudit" style="margin-left:auto"><i class="bi bi-arrow-clockwise"></i> Refresh</button></h2>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+          <input id="auditQ" placeholder="Search actor / action / entity / id…" style="flex:1;min-width:200px">
+          <select id="auditAction" style="width:auto;min-width:150px"><option value="">All actions</option></select>
+          <select id="auditStatus" style="width:auto;min-width:120px"><option value="">All status</option><option value="ok">OK only</option><option value="fail">Failed only</option></select>
+          <button class="btn ghost sm" id="auditClear"><i class="bi bi-x-circle"></i> Clear</button>
+          <span class="muted" id="auditCount" style="margin-left:auto"></span>
+        </div>
         <table><thead><tr><th>When (UTC)</th><th>Actor</th><th>Action</th><th>Entity</th><th>Id</th><th>OK</th></tr></thead>
         <tbody id="auditBody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody></table>
       </div>
@@ -388,18 +395,44 @@
     toast('Entitlement updated — the tenant menu reflects it immediately');
   }));
 
-  // ---- Audit ----
-  async function loadAudit() {
-    const rows = await api('GET', '/api/platform/audit?take=50');
+  // ---- Audit (client-side filter over the loaded window) ----
+  let AUDIT_ROWS = [];
+  function renderAudit() {
+    const q = ($('#auditQ').value || '').toLowerCase().trim();
+    const act = $('#auditAction').value;
+    const st = $('#auditStatus').value;
+    const rows = AUDIT_ROWS.filter(r => {
+      if (act && r.action !== act) return false;
+      if (st === 'ok' && !r.succeeded) return false;
+      if (st === 'fail' && r.succeeded) return false;
+      if (q && !`${r.actor || ''} ${r.action} ${r.entity} ${r.entityId || ''}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
     $('#auditBody').innerHTML = rows.length
       ? rows.map(r => {
           const when = (r.occurredUtc || '').replace('T', ' ').slice(0, 19);
           const ok = r.succeeded ? '<span class="pill ok">ok</span>' : '<span class="pill no">fail</span>';
           return `<tr><td>${when}</td><td>${r.actor || '—'}</td><td>${r.action}</td><td>${r.entity}</td><td>${r.entityId || ''}</td><td>${ok}</td></tr>`;
         }).join('')
-      : '<tr><td colspan="6" class="muted">No events.</td></tr>';
+      : `<tr><td colspan="6" class="muted">${AUDIT_ROWS.length ? 'No events match the filter.' : 'No events.'}</td></tr>`;
+    $('#auditCount').textContent = AUDIT_ROWS.length ? `Showing ${rows.length} of ${AUDIT_ROWS.length}` : '';
+  }
+  async function loadAudit() {
+    AUDIT_ROWS = await api('GET', '/api/platform/audit?take=200') || [];
+    // Populate the action filter from whatever actions are actually present (nothing hardcoded).
+    const actions = [...new Set(AUDIT_ROWS.map(r => r.action))].sort();
+    const sel = $('#auditAction'), cur = sel.value;
+    sel.innerHTML = '<option value="">All actions</option>' + actions.map(a => `<option value="${a}">${a}</option>`).join('');
+    if (cur && actions.includes(cur)) sel.value = cur;
+    renderAudit();
   }
   $('#reloadAudit').addEventListener('click', guard(loadAudit));
+  ['auditQ', 'auditAction', 'auditStatus'].forEach(id => {
+    const el = $('#' + id); el.addEventListener('input', renderAudit); el.addEventListener('change', renderAudit);
+  });
+  $('#auditClear').addEventListener('click', () => {
+    $('#auditQ').value = ''; $('#auditAction').value = ''; $('#auditStatus').value = ''; renderAudit();
+  });
 
   // ---- Tenant users ----
   let ROLES = [];
