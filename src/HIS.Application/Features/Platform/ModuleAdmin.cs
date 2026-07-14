@@ -21,9 +21,16 @@ public sealed class CreateModuleValidator : AbstractValidator<CreateModuleComman
 public sealed class CreateModuleHandler : MediatR.IRequestHandler<CreateModuleCommand, int>
 {
     private readonly IModuleAdminRepository _repo;
-    public CreateModuleHandler(IModuleAdminRepository repo) => _repo = repo;
-    public Task<int> Handle(CreateModuleCommand c, CancellationToken ct) =>
-        _repo.CreateModuleAsync(c.Code, c.Label, c.Icon, c.SortOrder, ct);
+    private readonly IPlatformUserRepository _audit;
+    private readonly IBranchContext _ctx;
+    public CreateModuleHandler(IModuleAdminRepository repo, IPlatformUserRepository audit, IBranchContext ctx)
+    { _repo = repo; _audit = audit; _ctx = ctx; }
+    public async Task<int> Handle(CreateModuleCommand c, CancellationToken ct)
+    {
+        var id = await _repo.CreateModuleAsync(c.Code, c.Label, c.Icon, c.SortOrder, ct);
+        await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, null, "CreateModule", "Module", c.Code, true, null, ct);
+        return id;
+    }
 }
 
 // ============================ Create page (module.manage) ============================
@@ -44,9 +51,16 @@ public sealed class CreatePageValidator : AbstractValidator<CreatePageCommand>
 public sealed class CreatePageHandler : MediatR.IRequestHandler<CreatePageCommand, int>
 {
     private readonly IModuleAdminRepository _repo;
-    public CreatePageHandler(IModuleAdminRepository repo) => _repo = repo;
-    public Task<int> Handle(CreatePageCommand c, CancellationToken ct) =>
-        _repo.CreatePageAsync(c.ModuleCode, c.Code, c.Label, c.Route, c.SortOrder, ct);
+    private readonly IPlatformUserRepository _audit;
+    private readonly IBranchContext _ctx;
+    public CreatePageHandler(IModuleAdminRepository repo, IPlatformUserRepository audit, IBranchContext ctx)
+    { _repo = repo; _audit = audit; _ctx = ctx; }
+    public async Task<int> Handle(CreatePageCommand c, CancellationToken ct)
+    {
+        var id = await _repo.CreatePageAsync(c.ModuleCode, c.Code, c.Label, c.Route, c.SortOrder, ct);
+        await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, null, "CreatePage", "Page", $"{c.ModuleCode}/{c.Code}", true, null, ct);
+        return id;
+    }
 }
 
 // ============================ Assign module/page to role (rbac.manage) ============================
@@ -57,9 +71,16 @@ public sealed record AssignModuleToRoleCommand(string RoleCode, string ModuleCod
 public sealed class AssignModuleToRoleHandler : MediatR.IRequestHandler<AssignModuleToRoleCommand, bool>
 {
     private readonly IModuleAdminRepository _repo;
-    public AssignModuleToRoleHandler(IModuleAdminRepository repo) => _repo = repo;
-    public Task<bool> Handle(AssignModuleToRoleCommand c, CancellationToken ct) =>
-        _repo.AssignModuleToRoleAsync(c.RoleCode, c.ModuleCode, ct);
+    private readonly IPlatformUserRepository _audit;
+    private readonly IBranchContext _ctx;
+    public AssignModuleToRoleHandler(IModuleAdminRepository repo, IPlatformUserRepository audit, IBranchContext ctx)
+    { _repo = repo; _audit = audit; _ctx = ctx; }
+    public async Task<bool> Handle(AssignModuleToRoleCommand c, CancellationToken ct)
+    {
+        var okr = await _repo.AssignModuleToRoleAsync(c.RoleCode, c.ModuleCode, ct);
+        await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, null, "AssignModuleToRole", "RoleModule", $"{c.RoleCode}->{c.ModuleCode}", true, null, ct);
+        return okr;
+    }
 }
 
 public sealed record AssignPageToRoleCommand(string RoleCode, string PageCode) : ICommand<bool>, IAuthorizable
@@ -69,9 +90,16 @@ public sealed record AssignPageToRoleCommand(string RoleCode, string PageCode) :
 public sealed class AssignPageToRoleHandler : MediatR.IRequestHandler<AssignPageToRoleCommand, bool>
 {
     private readonly IModuleAdminRepository _repo;
-    public AssignPageToRoleHandler(IModuleAdminRepository repo) => _repo = repo;
-    public Task<bool> Handle(AssignPageToRoleCommand c, CancellationToken ct) =>
-        _repo.AssignPageToRoleAsync(c.RoleCode, c.PageCode, ct);
+    private readonly IPlatformUserRepository _audit;
+    private readonly IBranchContext _ctx;
+    public AssignPageToRoleHandler(IModuleAdminRepository repo, IPlatformUserRepository audit, IBranchContext ctx)
+    { _repo = repo; _audit = audit; _ctx = ctx; }
+    public async Task<bool> Handle(AssignPageToRoleCommand c, CancellationToken ct)
+    {
+        var okr = await _repo.AssignPageToRoleAsync(c.RoleCode, c.PageCode, ct);
+        await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, null, "AssignPageToRole", "RolePage", $"{c.RoleCode}->{c.PageCode}", true, null, ct);
+        return okr;
+    }
 }
 
 // ============================ Assign page-action to role (rbac.manage, L1.3.3) ============================
@@ -91,9 +119,16 @@ public sealed class AssignPageActionToRoleValidator : AbstractValidator<AssignPa
 public sealed class AssignPageActionToRoleHandler : MediatR.IRequestHandler<AssignPageActionToRoleCommand, bool>
 {
     private readonly IModuleAdminRepository _repo;
-    public AssignPageActionToRoleHandler(IModuleAdminRepository repo) => _repo = repo;
-    public Task<bool> Handle(AssignPageActionToRoleCommand c, CancellationToken ct) =>
-        _repo.AssignPageActionToRoleAsync(c.RoleCode, c.PageCode, c.ActionCode, ct);
+    private readonly IPlatformUserRepository _audit;
+    private readonly IBranchContext _ctx;
+    public AssignPageActionToRoleHandler(IModuleAdminRepository repo, IPlatformUserRepository audit, IBranchContext ctx)
+    { _repo = repo; _audit = audit; _ctx = ctx; }
+    public async Task<bool> Handle(AssignPageActionToRoleCommand c, CancellationToken ct)
+    {
+        var okr = await _repo.AssignPageActionToRoleAsync(c.RoleCode, c.PageCode, c.ActionCode, ct);
+        await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, null, "AssignPageActionToRole", "RolePageAction", $"{c.RoleCode}->{c.PageCode}.{c.ActionCode}", true, null, ct);
+        return okr;
+    }
 }
 
 // ============================ Set tenant module entitlement (module.manage, L1.3.3/L1.4.4) ============================
@@ -114,9 +149,17 @@ public sealed class SetTenantModuleValidator : AbstractValidator<SetTenantModule
 public sealed class SetTenantModuleHandler : MediatR.IRequestHandler<SetTenantModuleCommand, bool>
 {
     private readonly ITenantAdminRepository _repo;
-    public SetTenantModuleHandler(ITenantAdminRepository repo) => _repo = repo;
-    public Task<bool> Handle(SetTenantModuleCommand c, CancellationToken ct) =>
-        _repo.SetTenantModuleAsync(c.TenantCode, c.FiscalYearCode, c.ModuleCode, c.Enabled, ct);
+    private readonly IPlatformUserRepository _audit;
+    private readonly IBranchContext _ctx;
+    public SetTenantModuleHandler(ITenantAdminRepository repo, IPlatformUserRepository audit, IBranchContext ctx)
+    { _repo = repo; _audit = audit; _ctx = ctx; }
+    public async Task<bool> Handle(SetTenantModuleCommand c, CancellationToken ct)
+    {
+        var okr = await _repo.SetTenantModuleAsync(c.TenantCode, c.FiscalYearCode, c.ModuleCode, c.Enabled, ct);
+        await _audit.WritePlatformAuditAsync(_ctx.UserId, _ctx.UserName, null, "SetTenantModule", "TenantModule",
+            $"{c.TenantCode}/{c.FiscalYearCode}/{c.ModuleCode}={(c.Enabled ? "on" : "off")}", true, null, ct);
+        return okr;
+    }
 }
 
 // ============================ Effective menu (authenticated) ============================

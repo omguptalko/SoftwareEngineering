@@ -234,7 +234,13 @@ public sealed class ModuleAdminRepository : IModuleAdminRepository
               IF @ModuleId IS NULL THROW 50000, 'Unknown module code.', 1;
               INSERT INTO security.AppPage (ModuleId, Code, Label, Route, SortOrder)
               VALUES (@ModuleId, @code, @label, @route, @sortOrder);
-              SELECT CAST(SCOPE_IDENTITY() AS INT);",
+              DECLARE @PageId INT = CAST(SCOPE_IDENTITY() AS INT);
+              -- Seed the standard CRUD page-actions (L1.3.3) so they can be granted to roles
+              -- immediately — there is no separate 'create action' step in the admin console.
+              INSERT INTO security.PageAction (PageId, Code, Label) VALUES
+                  (@PageId, 'view', 'View'), (@PageId, 'create', 'Create'),
+                  (@PageId, 'edit', 'Edit'), (@PageId, 'delete', 'Delete');
+              SELECT @PageId;",
             new { moduleCode, code, label, route, sortOrder }, cancellationToken: ct));
     }
 
