@@ -82,11 +82,11 @@
       <div class="card">
         <h2><i class="bi bi-calendar-plus"></i> Open next fiscal year (year shift)</h2>
         <div class="grid g3">
-          <div><label>Tenant code</label><input id="fy_code" placeholder="e.g. ACME"></div>
-          <div><label>Fiscal year start</label><select id="fy_year"></select></div>
+          <div><label>Tenant</label><select id="fy_code"><option value="">Loading tenants…</option></select></div>
+          <div><label>Next fiscal year</label><select id="fy_year"></select></div>
           <div class="actions"><button class="btn" id="openFyBtn"><i class="bi bi-calendar-plus"></i> Open fiscal year</button></div>
         </div>
-        <p class="muted" style="margin:10px 0 0">Provisions the new FY data DB, carries module entitlements forward, and rolls the billing balance forward.</p>
+        <p class="muted" style="margin:10px 0 0" id="fyHint">Provisions the new FY data DB, carries module entitlements forward, and rolls the billing balance forward.</p>
       </div>
       <div class="card" style="border-color:#f5c6cb">
         <h2 style="color:var(--danger)"><i class="bi bi-exclamation-octagon"></i> Decommission a tenant</h2>
@@ -264,13 +264,48 @@
     $('#panel-' + a.dataset.tab).classList.add('active');
   }));
 
-  // ---- Fiscal-year dropdowns (current ± a few years; nothing hardcoded as a literal list) ----
-  (function fillYears() {
-    const now = new Date(); const base = now.getUTCMonth() + 1 >= 4 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
-    const opts = [];
-    for (let y = base - 1; y <= base + 3; y++) opts.push(`<option value="${y}"${y === base ? ' selected' : ''}>FY ${y}-${String((y + 1) % 100).padStart(2, '0')}</option>`);
-    $('#ob_year').innerHTML = opts.join(''); $('#fy_year').innerHTML = opts.join('');
+  // ---- Fiscal-year helpers ----
+  // Current FY start year (Apr–Mar per Decision D1): before April, still the prior year.
+  function fyBaseYear() { const n = new Date(); return n.getUTCMonth() + 1 >= 4 ? n.getUTCFullYear() : n.getUTCFullYear() - 1; }
+  function fyLabel(y) { return `FY ${y}-${String((y + 1) % 100).padStart(2, '0')}`; }
+
+  // Onboard year list is a static current ± few (brand-new tenant, no history to derive from).
+  (function fillOnboardYears() {
+    const base = fyBaseYear(); const opts = [];
+    for (let y = base - 1; y <= base + 3; y++) opts.push(`<option value="${y}"${y === base ? ' selected' : ''}>${fyLabel(y)}</option>`);
+    $('#ob_year').innerHTML = opts.join('');
   })();
+
+  // The year-shift form is DYNAMIC: tenant list + the next-openable FY are derived from live data.
+  let FY_MODEL = {};   // tenantCode → { name, years:[fyStartYear,…] }
+  function buildFyModel(rows) {
+    FY_MODEL = {};
+    (rows || []).forEach(r => {
+      const m = (FY_MODEL[r.code] || (FY_MODEL[r.code] = { name: r.name, years: [] }));
+      const mm = /FY(\d{4})/.exec(r.fiscalYear || '');
+      if (mm) { const y = +mm[1]; if (!m.years.includes(y)) m.years.push(y); }
+    });
+    const codes = Object.keys(FY_MODEL).sort();
+    const sel = $('#fy_code'), prev = sel.value;
+    sel.innerHTML = codes.length
+      ? codes.map(c => `<option value="${c}">${c} · ${FY_MODEL[c].name}</option>`).join('')
+      : '<option value="">No tenants onboarded yet</option>';
+    if (prev && codes.includes(prev)) sel.value = prev;
+    onFyTenantChange();
+  }
+  function onFyTenantChange() {
+    const code = $('#fy_code').value, yearSel = $('#fy_year'), hint = $('#fyHint');
+    const m = FY_MODEL[code];
+    if (!m) { yearSel.innerHTML = ''; return; }
+    // Next openable year = one past the tenant's latest FY (fall back to the current FY if none).
+    const latest = m.years.length ? Math.max(...m.years) : fyBaseYear() - 1;
+    const next = latest + 1, opts = [];
+    for (let y = next; y <= next + 2; y++) opts.push(`<option value="${y}">${fyLabel(y)}</option>`);
+    yearSel.innerHTML = opts.join('');
+    const cur = m.years.length ? fyLabel(Math.max(...m.years)) : '—';
+    hint.textContent = `${code} abhi ${cur} tak open hai → agla: ${fyLabel(next)}. Nayi FY DB provision hogi; entitlements + billing balance carry-forward.`;
+  }
+  $('#fy_code').addEventListener('change', onFyTenantChange);
 
   // ---- Tenants ----
   async function loadTenants() {
@@ -278,10 +313,13 @@
     $('#tenantsBody').innerHTML = rows.length
       ? rows.map(r => `<tr><td><b>${r.code}</b></td><td>${r.name}</td><td>${r.fiscalYear || '—'}</td><td>${r.dbKind}</td><td><code>${r.dbName}</code></td></tr>`).join('')
       : '<tr><td colspan="5" class="muted">No tenants yet — onboard one.</td></tr>';
+    buildFyModel(rows);   // drive the dynamic year-shift form from the same live data
   }
   $('#reloadTenants').addEventListener('click', guard(loadTenants));
   $('#openFyBtn').addEventListener('click', guard(async () => {
-    const r = await api('POST', '/api/platform/fiscal-years/open', { tenantCode: $('#fy_code').value.trim(), fiscalYearStart: +$('#fy_year').value });
+    const code = $('#fy_code').value.trim();
+    if (!code) { toast('Select a tenant first', true); return; }
+    const r = await api('POST', '/api/platform/fiscal-years/open', { tenantCode: code, fiscalYearStart: +$('#fy_year').value });
     toast(`Opened ${r.fiscalYearCode} → ${r.dataDb}`); loadTenants();
   }));
   $('#decommBtn').addEventListener('click', guard(async () => {
